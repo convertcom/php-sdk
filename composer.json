@@ -1,0 +1,16 @@
+{
+    "name": "convert/php-sdk",
+    "description": "A PHP SDK enabling seamless integration with feature tests, feature flags, rollouts, and audience segmentation. This SDK provides experiment management, user bucketing, event tracking, and persistent storage options while adhering to modern PHP coding standards (PSR-compliant) and being compatible with PHP 7+",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Convert\\PhpSdk\\": "src/"
+        }
+    },
+    "minimum-stability": "stable",
+    "require": {
+        "psr/log": "^3.0",
+        "guzzlehttp/guzzle": "^7.9"
+    }
+}
