@@ -1,0 +1,41 @@
+<?php
+namespace ConvertSdk\Config;
+
+use ConvertSdk\Enums\LogLevel;
+use ConvertSdk\Utils\ObjectUtils;
+
+class Config
+{
+    /**
+     * Create and merge configuration settings.
+     *
+     * @param array $config Optional custom configuration.
+     * @return array The merged configuration.
+     */
+    public static function create(array $config = []): array
+    {
+        $defaultLoggerSettings = [
+            'logger' => [
+                'logLevel' => LogLevel::WARN,
+                'customLoggers' => []
+            ]
+        ];
+
+        $defaultEnvironmentSettings = [
+            'environment' => 'staging'
+        ];
+
+        // Retrieve the default configuration.
+        $defaultConfig = DefaultConfig::getDefault();
+
+        // Merge all configuration arrays deeply.
+        $configuration = ObjectUtils::objectDeepMerge(
+            $defaultLoggerSettings,
+            $defaultEnvironmentSettings,
+            $defaultConfig,
+            $config
+        );
+
+        return $configuration;
+    }
+}
