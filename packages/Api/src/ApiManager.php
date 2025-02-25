@@ -20,26 +20,27 @@ class ApiManager
     private const DEFAULT_TRACK_ENDPOINT  = null; // e.g. getenv('TRACK_ENDPOINT')
 
     // Properties
-    private $requestsQueue;
-    private $requestsQueueTimerID;
+    protected $requestsQueue;
+    protected $requestsQueueTimerID;
 
-    private $configEndpoint;
-    private $trackEndpoint;
+    protected $configEndpoint;
+    protected $trackEndpoint;
 
-    private $defaultHeaders;
-    private $data;
-    private $enrichData;
-    private $environment;
-    private $loggerManager;
-    private $eventManager;
-    private $sdkKey;
-    private $accountId;
-    private $projectId;
-    private $trackingEvent;
-    private $trackingEnabled;
-    private $trackingSource;
-    private $cacheLevel;
-    private $mapper;
+    protected $defaultHeaders;
+    protected $data;
+    protected $enrichData;
+    protected $environment;
+    protected $loggerManager;
+    protected $eventManager;
+    protected $sdkKey;
+    protected $accountId;
+    protected $projectId;
+    protected $trackingEvent;
+    protected $trackingEnabled;
+    protected $trackingSource;
+    protected $cacheLevel;
+    protected $mapper;
+    
 
     public $batchSize;
     public $releaseInterval;
@@ -155,7 +156,7 @@ class ApiManager
      * @param array $eventRequest
      * @param array|null $segments
      */
-    private function pushQueue(string $visitorId, array $eventRequest, ?array $segments = null): void
+    protected function pushQueue(string $visitorId, array $eventRequest, ?array $segments = null): void
     {
         $found = false;
         foreach ($this->requestsQueue['items'] as &$item) {
@@ -192,7 +193,7 @@ class ApiManager
      *
      * @return int
      */
-    private function getQueueLength(): int
+    protected function getQueueLength(): int
     {
         return $this->requestsQueue['length'];
     }
