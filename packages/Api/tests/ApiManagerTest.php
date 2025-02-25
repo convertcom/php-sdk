@@ -11,11 +11,6 @@ use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Utils\ObjectUtils;
 use GuzzleHttp\Promise\PromiseInterface;
 
-/**
- * Class ApiManagerTest
- *
- * Mimics the TypeScript tests for the API Manager.
- */
 final class ApiManagerTest extends TestCase
 {
     private string $host = 'http://localhost';
