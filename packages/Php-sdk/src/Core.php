@@ -1,4 +1,5 @@
 <?php
+
 namespace ConvertSdk;
 
 use GuzzleHttp\Promise\PromiseInterface;
@@ -7,12 +8,14 @@ use ConvertSdk\Enums\Messages;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Interfaces\CoreInterface;
+use ConvertSdk\Experience\ExperienceManager;
 
 class Core implements CoreInterface
 {
     protected $dataManager;       // DataManagerInterface
     protected $eventManager;      // EventManagerInterface
-    protected $loggerManager;     // ?LogManagerInterface
+    protected $experienceManager; // ExperienceManager
+    protected $loggerManager;     // LogManagerInterface
     protected $apiManager;        // ApiManagerInterface
     protected $config;            // Array holding configuration settings
     protected $promise;           // PromiseInterface resolving with config response data
@@ -31,17 +34,18 @@ class Core implements CoreInterface
      *      @type EventManagerInterface      $eventManager
      *      @type ApiManagerInterface        $apiManager
      *      @type LogManagerInterface|null   $loggerManager
+     *      @type ExperienceManager          $experienceManager
      * }
      */
     public function __construct(array $config, array $dependencies)
-
     {
         $this->initialized   = false;
         $this->environment   = $config['environment'] ?? '';
         $this->dataManager   = $dependencies['dataManager'];
         $this->eventManager  = $dependencies['eventManager'];
-        $this->apiManager        = $dependencies['apiManager'];
-        $this->loggerManager     = $dependencies['loggerManager'] ?? null;
+        $this->apiManager    = $dependencies['apiManager'];
+        $this->loggerManager = $dependencies['loggerManager'] ?? null;
+        $this->experienceManager = $dependencies['experienceManager']; // Initialize the ExperienceManager
 
         // Log constructor call if a logger is available.
         if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
@@ -63,7 +67,6 @@ class Core implements CoreInterface
         $this->config = $config;
 
         if (isset($config['sdkKey']) && !empty($config['sdkKey'])) {
-
             // If an SDK key is provided, fetch remote configuration.
             $this->fetchConfig();
         } elseif (isset($config['data'])) {
@@ -105,9 +108,7 @@ class Core implements CoreInterface
             $visitorId,
             [
                 'eventManager'      => $this->eventManager,
-                // 'experienceManager' => $this->experienceManager,
-                // 'featureManager'    => $this->featureManager,
-                // 'segmentsManager'   => $this->segmentsManager,
+                'experienceManager' => $this->experienceManager, // Pass ExperienceManager here
                 'apiManager'        => $this->apiManager,
                 'dataManager'       => $this->dataManager,
                 'loggerManager'     => $this->loggerManager
