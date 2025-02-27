@@ -1,36 +1,36 @@
 {
-    "name": "convertcom/php-sdk-logger",
-    "description": "PHP implementation of Convert SDK Logger package",
-    "type": "library",
-    "license": "Apache-2.0",
-    "version": "1.0.0",
-    "authors": [
-      {
-        "name": "Convert Insights, Inc"
-      }
-    ],
-    "autoload": {
-      "psr-4": {
-        "ConvertSdk\\Logger\\": "src/"
-      }
-    },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../Enums"
-        }
-    ],
-    "require": {
-      "php": ">=7.4",
-      "convertcom/php-sdk-enums": ">=1.0.0"
-    },
-    "require-dev": {
-      "phpunit/phpunit": "^9.0",
-      "squizlabs/php_codesniffer": "^3.6"
-    },
-    "scripts": {
-      "test": "phpunit"
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true
-  }
+  "name": "convertcom/php-sdk-logger",
+  "description": "PHP implementation of Convert SDK Logger package",
+  "type": "library",
+  "license": "Apache-2.0",
+  "version": "1.0.0",
+  "authors": [
+    {
+      "name": "Convert Insights, Inc"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "ConvertSdk\\": "src/"
+    }
+  },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../Enums"
+    }
+  ],
+  "require": {
+    "php": ">=7.4",
+    "convertcom/php-sdk-enums": ">=1.0.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.0",
+    "squizlabs/php_codesniffer": "^3.6"
+  },
+  "scripts": {
+    "test": "phpunit"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

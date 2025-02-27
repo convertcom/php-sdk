@@ -1,31 +1,36 @@
 <?php
-namespace ConvertSdk\Logger;
+/**
+ * Convert PHP SDK
+ * Version 1.0.0
+ * Copyright(c) 2020 Convert Insights, Inc
+ * License Apache-2.0
+ */
 
-use ConvertSdk\Enums\LogLevel;   
+namespace ConvertSdk;
+
+use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Enums\LogMethod;
+use ConvertSdk\Interfaces\LogClientInterface;
+use ConvertSdk\Interfaces\LogMethodMapInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
 
 /**
- * Class LogManager
+ * Provides logging logic for the PHP SDK.
  *
- * Provides logging logic.
+ * @category Modules
+ * @implements LogManagerInterface
  */
-class LogManager
+class LogManager implements LogManagerInterface
 {
     /**
-     * Default log level.
+     * @var array Array of log clients.
      */
-    private const DEFAULT_LOG_LEVEL = LogLevel::TRACE;
+    protected $_clients = [];
 
     /**
-     * @var array List of log clients.
-     * Each client is an associative array with keys: 'sdk', 'level', 'mapper'.
+     * @var array Default mapping for log methods.
      */
-    private $clients = [];
-
-    /**
-     * @var array Default method map.
-     */
-    private $defaultMapper = [
+    protected $_defaultMapper = [
         LogMethod::LOG   => LogMethod::LOG,
         LogMethod::DEBUG => LogMethod::DEBUG,
         LogMethod::INFO  => LogMethod::INFO,
@@ -35,97 +40,80 @@ class LogManager
     ];
 
     /**
-     * LogManager constructor.
-     *
-     * @param mixed $client A logging client (defaults to a simple console object).
-     * @param int $level Log level (default is DEFAULT_LOG_LEVEL).
-     * @param array|null $mapper Optional method map to override defaults.
+     * Default log level.
      */
-    public function __construct($client = null, int $level = self::DEFAULT_LOG_LEVEL, ?array $mapper = null)
+    protected const DEFAULT_LOG_LEVEL = LogLevel::TRACE;
+
+    /**
+     * Constructor.
+     *
+     * @param mixed $client A logging client (for example, an object with logging methods).
+     * @param int $level The log level.
+     * @param LogMethodMapInterface|null $mapper An optional custom method mapping.
+     */
+    public function __construct($client = null, int $level = self::DEFAULT_LOG_LEVEL, ?LogMethodMapInterface $mapper = null)
     {
-        $this->clients = [];
-        // If no client is provided, you might want to create a default client.
-        // For this example, if $client is null, we create a simple stub that uses PHP's error_log.
+        $this->_clients = [];
+
         if ($client === null) {
-            $client = new class {
-                public function log(...$args) {
-                    error_log(implode(" ", $args));
-                }
-                public function debug(...$args) {
-                    error_log(implode(" ", $args));
-                }
-                public function info(...$args) {
-                    error_log(implode(" ", $args));
-                }
-                public function warn(...$args) {
-                    error_log(implode(" ", $args));
-                }
-                public function error(...$args) {
-                    error_log(implode(" ", $args));
-                }
-                public function trace(...$args) {
-                    error_log(implode(" ", $args));
-                }
-            };
+            error_log('Invalid Client SDK\n');
+            return;
         }
         $this->addClient($client, $level, $mapper);
     }
 
     /**
-     * Check if provided log level is valid.
+     * Checks if the provided level is valid.
      *
      * @param mixed $level
      * @return bool
      */
-    private function isValidLevel($level): bool
+    private function _isValidLevel($level): bool
     {
-        $values = (new \ReflectionClass(\ConvertSdk\Enums\LogLevel::class))->getConstants();
+        $reflection = new \ReflectionClass(LogLevel::class);
+        $values = array_values($reflection->getConstants());
         return in_array($level, $values, true);
     }
+
     /**
-     * Check if provided method is valid.
+     * Checks if the provided method is valid.
      *
      * @param string $method
      * @return bool
      */
-    private function isValidMethod(string $method): bool
+    private function _isValidMethod(string $method): bool
     {
-        // Assume LogMethod::getValues() returns an array of valid methods.
-        return in_array($method, LogMethod::getValues(), true);
+        $reflection = new \ReflectionClass(LogMethod::class);
+        $values = array_values($reflection->getConstants());
+        return in_array($method, $values, true);
     }
 
     /**
-     * Internal method to log a message.
+     * Internal logging function.
      *
-     * @param string $method The log method name.
+     * @param string $method The log method key.
      * @param int $level The log level.
-     * @param mixed ...$args The arguments to log.
+     * @param mixed ...$args The log message arguments.
      * @return void
      */
     private function _log(string $method, int $level, ...$args): void
     {
-        foreach ($this->clients as $client) {
+        foreach ($this->_clients as $client) {
+            // Only log if the provided level is greater or equal to the client's level and level is not SILENT.
             if ($level >= $client['level'] && $level !== LogLevel::SILENT) {
-                $mappedMethod = $client['mapper'][$method] ?? null;
+                $mappedMethod = isset($client['mapper'][$method]) ? $client['mapper'][$method] : null;
                 if ($mappedMethod && method_exists($client['sdk'], $mappedMethod)) {
                     call_user_func_array([$client['sdk'], $mappedMethod], $args);
                 } else {
-                    // Fallback: log a message stating the method is missing.
-                    error_log("Info: Unable to find method \"{$method}()\" in client sdk: " . (is_object($client['sdk']) ? get_class($client['sdk']) : gettype($client['sdk'])));
-                    // Attempt to call the method directly if it exists.
-                    if (method_exists($client['sdk'], $method)) {
-                        call_user_func_array([$client['sdk'], $method], $args);
-                    } else {
-                        // As a last resort, just print to error_log.
-                        error_log(implode(" ", $args));
-                    }
+                    error_log("Info: Unable to find method \"{$method}()\" in client sdk: " . (is_object($client['sdk']) ? get_class($client['sdk']) : gettype($client['sdk'])) . "\n");
+                    error_log(implode(' ', array_map('strval', $args)) . "\n");
                 }
             }
         }
     }
 
     /**
-     * Log a message at the specified level.
+     * Logs a message with a specified level.
      *
      * @param int $level
      * @param mixed ...$args
@@ -133,15 +121,15 @@ class LogManager
      */
     public function log(int $level, ...$args): void
     {
-        if (!$this->isValidLevel($level)) {
-            error_log('Invalid Log Level');
+        if (!$this->_isValidLevel($level)) {
+            error_log('Invalid Log Level\n');
             return;
         }
         $this->_log(LogMethod::LOG, $level, ...$args);
     }
 
     /**
-     * Log a trace message.
+     * Logs a trace message.
      *
      * @param mixed ...$args
      * @return void
@@ -152,7 +140,7 @@ class LogManager
     }
 
     /**
-     * Log a debug message.
+     * Logs a debug message.
      *
      * @param mixed ...$args
      * @return void
@@ -163,7 +151,7 @@ class LogManager
     }
 
     /**
-     * Log an info message.
+     * Logs an info message.
      *
      * @param mixed ...$args
      * @return void
@@ -174,7 +162,7 @@ class LogManager
     }
 
     /**
-     * Log a warning message.
+     * Logs a warning message.
      *
      * @param mixed ...$args
      * @return void
@@ -185,7 +173,7 @@ class LogManager
     }
 
     /**
-     * Log an error message.
+     * Logs an error message.
      *
      * @param mixed ...$args
      * @return void
@@ -196,66 +184,73 @@ class LogManager
     }
 
     /**
-     * Add a logging client.
+     * Adds a client to the logger.
      *
      * @param mixed $client A logging client.
-     * @param int $level Log level.
-     * @param array|null $methodMap Optional method map.
+     * @param int|null $level The log level.
+     * @param LogMethodMapInterface|null $methodMap Optional custom method map.
      * @return void
      */
-    public function addClient($client, int $level = self::DEFAULT_LOG_LEVEL, ?array $methodMap = null): void
+    public function addClient($client = null, ?int $level = null, ?LogMethodMapInterface $methodMap = null): void
     {
         if (!$client) {
             error_log('Invalid Client SDK');
             return;
         }
-        if (!$this->isValidLevel($level)) {
-            error_log('Invalid Log Level');
+        // If no level is provided, use the default.
+        $level = $level ?? self::DEFAULT_LOG_LEVEL;
+        if (!$this->_isValidLevel($level)) {
+            error_log('Invalid Log Level\n');
             return;
         }
-        $mapper = $this->defaultMapper;
-        if ($methodMap && is_array($methodMap)) {
-            foreach (array_keys($methodMap) as $method) {
-                if ($this->isValidMethod($method)) {
-                    $mapper[$method] = $methodMap[$method];
+        // Start with the default mapper.
+        $mapper = $this->_defaultMapper;
+        if ($methodMap) {
+            // Override default mappings with provided mappings if the key is valid.
+            foreach ($methodMap as $key => $value) {
+                if ($this->_isValidMethod($key)) {
+                    $mapper[$key] = $value;
                 }
             }
         }
-        $this->clients[] = [
+        // Add the client info as an associative array.
+        $this->_clients[] = [
             'sdk'    => $client,
             'level'  => $level,
-            'mapper' => $mapper
+            'mapper' => $mapper,
         ];
     }
 
     /**
-     * Set the log level for a specific client or all clients.
+     * Sets the log level for a given client, or for all clients if none is specified.
      *
-     * @param int $level
-     * @param mixed|null $client Optional specific client.
+     * @param int $level The new log level.
+     * @param mixed|null $client The specific client to update.
      * @return void
      */
     public function setClientLevel(int $level, $client = null): void
     {
-        if (!$this->isValidLevel($level)) {
-            error_log('Invalid Log Level');
+        if (!$this->_isValidLevel($level)) {
+            error_log('Invalid Log Level\n');
             return;
         }
         if ($client !== null) {
             $found = false;
-            foreach ($this->clients as &$cl) {
-                if ($cl['sdk'] === $client) {
-                    $cl['level'] = $level;
+            foreach ($this->_clients as $index => $c) {
+                if ($c['sdk'] === $client) {
+                    $this->_clients[$index]['level'] = $level;
                     $found = true;
                     break;
                 }
             }
             if (!$found) {
-                error_log('Client SDK not found');
+                error_log('Client SDK not found\n');
+                return;
             }
         } else {
-            foreach ($this->clients as &$cl) {
-                $cl['level'] = $level;
+            // Update all clients.
+            foreach ($this->_clients as $index => $c) {
+                $this->_clients[$index]['level'] = $level;
             }
         }
     }
