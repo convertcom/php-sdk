@@ -1,148 +1,265 @@
 <?php
-namespace ConvertSdk\Api;
+/**
+ * Convert PHP SDK
+ * Version 1.0.0
+ * Copyright(c) 2020 Convert Insights, Inc
+ * License Apache-2.0
+ */
+
+namespace ConvertSdk;
 
 use GuzzleHttp\Promise\PromiseInterface;
-use GuzzleHttp\Promise\promise_for;
-use ConvertSdk\Utils\HttpClient;
-use ConvertSdk\Enums\Messages;
+use GuzzleHttp\Promise\Promise;
+use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Enums\SystemEvents;
-use ConvertSdk\Enums\ErrorMessages;
+use ConvertSdk\Logger\Interfaces\LogManagerInterface;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
+use ConvertSdk\Utils\HttpClient;
 use ConvertSdk\Utils\ObjectUtils;
 
-class ApiManager
+class ApiManager implements ApiManagerInterface
 {
-    // Constants
-    private const DEFAULT_HEADERS = ['Content-Type' => 'application/json'];
-    private const DEFAULT_BATCH_SIZE = 10;
-    private const DEFAULT_RELEASE_INTERVAL = 10000; // in milliseconds
-    // Default endpoints are taken from environment variables if not provided in config.
-    private const DEFAULT_CONFIG_ENDPOINT = null; // e.g. getenv('CONFIG_ENDPOINT')
-    private const DEFAULT_TRACK_ENDPOINT  = null; // e.g. getenv('TRACK_ENDPOINT')
+    /**
+     * @var object Requests queue with two properties: length and items.
+     */
+    private $_requestsQueue;
 
-    // Properties
-    protected $requestsQueue;
-    protected $requestsQueueTimerID;
+    /**
+     * @var mixed Timer identifier for queue release (simulation).
+     */
+    private $_requestsQueueTimerID;
 
-    protected $configEndpoint;
-    protected $trackEndpoint;
+    /**
+     * @var string Configuration endpoint.
+     */
+    private $_configEndpoint;
 
-    protected $defaultHeaders;
-    protected $data;
-    protected $enrichData;
-    protected $environment;
-    protected $loggerManager;
-    protected $eventManager;
-    protected $sdkKey;
-    protected $accountId;
-    protected $projectId;
-    protected $trackingEvent;
-    protected $trackingEnabled;
-    protected $trackingSource;
-    protected $cacheLevel;
-    protected $mapper;
-    
+    /**
+     * @var string Tracking endpoint.
+     */
+    private $_trackEndpoint;
 
+    /**
+     * @var array Default headers for requests.
+     */
+    private $_defaultHeaders = [
+        'Content-Type' => 'application/json'
+    ];
+
+    /**
+     * @var array|null Configuration response data.
+     */
+    private $_data;
+
+    /**
+     * @var bool Whether to enrich data.
+     */
+    private $_enrichData;
+
+    /**
+     * @var string|null Environment string.
+     */
+    private $_environment;
+
+    /**
+     * @var LogManagerInterface|null Logger manager.
+     */
+    private $_loggerManager;
+
+    /**
+     * @var EventManagerInterface|null Event manager.
+     */
+    private $_eventManager;
+
+    /**
+     * @var string SDK key.
+     */
+    private $_sdkKey;
+
+    /**
+     * @var string|null Account ID.
+     */
+    private $_accountId;
+
+    /**
+     * @var string|null Project ID.
+     */
+    private $_projectId;
+
+    /**
+     * @var array Tracking event payload.
+     */
+    private $_trackingEvent;
+
+    /**
+     * @var bool Whether tracking is enabled.
+     */
+    private $_trackingEnabled;
+
+    /**
+     * @var string Tracking source.
+     */
+    private $_trackingSource;
+
+    /**
+     * @var string|null Cache level.
+     */
+    private $_cacheLevel;
+
+    /**
+     * @var callable Mapper function.
+     */
+    private $_mapper;
+
+    /**
+     * @var int Batch size for events.
+     */
     public $batchSize;
+
+    /**
+     * @var int Release interval (milliseconds).
+     */
     public $releaseInterval;
 
     /**
-     * ApiManager constructor.
+     * Constructor.
      *
-     * @param array|null $config
-     * @param array $dependencies {
-     *     @type EventManagerInterface|null $eventManager
-     *     @type LogManagerInterface|null   $loggerManager
-     * }
+     * @param array|null $config Optional configuration array.
+     * @param array $dependencies Optional dependencies array.
+     *        Expected keys: 'eventManager' (EventManagerInterface), 'loggerManager' (LogManagerInterface)
      */
-    public function __construct(?array $config = null, array $dependencies = [])
+    public function __construct(?array $config = [], array $dependencies = [])
     {
-        $this->loggerManager = $dependencies['loggerManager'] ?? null;
-        $this->eventManager  = $dependencies['eventManager'] ?? null;
-        // Endpoints: prefer config values, fallback to environment variables.
-        $this->configEndpoint = $config['api']['endpoint']['config'] ?? getenv('DEFAULT_CONFIG_ENDPOINT');;
-        $this->trackEndpoint  = $config['api']['endpoint']['track']  ?? getenv('TRACK_ENDPOINT');
+        // Set dependencies.
+        $this->_loggerManager = $dependencies['loggerManager'] ?? null;
+        $this->_eventManager  = $dependencies['eventManager'] ?? null;
 
-        $this->defaultHeaders = self::DEFAULT_HEADERS;
+        // Define defaults (using environment variables if available).
+        $defaultConfigEndpoint = getenv('CONFIG_ENDPOINT') ?: '';
+        $defaultTrackEndpoint  = getenv('TRACK_ENDPOINT') ?: '';
 
-        // Retrieve deep value for data using our helper.
-        $this->data = ObjectUtils::objectDeepValue($config, 'data');
+        $this->_configEndpoint = isset($config['api']['endpoint']['config']) ? $config['api']['endpoint']['config'] : $defaultConfigEndpoint;
+        $this->_trackEndpoint  = isset($config['api']['endpoint']['track']) ? $config['api']['endpoint']['track'] : $defaultTrackEndpoint;
 
-        $this->enrichData = !ObjectUtils::objectDeepValue($config, 'dataStore');
-        $this->environment = $config['environment'] ?? null;
-        $this->mapper = $config['mapper'] ?? function ($value) {
-            return $value;
-        };
+        // Load configuration data.
+        $this->_data = ObjectUtils::objectDeepValue($config, 'data');
+        $this->_enrichData = !ObjectUtils::objectDeepValue($config, 'dataStore');
+        $this->_environment = $config['environment'] ?? null;
+        $this->_mapper = isset($config['mapper']) && is_callable($config['mapper'])
+            ? $config['mapper']
+            : function ($value) { return $value; };
 
-        $this->batchSize = isset($config['events']['batch_size']) ? (int)$config['events']['batch_size'] : self::DEFAULT_BATCH_SIZE;
-        $this->releaseInterval = isset($config['events']['release_interval']) ? (int)$config['events']['release_interval'] : self::DEFAULT_RELEASE_INTERVAL;
+        // Batch size and release interval.
+        $this->batchSize = isset($config['events']['batch_size']) ? (int)$config['events']['batch_size'] : 10;
+        $this->releaseInterval = isset($config['events']['release_interval']) ? (int)$config['events']['release_interval'] : 10000;
 
-        $this->accountId = $this->data['account_id'] ?? null;
-        $this->projectId = $this->data['project']['id'] ?? null;
-        $this->sdkKey = $config['sdkKey'] ?? ($this->accountId . '/' . $this->projectId);
+        // Set account, project, sdk key.
+        $this->_accountId = $this->_data['account_id'] ?? null;
+        $this->_projectId = $this->_data['project']['id'] ?? null;
+        $this->_sdkKey = $config['sdkKey'] ?? ($this->_accountId . '/' . $this->_projectId);
         if (isset($config['sdkKeySecret'])) {
-            // $this->defaultHeaders['Authorization'] = 'Bearer ' . $config['sdkKeySecret'];
+            $this->_defaultHeaders['Authorization'] = 'Bearer ' . $config['sdkKeySecret'];
         }
-
-        // Initialize tracking event object.
-        $this->trackingEvent = [
-            'enrichData' => $this->enrichData,
-            'accountId' => $this->accountId,
-            'projectId' => $this->projectId,
+        $this->_trackingEvent = [
+            'enrichData' => $this->_enrichData,
+            'accountId' => $this->_accountId,
+            'projectId' => $this->_projectId,
             'visitors' => []
         ];
+        $this->_trackingEnabled = $config['network']['tracking'] ?? false;
+        $this->_trackingSource = $config['network']['source'] ?? 'js-sdk';
+        $this->_cacheLevel = $config['network']['cacheLevel'] ?? null;
 
-        $this->trackingEnabled = $config['network']['tracking'] ?? false;
-        $this->trackingSource = $config['network']['source'] ?? 'js-sdk';
-        $this->cacheLevel = $config['network']['cacheLevel'] ?? null;
+        // Initialize requests queue as an object with items and length.
+        $this->_requestsQueue = new \stdClass();
+        $this->_requestsQueue->length = 0;
+        $this->_requestsQueue->items = [];
 
-        // Initialize requests queue as an associative array.
-        $this->requestsQueue = [
-            'length' => 0,
-            'items' => []
-        ];
+        // We'll implement a helper method below for pushing and resetting the queue.
     }
 
     /**
-     * Send a request to the API server.
+     * Helper: Push a new visitor event to the queue.
      *
-     * @param string $method
-     * @param array  $path    Array with keys 'base' and 'route'
-     * @param array  $data
-     * @param array  $headers
+     * @param string $visitorId
+     * @param mixed $eventRequest
+     * @param mixed $segments
+     * @return void
+     */
+    private function queuePush(string $visitorId, $eventRequest, $segments = null): void
+    {
+        // Check if a visitor with this visitorId already exists.
+        if (!isset($this->_requestsQueue->items[$visitorId])) {
+            // If not, create a new entry for this visitor.
+            $this->_requestsQueue->items[$visitorId] = [
+                'visitorId' => $visitorId,
+                'events'    => []
+            ];
+            if ($segments !== null) {
+                $this->_requestsQueue->items[$visitorId]['segments'] = $segments;
+            }
+        }
+        // Append the event request to the visitor's events.
+        $this->_requestsQueue->items[$visitorId]['events'][] = $eventRequest;
+        // Optionally, update length as the count of visitors (or recalc total events if needed)
+        $this->_requestsQueue->length = count($this->_requestsQueue->items);
+    }
+
+    /**
+     * Helper: Reset the requests queue.
+     *
+     * @return void
+     */
+    private function queueReset(): void
+    {
+        $this->_requestsQueue->items = [];
+        $this->_requestsQueue->length = 0;
+    }
+
+    /**
+     * Send request to API server.
+     *
+     * @param string $method HTTP method (e.g. 'GET', 'POST')
+     * @param mixed $path An array with keys 'base' and 'route'
+     * @param array $data Request data.
+     * @param array $headers Request headers.
      * @return PromiseInterface
      */
-    public function request(string $method, array $path, array $data = [], array $headers = []): PromiseInterface
+    public function request(string $method, $path, array $data = [], array $headers = []): PromiseInterface
     {
-        $requestHeaders = array_merge($this->defaultHeaders, $headers);
+        $requestHeaders = array_merge($this->_defaultHeaders, $headers);
         $requestConfig = [
-            'method' => $method,
-            'path' => $path['route'],
-            'baseURL' => $path['base'],
-            'headers' => $requestHeaders,
-            'data' => $data,
+            'method' => $method, // e.g., 'GET'
+            'path'   => $path['route'] ?? '',
+            'baseURL'=> $path['base'] ?? '',
+            'headers'=> $requestHeaders,
+            'data'   => $data,
             'responseType' => 'json'
         ];
         return HttpClient::request($requestConfig);
     }
 
     /**
-     * Enqueue a tracking event request.
+     * Add a request to the queue.
      *
      * @param string $visitorId
-     * @param array  $eventRequest
-     * @param array|null $segments
+     * @param mixed $eventRequest (VisitorTrackingEvents)
+     * @param mixed|null $segments (VisitorSegments)
+     * @return void
      */
-    public function enqueue(string $visitorId, array $eventRequest, ?array $segments = null): void
+    public function enqueue(string $visitorId, $eventRequest, $segments = null): void
     {
-        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-            $this->loggerManager->trace('ApiManager.enqueue()', call_user_func($this->mapper, ['eventRequest' => $eventRequest]));
+        if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'trace')) {
+            $this->_loggerManager->trace('ApiManager.enqueue()', call_user_func($this->_mapper, [
+                'eventRequest' => $eventRequest
+            ]));
         }
-        $this->pushQueue($visitorId, $eventRequest, $segments);
-        if ($this->trackingEnabled) {
-            if ($this->getQueueLength() === $this->batchSize) {
+        $this->queuePush($visitorId, $eventRequest, $segments);
+        if ($this->_trackingEnabled) {
+            if ($this->_requestsQueue->length === $this->batchSize) {
                 $this->releaseQueue('size');
             } else {
-                if ($this->getQueueLength() === 1) {
+                if ($this->_requestsQueue->length === 1) {
                     $this->startQueue();
                 }
             }
@@ -150,190 +267,148 @@ class ApiManager
     }
 
     /**
-     * Push a new event into the queue.
-     *
-     * @param string $visitorId
-     * @param array $eventRequest
-     * @param array|null $segments
-     */
-    protected function pushQueue(string $visitorId, array $eventRequest, ?array $segments = null): void
-    {
-        $found = false;
-        foreach ($this->requestsQueue['items'] as &$item) {
-            if ($item['visitorId'] === $visitorId) {
-                $item['events'][] = $eventRequest;
-                $found = true;
-                break;
-            }
-        }
-        if (!$found) {
-            $visitor = [
-                'visitorId' => $visitorId,
-                'events' => [$eventRequest]
-            ];
-            if ($segments !== null) {
-                $visitor['segments'] = $segments;
-            }
-            $this->requestsQueue['items'][] = $visitor;
-        }
-        $this->requestsQueue['length']++;
-    }
-
-    /**
-     * Reset the requests queue.
-     */
-    private function resetQueue(): void
-    {
-        $this->requestsQueue['items'] = [];
-        $this->requestsQueue['length'] = 0;
-    }
-
-    /**
-     * Get the current length of the queue.
-     *
-     * @return int
-     */
-    protected function getQueueLength(): int
-    {
-        return $this->requestsQueue['length'];
-    }
-
-    /**
      * Release the queue to the server.
      *
-     * @param string|null $reason
-     * @return PromiseInterface|null
+     * @param string|null $reason Optional reason.
+     * @return PromiseInterface
      */
-    public function releaseQueue(?string $reason = null): ?PromiseInterface
+    public function releaseQueue(string $reason = null): PromiseInterface
     {
-        if ($this->getQueueLength() === 0) {
-            return promise_for(null);
+        if (!$this->_requestsQueue->length) {
+            return new \GuzzleHttp\Promise\FulfilledPromise(null);
         }
-        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'info')) {
-            $this->loggerManager->info('ApiManager.releaseQueue()', Messages::RELEASING_QUEUE);
+        if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'info')) {
+            $this->_loggerManager->info('ApiManager.releaseQueue()', \ConvertSdk\Enums\Messages::RELEASING_QUEUE);
         }
-        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-            $this->loggerManager->trace('ApiManager.releaseQueue()', ['reason' => $reason ?? '']);
+        if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'trace')) {
+            $this->_loggerManager->trace('ApiManager.releaseQueue()', ['reason' => $reason ?? '']);
         }
         $this->stopQueue();
-
-        $payload = $this->trackingEvent;
-        // Copy queue items to payload's visitors
-        $payload['visitors'] = $this->requestsQueue['items'];
-        $payload['source'] = $this->trackingSource;
-
-        // Build the tracking path.
-        $trackEndpoint = str_replace('[project_id]', (string)$this->projectId, $this->trackEndpoint);
+        $payload = $this->_trackingEvent;
+        // Clone visitors from queue.
+        $payload['visitors'] = $this->_requestsQueue->items;
+        $payload['source'] = $this->_trackingSource;
+        // Build URL by replacing [project_id] placeholder.
+        $base = str_replace('[project_id]', strval($this->_projectId), $this->_trackEndpoint);
         $path = [
-            'base' => $trackEndpoint,
-            'route' => '/track/' . $this->sdkKey
+            'base' => $base,
+            'route' => "/track/{$this->_sdkKey}"
         ];
-
-        return $this->request('post', $path, call_user_func($this->mapper, $payload))
-            ->then(function ($result) use ($reason, $payload) {
-                $this->resetQueue();
-                if ($this->eventManager !== null && method_exists($this->eventManager, 'fire')) {
-                    $this->eventManager->fire(SystemEvents::API_QUEUE_RELEASED, [
+        // Return a promise from the request.
+        return $this->request('post', $path, call_user_func($this->_mapper, $payload))
+            ->then(function ($result) use ($reason) {
+                $this->queueReset();
+                if ($this->_eventManager !== null && method_exists($this->_eventManager, 'fire')) {
+                    $this->_eventManager->fire(SystemEvents::API_QUEUE_RELEASED, [
                         'reason' => $reason,
                         'result' => $result,
-                        'visitors' => $payload['visitors']
+                        'visitors' => $this->_trackingEvent['visitors'] ?? []
                     ]);
                 }
-            })->otherwise(function ($error) use ($reason) {
-                if ($this->loggerManager !== null && method_exists($this->loggerManager, 'error')) {
-                    $this->loggerManager->error('ApiManager.releaseQueue()', ['error' => $error->getMessage()]);
+            })
+            ->otherwise(function ($error) use ($reason) {
+                if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'error')) {
+                    $this->_loggerManager->error('ApiManager.releaseQueue()', ['error' => $error->getMessage()]);
                 }
                 $this->startQueue();
-                if ($this->eventManager !== null && method_exists($this->eventManager, 'fire')) {
-                    $this->eventManager->fire(SystemEvents::API_QUEUE_RELEASED, ['reason' => $reason], $error);
+                if ($this->_eventManager !== null && method_exists($this->_eventManager, 'fire')) {
+                    $this->_eventManager->fire(SystemEvents::API_QUEUE_RELEASED, ['reason' => $reason], $error);
                 }
             });
     }
 
     /**
      * Stop the queue timer.
+     *
+     * @return void
      */
     public function stopQueue(): void
     {
-        if ($this->requestsQueueTimerID) {
-            // Cancel timer logic – depends on your event loop or timer library.
-            $this->requestsQueueTimerID = null;
-        }
+        // In PHP we don't have clearTimeout; simply set timer id to null.
+        $this->_requestsQueueTimerID = null;
     }
 
     /**
      * Start the queue timer.
      *
-     * In a production environment, integrate with a proper event loop.
-     * Here, we simulate a delay using sleep.
+     * @return void
      */
     public function startQueue(): void
     {
-        $this->requestsQueueTimerID = null;
-        // Blocking sleep simulation (convert milliseconds to seconds)
-        sleep($this->releaseInterval / 1000);
-        $this->releaseQueue('timeout');
+        // Simulate asynchronous behavior: we create a promise that waits.
+        $this->_requestsQueueTimerID = true; // just a flag
+        // Using a promise to simulate delay.
+        (new Promise(function () use (&$promise) {
+            sleep($this->releaseInterval / 1000); // convert ms to seconds
+            $this->releaseQueue('timeout')->then(function () use (&$promise) {
+                $promise->resolve(null);
+            });
+        }))->wait();
     }
 
     /**
      * Enable tracking.
+     *
+     * @return void
      */
     public function enableTracking(): void
     {
-        $this->trackingEnabled = true;
+        $this->_trackingEnabled = true;
         $this->releaseQueue('trackingEnabled');
     }
 
     /**
      * Disable tracking.
+     *
+     * @return void
      */
     public function disableTracking(): void
     {
-        $this->trackingEnabled = false;
+        $this->_trackingEnabled = false;
     }
 
     /**
-     * Set configuration data.
+     * Set data.
      *
-     * @param array $data
+     * @param array $data ConfigResponseData.
+     * @return void
      */
-    public function setData(array $data): void
+    public function setData($data): void
     {
-        $this->data = $data;
-        $this->accountId = $data['account_id'] ?? null;
-        $this->projectId = $data['project']['id'] ?? null;
-        $this->trackingEvent['accountId'] = $this->accountId;
-        $this->trackingEvent['projectId'] = $this->projectId;
+        $this->_data = $data;
+        $this->_accountId = $data['account_id'] ?? null;
+        $this->_projectId = $data['project']['id'] ?? null;
+        $this->_trackingEvent['accountId'] = $this->_accountId;
+        $this->_trackingEvent['projectId'] = $this->_projectId;
     }
 
     /**
-     * Get configuration data from the server.
+     * Get configuration data.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface Promise resolving to ConfigResponseData.
      */
     public function getConfig(): PromiseInterface
     {
-        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-            $this->loggerManager->trace('ApiManager.getConfig()');
+        if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'trace')) {
+            $this->_loggerManager->trace('ApiManager.getConfig()');
         }
-        $query = '';
-        // if ($this->cacheLevel === 'low' || $this->environment) {
-        //     $query = '?';
-        // }
-        // if ($this->environment) {
-        //     $query .= 'environment=' . $this->environment;
-        // }
-        if ($this->cacheLevel === 'low') {
-            $query .= '_conv_low_cache=1';
+        $query = ($this->_cacheLevel === 'low' || $this->_environment) ? '?' : '';
+        if ($this->_environment) {
+            $query .= "environment=" . $this->_environment;
         }
-        $path = [
-            'base' => $this->configEndpoint,
-            'route' => '/config/' . $this->sdkKey . $query
-        ];
-        
-        return $this->request('get', $path)
-            ->then(function ($response) {
-                return $response['data'];
+        if ($this->_cacheLevel === 'low') {
+            $query .= "_conv_low_cache=1";
+        }
+        $promise = new Promise(function () use (&$promise, $query) {
+            $this->request('get', [
+                'base' => $this->_configEndpoint,
+                'route' => "/config/{$this->_sdkKey}{$query}"
+            ])->then(function ($response) use (&$promise) {
+                $promise->resolve($response['data']);
+            })->catch(function ($error) use (&$promise) {
+                $promise->reject($error);
             });
+        });
+        return $promise;
     }
 }

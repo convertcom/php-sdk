@@ -11,7 +11,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "ConvertSdk\\Api\\": "src/"
+            "ConvertSdk\\": "src/"
         }
     },
     "repositories": [
@@ -35,6 +35,7 @@
     "require": {
         "php": ">=7.4",
         "guzzlehttp/promises": "^1.5",
+        "guzzlehttp/guzzle": "^7.0",
         "convertcom/php-sdk-enums": ">=1.0.0",
         "convertcom/php-sdk-event": ">=1.0.0",
         "convertcom/php-sdk-utils": ">=1.0.0"

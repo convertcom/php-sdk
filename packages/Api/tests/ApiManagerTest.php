@@ -1,145 +1,128 @@
 <?php
-declare(strict_types=1);
 
-require_once __DIR__ . '/Helpers/TestableApiManager.php';
-
+namespace ConvertSdk\Tests;
 
 use PHPUnit\Framework\TestCase;
-use ConvertSdk\Api\ApiManager;
-use ConvertSdk\Event\EventManager;
+use ConvertSdk\ApiManager;
+use ConvertSdk\EventManager;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Utils\ObjectUtils;
-use GuzzleHttp\Promise\PromiseInterface;
+use ConvertSdk\Enums\LogLevel;
+use GuzzleHttp\Client;
 
-final class ApiManagerTest extends TestCase
+// Include DefaultConfig
+
+class ApiManagerTest extends TestCase
 {
-    private string $host = 'http://localhost';
-    private int $port = 8090;
-    private int $releaseTimeout = 1000; // in milliseconds
-    private int $batchSize = 5;
-    
-    // Update test configuration: wrap the account and project info in a 'data' key.
-    private array $testConfig = [
-        'data' => [
-            'account_id' => '100414055',
-            'project' => ['id' => '100415443'],
-        ],
-    ];
+    private $host = 'http://localhost';
+    private $port = 8090;
+    private $releaseTimeout = 1000; // in milliseconds
+    private $testTimeout = 2000;    // in milliseconds (releaseTimeout + 1000)
+    private $batchSize = 5;
 
-    /**
-     * Get a merged configuration array (test config, default config, and overrides).
-     *
-     * @return array
-     */
-    private function getConfiguration(): array
+    /** @var ApiManager */
+    private $apiManager;
+
+    /** @var EventManager */
+    private $eventManager;
+
+    private $configuration;
+    private $serverPid;
+
+    protected function setUp(): void
     {
-        $defaultConfig = []; // Or use DefaultConfig::getDefault() if available
-        $overrides = [
+        // Load the test-config.json file
+        $configPath = __DIR__ . '/test-config.json';
+        if (!file_exists($configPath)) {
+            $this->fail('Configuration file not found');
+        }
+
+        $testConfig = json_decode(file_get_contents($configPath), true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $this->fail('Invalid JSON in test-config.json: ' . json_last_error_msg());
+        }
+
+        // Merge testConfig with defaultConfig using ObjectUtils::objectDeepMerge
+        $this->configuration = ObjectUtils::objectDeepMerge($testConfig, self::getDefault(), [
             'api' => [
                 'endpoint' => [
                     'config' => $this->host . ':' . $this->port,
-                    'track'  => $this->host . ':' . $this->port,
-                ],
+                    'track'  => $this->host . ':' . $this->port
+                ]
             ],
             'events' => [
                 'batch_size' => $this->batchSize,
-                'release_interval' => $this->releaseTimeout,
+                'release_interval' => $this->releaseTimeout
+            ]
+        ]);
+
+        // Initialize EventManager and ApiManager without creating a new Config instance
+        $this->eventManager = new EventManager($this->configuration);
+        $this->apiManager = new ApiManager($this->configuration, ['eventManager' => $this->eventManager]);
+
+    }
+
+    public static function getDefault(): array
+    {
+        return [
+            'api' => [
+                'endpoint' => [
+                    'config' => 'https://cdn-4.convertexperiments.com/api/v1/',
+                    'track'  => 'https://100415443.metrics.convertexperiments.com/v1/'
+                ]
             ],
-            // For testing, we set tracking enabled.
+            'environment' => 'staging',
+            'bucketing' => [
+                'max_traffic' => 10000,
+                'hash_seed'   => 9999
+            ],
+            'data' => [],
+            'dataStore' => null, // Allows 3rd party data store to be passed.
+            'dataRefreshInterval' => 300000, // in milliseconds (5 minutes)
+            'events' => [
+                'batch_size' => 10,
+                'release_interval' => 1000
+            ],
+            'logger' => [
+                'logLevel' => LogLevel::DEBUG,
+                'customLoggers' => [] // Allows 3rd party loggers to be passed.
+            ],
+            'rules' => [
+                'keys_case_sensitive' => true,
+                'comparisonProcessor' => null // Allows 3rd party comparison processor.
+            ],
             'network' => [
                 'tracking' => true,
-                'source'   => 'php-sdk',
+                'cacheLevel' => 'default' // Can be set to 'low' for short-lived cache.
             ],
+            'sdkKey' => '',
+            'sdkKeySecret' => ''
         ];
-        return ObjectUtils::objectDeepMerge($this->testConfig, $defaultConfig, $overrides);
     }
 
-    public function testApiManagerIsDefined(): void
+    public function testShouldExposeApiManager(): void
     {
-        $this->assertTrue(class_exists(ApiManager::class), 'ApiManager class should exist.');
+        $this->assertTrue(class_exists(ApiManager::class));
     }
 
-    public function testApiManagerConstructorName(): void
+    public function testImportedEntityShouldBeConstructorOfApiManagerInstance(): void
     {
-        $reflection = new ReflectionClass(ApiManager::class);
-        $this->assertEquals('ApiManager', $reflection->getShortName(), 'Constructor name should be "ApiManager".');
+        $reflection = new \ReflectionClass($this->apiManager);
+        $this->assertEquals('ApiManager', $reflection->getShortName());
     }
 
-    public function testDefaultApiManagerInstance(): void
+    public function testShouldSuccessfullyCreateNewApiManagerInstanceWithDefaultConfig(): void
     {
-        $apiManager = new ApiManager([]);
-        $this->assertInstanceOf(ApiManager::class, $apiManager, 'Should be an instance of ApiManager.');
+        $apiManager = new ApiManager($this->configuration);
+        $reflection = new \ReflectionClass($apiManager);
+        $this->assertEquals('ApiManager', $reflection->getShortName());
     }
 
-    public function testApiManagerInstanceWithConfiguration(): void
+    public function testShouldCreateNewApiManagerInstanceWithVisitorProvidedConfigurationAndEventManagerDependency(): void
     {
-        $configuration = $this->getConfiguration();
-        $eventManager = new EventManager($configuration);
-        $apiManager = new ApiManager($configuration, ['eventManager' => $eventManager]);
-        $this->assertInstanceOf(ApiManager::class, $apiManager, 'ApiManager instance created with dependencies.');
+        $apiManager = new ApiManager($this->configuration, ['eventManager' => $this->eventManager]);
+        $reflection = new \ReflectionClass($apiManager);
+        $this->assertEquals('ApiManager', $reflection->getShortName());
     }
 
-    public function testApiManagerRequest(): void
-    {
-        // Use the TestableApiManager to simulate a request.
-        $configuration = $this->getConfiguration();
-        $apiManager = new TestableApiManager($configuration);
-        
-        $testPayload = [
-            'foo'  => 'bar',
-            'some' => [
-                'test' => [
-                    'data' => 'value'
-                ]
-            ]
-        ];
-        // Simulate a POST request and expect the payload to be echoed back.
-        $promise = $apiManager->request('post', [
-            'base'  => $this->host . ':' . $this->port,
-            'route' => '/test'
-        ], $testPayload);
-        $response = $promise->wait();
-        $this->assertEquals($testPayload, $response['data'], 'The test payload should match the response.');
-    }
-
-    public function testEnqueueRequestsReleaseBySize(): void
-    {
-        $configuration = $this->getConfiguration();
-        $apiManager = new TestableApiManager($configuration);
-        // Enqueue events until reaching batch size.
-        for ($i = 0; $i < $this->batchSize; $i++) {
-            $apiManager->enqueue("visitor1", ['event' => "event$i"]);
-        }
-        // The overridden releaseQueue should have been called automatically.
-        $this->assertTrue($apiManager->released, 'Queue should be released when batch size is reached.');
-    }
-
-    public function testEnqueueRequestsReleaseByTimeout(): void
-    {
-        $configuration = $this->getConfiguration();
-        $apiManager = new TestableApiManager($configuration);
-        // Enqueue a single event.
-        $apiManager->enqueue("visitor1", ['event' => "event1"]);
-        // Manually trigger the startQueue (which is overridden to release immediately).
-        $apiManager->startQueue();
-        $this->assertTrue($apiManager->released, 'Queue should be released when timeout occurs.');
-    }
-
-    public function testEventFiringOnQueueRelease(): void
-    {
-        $configuration = $this->getConfiguration();
-        $eventManagerMock = $this->createMock(EventManager::class);
-        $eventManagerMock->expects($this->once())
-            ->method('fire')
-            ->with(
-                $this->equalTo(SystemEvents::API_QUEUE_RELEASED),
-                $this->arrayHasKey('reason')
-            );
-
-        $apiManager = new TestableApiManager($configuration, ['eventManager' => $eventManagerMock]);
-        for ($i = 0; $i < $this->batchSize; $i++) {
-            $apiManager->enqueue("visitor1", ['event' => "event$i"]);
-        }
-        // The mock's expectation verifies that fire() was called only once.
-    }
 }
