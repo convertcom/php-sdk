@@ -11,6 +11,8 @@ use ConvertSdk\Config\Config;
 use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\Experience\ExperienceManager;
+use Monolog\Logger;
+use Monolog\Handler\StreamHandler;
 
 class ConvertSDK extends Core {
     public $dataManager;
@@ -29,8 +31,31 @@ class ConvertSDK extends Core {
             $configuration['network']['source'] = getenv('VERSION') ?: 'php-sdk';
         }
 
-        // Initialize LogManager
-        $this->loggerManager = new LogManager(null, $configuration['logger']['logLevel'], $configuration['logger']['customLoggers'] ?? []);
+        // Create a Monolog logger instance.
+        $monolog = new Logger('convert');
+        // Configure Monolog to log to STDOUT at DEBUG level.
+        $monolog->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
+
+        // Initialize LogManager with the Monolog logger and provided log level.
+        $this->loggerManager = new LogManager($monolog, $configuration['logger']['logLevel']);
+
+        // Iterate over custom loggers (if any) and add them to LogManager.
+        if (isset($configuration['logger']['customLoggers']) && is_array($configuration['logger']['customLoggers'])) {
+            foreach ($configuration['logger']['customLoggers'] as $customLogger) {
+                if (isset($customLogger['logger']) && isset($customLogger['logLevel'])) {
+                    $this->loggerManager->addClient(
+                        $customLogger['logger'],
+                        $customLogger['logLevel'],
+                        $customLogger['methodsMap'] ?? []
+                    );
+                } else {
+                    $this->loggerManager->addClient(
+                        $customLogger,
+                        $configuration['logger']['logLevel']
+                    );
+                }
+            }
+        }
 
         // Initialize EventManager
         $this->eventManager = new EventManager($configuration, ['loggerManager' => $this->loggerManager]);
@@ -55,10 +80,10 @@ class ConvertSDK extends Core {
 
         // Call parent constructor
         parent::__construct($configuration, [
-            'dataManager'   => $this->dataManager,
-            'eventManager'  => $this->eventManager,
-            'apiManager'    => $this->apiManager,
-            'loggerManager' => $this->loggerManager,
+            'dataManager'       => $this->dataManager,
+            'eventManager'      => $this->eventManager,
+            'apiManager'        => $this->apiManager,
+            'loggerManager'     => $this->loggerManager,
             'experienceManager' => $this->experienceManager // Add ExperienceManager to parent
         ]);
     }

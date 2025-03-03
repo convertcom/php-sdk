@@ -11,7 +11,7 @@
     ],
     "autoload": {
       "psr-4": {
-        "ConvertSdk\\Event\\": "src/"
+        "ConvertSdk\\": "src/"
       }
     },
     "repositories": {
@@ -37,7 +37,7 @@
       "friendsofphp/php-cs-fixer": "^3.30"
     },
     "scripts": {
-      "test": "phpunit --coverage-text",
+      "test": "phpunit",
       "lint": "phpcs",
       "lint:fix": "phpcbf",
       "phpstan": "phpstan analyse src --level=max"

@@ -13,13 +13,8 @@ use ConvertSdk\Enums\LogMethod;
 use ConvertSdk\Interfaces\LogClientInterface;
 use ConvertSdk\Interfaces\LogMethodMapInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
+use Psr\Log\LoggerInterface;
 
-/**
- * Provides logging logic for the PHP SDK.
- *
- * @category Modules
- * @implements LogManagerInterface
- */
 class LogManager implements LogManagerInterface
 {
     /**
@@ -40,6 +35,18 @@ class LogManager implements LogManagerInterface
     ];
 
     /**
+     * Default mapping for PSR-3 loggers (e.g. Monolog).
+     */
+    protected $_monologMapping = [
+        LogMethod::LOG   => 'info',
+        LogMethod::DEBUG => 'debug',
+        LogMethod::INFO  => 'info',
+        LogMethod::WARN  => 'warning',
+        LogMethod::ERROR => 'error',
+        LogMethod::TRACE => 'debug'  // Use 'debug' for TRACE since Monolog doesn't have trace.
+    ];
+
+    /**
      * Default log level.
      */
     protected const DEFAULT_LOG_LEVEL = LogLevel::TRACE;
@@ -47,19 +54,28 @@ class LogManager implements LogManagerInterface
     /**
      * Constructor.
      *
-     * @param mixed $client A logging client (for example, an object with logging methods).
+     * @param mixed $client A logging client (for example, an object with logging methods or a PSR-3 logger).
      * @param int $level The log level.
      * @param LogMethodMapInterface|null $mapper An optional custom method mapping.
      */
     public function __construct($client = null, int $level = self::DEFAULT_LOG_LEVEL, ?LogMethodMapInterface $mapper = null)
     {
         $this->_clients = [];
-
         if ($client === null) {
-            error_log('Invalid Client SDK\n');
+            error_log('Invalid Client SDK' . "\n");
             return;
         }
         $this->addClient($client, $level, $mapper);
+    }
+
+    /**
+     * Clears all registered log clients.
+     *
+     * @return void
+     */
+    public function clearClients(): void
+    {
+        $this->_clients = [];
     }
 
     /**
@@ -99,13 +115,20 @@ class LogManager implements LogManagerInterface
     private function _log(string $method, int $level, ...$args): void
     {
         foreach ($this->_clients as $client) {
-            // Only log if the provided level is greater or equal to the client's level and level is not SILENT.
             if ($level >= $client['level'] && $level !== LogLevel::SILENT) {
                 $mappedMethod = isset($client['mapper'][$method]) ? $client['mapper'][$method] : null;
                 if ($mappedMethod && method_exists($client['sdk'], $mappedMethod)) {
-                    call_user_func_array([$client['sdk'], $mappedMethod], $args);
+                    if ($client['sdk'] instanceof \Psr\Log\LoggerInterface) {
+                        // Concatenate all arguments into one message
+                        $message = implode(' ', array_map('strval', $args));
+                        // Call the PSR-3 method with an empty context array
+                        $client['sdk']->$mappedMethod($message, []);
+                    } else {
+                        call_user_func_array([$client['sdk'], $mappedMethod], $args);
+                    }
                 } else {
-                    error_log("Info: Unable to find method \"{$method}()\" in client sdk: " . (is_object($client['sdk']) ? get_class($client['sdk']) : gettype($client['sdk'])) . "\n");
+                    error_log("Info: Unable to find method \"{$method}()\" in client sdk: " .
+                        (is_object($client['sdk']) ? $this->classBasename($client['sdk']) : gettype($client['sdk'])) . "\n");
                     error_log(implode(' ', array_map('strval', $args)) . "\n");
                 }
             }
@@ -122,7 +145,7 @@ class LogManager implements LogManagerInterface
     public function log(int $level, ...$args): void
     {
         if (!$this->_isValidLevel($level)) {
-            error_log('Invalid Log Level\n');
+            error_log('Invalid Log Level' . "\n");
             return;
         }
         $this->_log(LogMethod::LOG, $level, ...$args);
@@ -184,36 +207,48 @@ class LogManager implements LogManagerInterface
     }
 
     /**
+     * Helper method to get only the base name of a class.
+     *
+     * @param object|string $objectOrClass
+     * @return string
+     */
+    protected function classBasename($objectOrClass): string
+    {
+        $class = is_object($objectOrClass) ? get_class($objectOrClass) : $objectOrClass;
+        return substr(strrchr($class, "\\"), 1) ?: $class;
+    }
+
+    /**
      * Adds a client to the logger.
      *
      * @param mixed $client A logging client.
      * @param int|null $level The log level.
-     * @param LogMethodMapInterface|null $methodMap Optional custom method map.
+     * @param LogMethodMapInterface|null $methodMap Optional custom method mapping.
      * @return void
      */
     public function addClient($client = null, ?int $level = null, ?LogMethodMapInterface $methodMap = null): void
     {
         if (!$client) {
-            error_log('Invalid Client SDK');
+            error_log('Invalid Client SDK' . "\n");
             return;
         }
-        // If no level is provided, use the default.
         $level = $level ?? self::DEFAULT_LOG_LEVEL;
         if (!$this->_isValidLevel($level)) {
-            error_log('Invalid Log Level\n');
+            error_log('Invalid Log Level' . "\n");
             return;
         }
-        // Start with the default mapper.
-        $mapper = $this->_defaultMapper;
+        if ($client instanceof LoggerInterface) {
+            $mapper = $this->_monologMapping;
+        } else {
+            $mapper = $this->_defaultMapper;
+        }
         if ($methodMap) {
-            // Override default mappings with provided mappings if the key is valid.
             foreach ($methodMap as $key => $value) {
                 if ($this->_isValidMethod($key)) {
                     $mapper[$key] = $value;
                 }
             }
         }
-        // Add the client info as an associative array.
         $this->_clients[] = [
             'sdk'    => $client,
             'level'  => $level,
@@ -231,7 +266,7 @@ class LogManager implements LogManagerInterface
     public function setClientLevel(int $level, $client = null): void
     {
         if (!$this->_isValidLevel($level)) {
-            error_log('Invalid Log Level\n');
+            error_log('Invalid Log Level' . "\n");
             return;
         }
         if ($client !== null) {
@@ -244,11 +279,10 @@ class LogManager implements LogManagerInterface
                 }
             }
             if (!$found) {
-                error_log('Client SDK not found\n');
+                error_log('Client SDK not found' . "\n");
                 return;
             }
         } else {
-            // Update all clients.
             foreach ($this->_clients as $index => $c) {
                 $this->_clients[$index]['level'] = $level;
             }

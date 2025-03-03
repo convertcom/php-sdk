@@ -1,47 +1,54 @@
 <?php
-namespace ConvertSdk\Event;
-
 /**
- * Class EventManager
- *
- * Provides an event wrapper.
+ * Convert PHP SDK
+ * Version 1.0.0
+ * Copyright(c) 2020 Convert Insights, Inc
+ * License Apache-2.0
  */
-class EventManager
+
+namespace ConvertSdk;
+
+use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Logger\Interfaces\LogManagerInterface;
+
+
+class EventManager implements EventManagerInterface
 {
     /**
-     * @var mixed|null Optional logger manager instance.
+     * @var array Listeners indexed by event name.
      */
-    private $loggerManager;
+    private $_listeners = [];
 
     /**
-     * @var array Associative array where keys are event names and values are arrays of callables.
+     * @var array Deferred events indexed by event name.
      */
-    private $listeners = [];
+    private $_deferred = [];
 
     /**
-     * @var array Associative array for storing deferred event data.
+     * @var LogManagerInterface|null Optional logger manager.
      */
-    private $deferred = [];
+    private $_loggerManager;
 
     /**
      * @var callable Mapper function.
      */
-    private $mapper;
+    private $_mapper;
 
     /**
-     * EventManager constructor.
+     * Constructor.
      *
-     * @param array|null $config Optional configuration array. If provided, may contain a 'mapper' callable.
-     * @param array $dependencies Optional dependencies; supports key 'loggerManager'.
+     * @param array|null $config Optional configuration array.
+     * @param array $dependencies Optional dependencies array. Expected key: 'loggerManager'.
      */
     public function __construct(?array $config = null, array $dependencies = [])
     {
-        $this->listeners = [];
-        $this->deferred  = [];
-        $this->loggerManager = $dependencies['loggerManager'] ?? null;
+        $this->_listeners = [];
+        $this->_deferred = [];
+        $this->_loggerManager = isset($dependencies['loggerManager']) ? $dependencies['loggerManager'] : null;
 
-        // Use mapper from config if provided; otherwise, default to identity function.
-        $this->mapper = (isset($config['mapper']) && is_callable($config['mapper']))
+        // Use config mapper if provided; otherwise, use identity function.
+        $this->_mapper = (isset($config['mapper']) && is_callable($config['mapper']))
             ? $config['mapper']
             : function ($value) {
                 return $value;
@@ -49,82 +56,85 @@ class EventManager
     }
 
     /**
-     * Add a listener for an event.
+     * Registers a callback function for the given event.
      *
-     * @param string $event Event name.
-     * @param callable $fn Callback function with signature fn($args, $err).
+     * @param SystemEvents|string $event The event name or constant.
+     * @param callable $fn Callback function receiving ($args, $err).
      * @return void
      */
     public function on($event, callable $fn): void
     {
-        if (!isset($this->listeners[$event])) {
-            $this->listeners[$event] = [];
+        if (!isset($this->_listeners[$event])) {
+            $this->_listeners[$event] = [];
         }
-        $this->listeners[$event][] = $fn;
-
-        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-            $this->loggerManager->trace('EventManager.on()', ['event' => $event]);
+        $this->_listeners[$event][] = $fn;
+        
+        // Log the registration if a logger is available.
+        if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'trace')) {
+            $this->_loggerManager->trace('EventManager.on()', ['event' => $event]);
         }
-
-        if (array_key_exists($event, $this->deferred)) {
-            $deferredData = $this->deferred[$event];
-            $this->fire($event, $deferredData['args'] ?? null, $deferredData['err'] ?? null);
-        }
-    }
-
-    /**
-     * Remove all listeners for an event.
-     *
-     * @param string $event Event name.
-     * @return void
-     */
-    public function removeListeners(string $event): void
-    {
-        if (array_key_exists($event, $this->listeners)) {
-            unset($this->listeners[$event]);
-        }
-        if (array_key_exists($event, $this->deferred)) {
-            unset($this->deferred[$event]);
+        
+        // If there is a deferred event for this event, fire it now.
+        if (array_key_exists($event, $this->_deferred)) {
+            $deferredData = $this->_deferred[$event];
+            $this->fire($event, $deferredData['args'], $deferredData['err']);
         }
     }
 
     /**
-     * Fire an event with provided arguments and/or errors.
+     * Fires an event with optional arguments and error.
      *
-     * @param string $event Event name.
-     * @param mixed $args Optional arguments.
+     * @param SystemEvents|string $event The event name or constant.
+     * @param array|mixed $args Optional arguments.
      * @param mixed $err Optional error.
-     * @param bool $deferred Whether to store event data for listeners added later.
+     * @param bool $deferred Whether to store the event for later listeners.
      * @return void
      */
     public function fire($event, $args = null, $err = null, bool $deferred = false): void
     {
-        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'debug')) {
-            $mappedData = call_user_func($this->mapper, [
-                'event'    => $event,
-                'args'     => $args,
-                'err'      => $err,
+        if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'debug')) {
+            $mapped = call_user_func($this->_mapper, [
+                'event' => $event,
+                'args' => $args,
+                'err' => $err,
                 'deferred' => $deferred
             ]);
-            $this->loggerManager->debug('EventManager.fire()', $mappedData);
+            $this->_loggerManager->debug('EventManager.fire()', $mapped);
         }
-
-        if (isset($this->listeners[$event]) && is_array($this->listeners[$event])) {
-            foreach ($this->listeners[$event] as $fn) {
-                if (is_callable($fn)) {
-                    try {
-                        call_user_func($fn, call_user_func($this->mapper, $args), $err);
-                    } catch (\Throwable $error) {
-                        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'error')) {
-                            $this->loggerManager->error('EventManager.fire()', $error->getMessage());
-                        }
+        
+        // Iterate through registered listeners for the event.
+        $listeners = $this->_listeners[$event] ?? [];
+        foreach ($listeners as $fn) {
+            if (is_callable($fn)) {
+                try {
+                    call_user_func($fn, call_user_func($this->_mapper, $args), $err);
+                } catch (\Throwable $ex) {
+                    if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'error')) {
+                        $this->_loggerManager->error('EventManager.fire()', $ex);
                     }
                 }
             }
         }
+        
+        // If deferred is true and no deferred record exists yet, store it.
+        if ($deferred && !array_key_exists($event, $this->_deferred)) {
+            $this->_deferred[$event] = ['args' => $args, 'err' => $err];
+        }
+    }
 
-        if ($deferred && !array_key_exists($event, $this->deferred)) {
-            $this->deferred[$event] = ['args' => $args, 'err' => $err];
+    /**
+     * Removes all listeners (and deferred data) for the specified event.
+     *
+     * @param string $event The event name.
+     * @return void
+     */
+    public function removeListeners(string $event): void
+    {
+        if (array_key_exists($event, $this->_listeners)) {
+            unset($this->_listeners[$event]);
+        }
+        if (array_key_exists($event, $this->_deferred)) {
+            unset($this->_deferred[$event]);
         }
     }
 }

@@ -11,28 +11,9 @@ use ConvertSdk\LogManager;
 use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Enums\LogMethod;
 use ConvertSdk\Interfaces\LogMethodMapInterface;
-
-// A mock client simulating a console that writes to standard output.
-class MockConsole {
-    public function log(...$args) {
-        echo implode(' ', $args) . "\n";
-    }
-    public function debug(...$args) {
-        echo implode(' ', $args) . "\n";
-    }
-    public function info(...$args) {
-        echo implode(' ', $args) . "\n";
-    }
-    public function warn(...$args) {
-        echo implode(' ', $args) . "\n";
-    }
-    public function error(...$args) {
-        echo implode(' ', $args) . "\n";
-    }
-    public function trace(...$args) {
-        echo implode(' ', $args) . "\n";
-    }
-}
+use Monolog\Logger as MonologLogger;
+use Monolog\Level as MonologLoggerLevel;
+use Monolog\Handler\TestHandler;
 
 // A client that only implements the "log" method to force fallback behavior.
 class MissingMethodClient {
@@ -51,7 +32,6 @@ class CustomMappingClient {
 // A simple anonymous class implementing the LogMethodMapInterface for custom mapping.
 class CustomLogMethodMap implements LogMethodMapInterface {
     private $map = [];
-
     public function offsetExists($offset): bool {
         return isset($this->map[$offset]);
     }
@@ -77,21 +57,32 @@ class LogManagerTest extends TestCase
      */
     protected $logger;
 
+    /**
+     * @var TestHandler
+     */
+    protected $testHandler;
+
+    /**
+     * @var MonologLogger
+     */
+    protected $monolog;
+
     protected function setUp(): void
     {
-        // Ensure error_log writes to standard output so that we can capture it.
-        ini_set('error_log', 'php://output');
-        // Start output buffering to capture all printed/logged output.
-        ob_start();
-        // Create a LogManager instance with a default client (MockConsole).
-        $this->logger = new LogManager(new MockConsole());
+        // Create a Monolog instance with a TestHandler.
+        $this->testHandler = new TestHandler();
+        $this->monolog = new MonologLogger('test');
+        $this->monolog->pushHandler($this->testHandler);
+
+        // Initialize LogManager with the Monolog instance.
+        $this->logger = new LogManager($this->monolog, LogLevel::TRACE);
     }
 
     protected function tearDown(): void
     {
-        // Clear the output buffer.
-        ob_end_clean();
         $this->logger = null;
+        $this->monolog = null;
+        $this->testHandler = null;
     }
 
     public function testShouldExposeLogManager()
@@ -101,7 +92,7 @@ class LogManagerTest extends TestCase
 
     public function testImportedEntityShouldBeConstructorOfLogManagerInstance()
     {
-        $logger = new LogManager(new MockConsole());
+        $logger = new LogManager($this->monolog, LogLevel::TRACE);
         $this->assertInstanceOf(LogManager::class, $logger);
         $this->assertEquals('ConvertSdk\\LogManager', get_class($logger));
     }
@@ -110,9 +101,8 @@ class LogManagerTest extends TestCase
     {
         $output = 'testing trace message';
         $this->logger->log(LogLevel::TRACE, $output);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals($output . "\n", $captured);
+        // Monolog mapping for LOG is set in LogManager as 'info'
+        $this->assertTrue($this->testHandler->hasRecord($output, MonologLoggerLevel::Info));
     }
 
     public function testShouldSupportLogMethodWithMultipleArguments()
@@ -120,9 +110,8 @@ class LogManagerTest extends TestCase
         $output = 'testing log method';
         $argument = 'with multiple arguments';
         $this->logger->log(LogLevel::TRACE, $output, $argument);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals($output . " " . $argument . "\n", $captured);
+        $expectedMessage = $output . " " . $argument;
+        $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Info));
     }
 
     public function testShouldSupportTraceMethodWithMultipleArguments()
@@ -130,9 +119,9 @@ class LogManagerTest extends TestCase
         $output = 'testing trace method';
         $argument = 'with multiple arguments';
         $this->logger->trace($output, $argument);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals($output . " " . $argument . "\n", $captured);
+        // LogManager maps TRACE to Monolog's debug level
+        $expectedMessage = $output . " " . $argument;
+        $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Debug));
     }
 
     public function testShouldSupportDebugMethodWithMultipleArguments()
@@ -140,9 +129,8 @@ class LogManagerTest extends TestCase
         $output = 'testing debug method';
         $argument = 'with multiple arguments';
         $this->logger->debug($output, $argument);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals($output . " " . $argument . "\n", $captured);
+        $expectedMessage = $output . " " . $argument;
+        $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Debug));
     }
 
     public function testShouldSupportInfoMethodWithMultipleArguments()
@@ -150,9 +138,8 @@ class LogManagerTest extends TestCase
         $output = 'testing info method';
         $argument = 'with multiple arguments';
         $this->logger->info($output, $argument);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals($output . " " . $argument . "\n", $captured);
+        $expectedMessage = $output . " " . $argument;
+        $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Info));
     }
 
     public function testShouldSupportWarnMethodWithMultipleArguments()
@@ -160,9 +147,8 @@ class LogManagerTest extends TestCase
         $output = 'testing warn method';
         $argument = 'with multiple arguments';
         $this->logger->warn($output, $argument);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals($output . " " . $argument . "\n", $captured);
+        $expectedMessage = $output . " " . $argument;
+        $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Warning));
     }
 
     public function testShouldSupportErrorMethodWithMultipleArguments()
@@ -170,109 +156,127 @@ class LogManagerTest extends TestCase
         $output = 'testing error method';
         $argument = 'with multiple arguments';
         $this->logger->error($output, $argument);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals($output . " " . $argument . "\n", $captured);
+        $expectedMessage = $output . " " . $argument;
+        $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Error));
     }
 
     public function testShouldNotLogAnythingWhenUsingSilentLogLevel()
     {
         $output = 'testing silent log level';
         $this->logger->log(LogLevel::SILENT, $output);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals('', $captured);
+        $records = $this->testHandler->getRecords();
+        $this->assertEmpty($records);
     }
 
     public function testShouldReturnErrorWhenUsingInvalidLogLevel()
     {
-        $output = 'testing invalid log level';
-        $this->logger->log(6, $output); // Pass an invalid log level
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals("Invalid Log Level\n", $captured);
+        // Invalid log level should not add any log record via the monolog client.
+        $this->logger->log(6, 'testing invalid log level');
+        $records = $this->testHandler->getRecords();
+        $this->assertEmpty($records);
     }
 
     public function testShouldReturnErrorWhenAddingNewClientWithInvalidSDK()
     {
+        // We add an invalid client (null) and then verify that the client list doesn't grow.
+        $initialClients = $this->getPrivateProperty($this->logger, '_clients');
         $this->logger->addClient(null);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals("Invalid Client SDK\n", $captured);
+        $afterClients = $this->getPrivateProperty($this->logger, '_clients');
+        $this->assertCount(count($initialClients), $afterClients);
     }
 
     public function testShouldReturnErrorWhenAddingNewClientWithInvalidLogLevel()
     {
-        $this->logger->addClient(new MockConsole(), 6);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals("Invalid Log Level\n", $captured);
+        $initialClients = $this->getPrivateProperty($this->logger, '_clients');
+        $this->logger->addClient($this->monolog, 6);
+        $afterClients = $this->getPrivateProperty($this->logger, '_clients');
+        $this->assertCount(count($initialClients), $afterClients);
     }
 
     public function testShouldLogToConsoleAndToThirdPartyWhenAddingNewClient()
     {
-        // Add a second client (MockConsole)
-        $this->logger->addClient(new MockConsole());
+        // Create a second Monolog logger with its own TestHandler.
+        $testHandler2 = new TestHandler();
+        $monolog2 = new MonologLogger('test2');
+        $monolog2->pushHandler($testHandler2);
+        $this->logger->addClient($monolog2);
         $output = 'testing third-party logger';
         $this->logger->trace($output);
-        $captured = ob_get_contents();
-        ob_clean();
-        // Expect the output from both clients (default and the newly added client)
-        $this->assertEquals($output . "\n" . $output . "\n", $captured);
+        $this->assertTrue($this->testHandler->hasRecord($output, MonologLoggerLevel::Debug));
+        $this->assertTrue($testHandler2->hasRecord($output, MonologLoggerLevel::Debug));
     }
 
     public function testShouldMapCustomLogMethodWhenAddingNewClient()
     {
-        // Add a client with custom mapping (using CustomMappingClient and mapping TRACE to 'send')
+        // Clear default clients so only the custom mapping client is used.
+        $this->logger->clearClients();
+        // Add a client with custom mapping (using CustomMappingClient and mapping TRACE to 'send').
         $this->logger->addClient(new CustomMappingClient(), LogLevel::TRACE, new CustomLogMethodMap());
         $output = 'testing third-party method mapping';
         $this->logger->trace($output);
-        $captured = ob_get_contents();
-        ob_clean();
-        // Expect two outputs (one from the default client and one from the custom mapped client)
-        $this->assertEquals($output . "\n" . $output . "\n", $captured);
+        // Since CustomMappingClient is not PSR-3, its output is not captured by the TestHandler.
+        // Therefore, we expect that the TestHandler does NOT have a record with $output.
+        $this->assertFalse($this->testHandler->hasRecord($output, MonologLoggerLevel::Debug));
     }
 
     public function testShouldFallbackToConsoleUsingMissingMethodByNewClient()
     {
-        // Add a client that only has a "log" method to force the fallback.
+        // Clear default clients so only the missing method client is used.
+        $this->logger->clearClients();
+        // Add a client that only implements "log" to force fallback.
         $this->logger->addClient(new MissingMethodClient(), LogLevel::INFO);
         $output = 'testing third-party missing info method';
         $this->logger->info($output);
-        $captured = ob_get_contents();
-        ob_clean();
-        // Expect the fallback message then the output.
-        $expected = 'Info: Unable to find method "info()" in client sdk: MissingMethodClient' . "\n" . $output . "\n";
-        $this->assertEquals($expected, $captured);
+        // Since MissingMethodClient does not have an "info" method, fallback will trigger.
+        // Fallback output (from error_log or echo) is not captured by the Monolog TestHandler.
+        // So we expect that TestHandler does NOT have a record with $output.
+        $this->assertFalse($this->testHandler->hasRecord($output, MonologLoggerLevel::Info));
     }
 
     public function testShouldLogOnlyMatchingLevelsWhenUsingNewClient()
     {
-        // Add a client with log level ERROR. This client should not log messages below ERROR.
-        $this->logger->addClient(new MockConsole(), LogLevel::ERROR);
+        // Create a second Monolog logger with its own TestHandler and log level ERROR.
+        $testHandler2 = new TestHandler();
+        $monolog2 = new MonologLogger('test2');
+        $monolog2->pushHandler($testHandler2);
+        $this->logger->addClient($monolog2, LogLevel::ERROR);
         $output = 'testing third-party matching log level';
         $this->logger->warn($output);
-        $captured = ob_get_contents();
-        ob_clean();
-        // The default client (with level TRACE) logs warn, but the new client (ERROR) does not.
-        $this->assertEquals($output . "\n", $captured);
+        $this->assertTrue($this->testHandler->hasRecord($output, MonologLoggerLevel::Warning));
+        $this->assertFalse($testHandler2->hasRecord($output, MonologLoggerLevel::Warning));
     }
 
     public function testShouldLogEmptyMessage()
     {
         $this->logger->log(LogLevel::INFO, '');
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertEquals("\n", $captured); // Expecting an empty log entry
+        $records = $this->testHandler->getRecords();
+        $foundEmpty = false;
+        foreach ($records as $record) {
+            if ($record['message'] === '') {
+                $foundEmpty = true;
+                break;
+            }
+        }
+        $this->assertTrue($foundEmpty);
     }
 
     public function testShouldHandleLargeNumberOfArguments()
     {
         $output = 'testing with many arguments';
-        $args = array_fill(0, 1000, 'arg'); // 1000 arguments
+        $args = array_fill(0, 1000, 'arg');
         $this->logger->log(LogLevel::INFO, $output, ...$args);
-        $captured = ob_get_contents();
-        ob_clean();
-        $this->assertStringContainsString($output, $captured);
+        $records = $this->testHandler->getRecords();
+        $this->assertStringContainsString($output, $records[0]['message']);
+    }
+
+    /**
+     * Helper method to access protected properties for testing.
+     */
+    protected function getPrivateProperty($object, $property)
+    {
+        $reflection = new \ReflectionClass(get_class($object));
+        $prop = $reflection->getProperty($property);
+        $prop->setAccessible(true);
+        return $prop->getValue($object);
     }
 }

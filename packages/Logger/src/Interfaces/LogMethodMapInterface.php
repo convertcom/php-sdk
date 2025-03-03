@@ -27,6 +27,7 @@ interface LogMethodMapInterface extends \ArrayAccess {
      * @param LogMethod|string $offset
      * @return string|null
      */
+    #[\ReturnTypeWillChange]
     public function offsetGet($offset);
 
     /**
