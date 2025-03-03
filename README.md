@@ -8,7 +8,7 @@ A PHP SDK for integrating with Convert’s experimentation and feature flagging 
 - Implements feature rollouts and audience segmentation
 - Supports experiment management and user bucketing
 - Offers event tracking and custom conversions
-- Provides persistent storage options for user bucketing
+- Offers an interface to provide persistent storage options for user bucketing
 - Supports offline mode when no API key is provided
 
 ---
