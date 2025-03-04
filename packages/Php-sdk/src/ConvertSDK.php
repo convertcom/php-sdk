@@ -5,6 +5,7 @@ namespace ConvertSdk;
 use GuzzleHttp\Promise\PromiseInterface;
 use ConvertSdk\Api\ApiManager;
 use ConvertSdk\Data\DataManager;
+use ConvertSdk\Bucketing\BucketingManager;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\Logger\LogManager;
 use ConvertSdk\Config\Config;
@@ -63,6 +64,11 @@ class ConvertSDK extends Core {
         // Initialize ApiManager
         $this->apiManager = new ApiManager($configuration, [
             'eventManager' => $this->eventManager,
+            'loggerManager' => $this->loggerManager
+        ]);
+
+        // Initialize BucketingManager
+        $this->bucketingManager = new BucketingManager($configuration, [
             'loggerManager' => $this->loggerManager
         ]);
 
