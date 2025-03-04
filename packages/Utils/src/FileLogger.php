@@ -1,68 +1,71 @@
 <?php
 namespace ConvertSdk\Utils;
 
-/**
- * Mimics data-store.ts
- * A simple JSON file-based key-value store.
- */
-class DataStore
+use DateTime;
+
+class FileLogger
 {
     private $file;
+    private $fs;
+    private $appendMethod;
 
-    public function __construct(string $file)
+    /**
+     * @param string $file
+     * @param mixed $fs A filesystem handler (or null to use PHP built‑in functions)
+     * @param string $appendMethod Defaults to 'append'
+     */
+    public function __construct(string $file, $fs, string $appendMethod = 'append')
     {
         $this->file = $file;
-        try {
-            if (!file_exists($this->file)) {
-                file_put_contents($this->file, '{}');
+        $this->fs = $fs;
+        $this->appendMethod = $appendMethod;
+    }
+
+    /**
+     * Writes output to the file. (For testing, errors are allowed to propagate.)
+     *
+     * @param string $method
+     * @param mixed ...$args
+     * @return void
+     */
+    private function _write(string $method, ...$args): void
+    {
+        $prefix = sprintf("%s [%s]", (new DateTime())->format(DateTime::ATOM), strtoupper($method));
+        $output = $prefix . ' ' . implode("\n" . $prefix . ' ', array_map('json_encode', $args)) . "\n";
+        if ($this->appendMethod === 'append') {
+            // This will throw an error if, for example, the file is invalid or not writable.
+            file_put_contents($this->file, $output, FILE_APPEND);
+        } else {
+            if (is_callable([$this->fs, $this->appendMethod])) {
+                call_user_func([$this->fs, $this->appendMethod], $this->file, $output);
+            } else {
+                throw new \Exception("Append method not callable");
             }
-        } catch (\Exception $e) {
-            error_log($e->getMessage());
         }
     }
 
-    /**
-     * Get value by key
-     */
-    public function get(string $key)
+    public function log(...$args): void
     {
-        try {
-            $contents = file_get_contents($this->file);
-            $data = json_decode($contents, true);
-            return $data[$key] ?? null;
-        } catch (\Exception $e) {
-            error_log($e->getMessage());
-        }
-        return null;
+        $this->_write('log', ...$args);
     }
 
-    /**
-     * Store value by key
-     */
-    public function set(string $key, $value): void
+    public function info(...$args): void
     {
-        try {
-            $contents = file_get_contents($this->file);
-            $data = json_decode($contents, true);
-            $data[$key] = $value;
-            file_put_contents($this->file, json_encode($data));
-        } catch (\Exception $e) {
-            error_log($e->getMessage());
-        }
+        $this->_write('info', ...$args);
     }
 
-    /**
-     * Delete value by key
-     */
-    public function delete(string $key): void
+    public function debug(...$args): void
     {
-        try {
-            $contents = file_get_contents($this->file);
-            $data = json_decode($contents, true);
-            unset($data[$key]);
-            file_put_contents($this->file, json_encode($data));
-        } catch (\Exception $e) {
-            error_log($e->getMessage());
-        }
+        $this->_write('debug', ...$args);
+    }
+
+    public function warn(...$args): void
+    {
+        $this->_write('warn', ...$args);
+    }
+
+    public function error(...$args): void
+    {
+        $this->_write('error', ...$args);
     }
 }

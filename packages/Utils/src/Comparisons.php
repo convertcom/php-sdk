@@ -3,25 +3,25 @@ namespace ConvertSdk\Utils;
 
 use ConvertSdk\Utils\ObjectUtils;
 
-/**
- * Mimics comparisons.ts
- */
 class Comparisons
 {
     public static function equals($value, $testAgainst, bool $negation = false): bool
     {
-        // If $value is an array
         if (is_array($value)) {
             $result = in_array($testAgainst, $value, true);
             return self::_returnNegationCheck($result, $negation);
         }
-        // If $value is a non-empty object/associative array
+        // If $value is an object (or associative array) and not empty,
+        // convert it to an array and check keys.
+        if (is_object($value)) {
+            $value = get_object_vars($value);
+        }
         if (is_array($value) && ObjectUtils::objectNotEmpty($value)) {
             $keys = array_keys($value);
             $result = in_array((string)$testAgainst, $keys, true);
             return self::_returnNegationCheck($result, $negation);
         }
-        // Convert to lowercase strings
+        // Otherwise, compare lowercase string representations.
         $valueStr = strtolower((string)$value);
         $testStr = strtolower((string)$testAgainst);
         return self::_returnNegationCheck($valueStr === $testStr, $negation);
@@ -59,7 +59,6 @@ class Comparisons
     {
         $valueStr = strtolower((string)$value);
         $testStr = strtolower((string)$testAgainst);
-        // If testAgainst is just whitespace, treat as matched
         if (trim($testStr) === '') {
             return self::_returnNegationCheck(true, $negation);
         }
@@ -69,24 +68,34 @@ class Comparisons
 
     public static function isIn($values, $testAgainst, bool $negation = false, string $splitter = '|'): bool
     {
-        // Convert $values to an array of strings
+        // Convert $values to an array of strings.
         $matchedValuesArray = explode($splitter, (string)$values);
-        // Convert $testAgainst to array if it's a string
+
         if (is_string($testAgainst)) {
             $testAgainst = explode($splitter, $testAgainst);
+        } elseif (is_object($testAgainst)) {
+            // If $testAgainst is an object, we return false (or handle as needed)
+            return self::_returnNegationCheck(false, $negation);
+        } elseif (!is_array($testAgainst)) {
+            $testAgainst = [$testAgainst];
         }
-        if (!is_array($testAgainst)) {
-            $testAgainst = [];
-        }
-        // Lowercase everything
-        $testAgainst = array_map('strtolower', $testAgainst);
+        
+        // Convert all items to lowercase strings.
+        $matchedValuesArray = array_map(function ($item) {
+            return strtolower((string)$item);
+        }, $matchedValuesArray);
+        $testAgainst = array_map(function ($item) {
+            return strtolower((string)$item);
+        }, $testAgainst);
+        
         foreach ($matchedValuesArray as $item) {
-            if (in_array(strtolower($item), $testAgainst, true)) {
+            if (in_array($item, $testAgainst, true)) {
                 return self::_returnNegationCheck(true, $negation);
             }
         }
         return self::_returnNegationCheck(false, $negation);
     }
+    
 
     public static function startsWith($value, $testAgainst, bool $negation = false): bool
     {
@@ -108,7 +117,9 @@ class Comparisons
     public static function regexMatches($value, $testAgainst, bool $negation = false): bool
     {
         $valueStr = strtolower((string)$value);
-        $pattern = '/' . $testAgainst . '/i';
+        // Escape delimiter '/' if present in the pattern.
+        $escapedPattern = str_replace('/', '\/', $testAgainst);
+        $pattern = '/' . $escapedPattern . '/i';
         $matched = (preg_match($pattern, $valueStr) === 1);
         return self::_returnNegationCheck($matched, $negation);
     }

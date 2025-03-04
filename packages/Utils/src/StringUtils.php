@@ -1,5 +1,6 @@
 <?php
 namespace ConvertSdk\Utils;
+use lastguest\Murmur;
 
 class StringUtils
 {
@@ -30,13 +31,18 @@ class StringUtils
 
     public static function camelCase(string $input): string
     {
-        // Convert "Some text" -> "someText"
-        return preg_replace_callback('/(?:^\w|[A-Z]|\b\w)/', function($matches) use (&$input) {
-            static $index = 0;
-            $char = $matches[0];
-            return $index++ === 0 ? strtolower($char) : strtoupper($char);
-        }, $input ?? '');
+        $words = preg_split('/\s+/', strtolower($input));
+    
+        $words = array_map(function ($word, $index) {
+            if ($index === 0) {
+                return $word; // Keep the first word in lowercase
+            }
+            return ucfirst($word); // Capitalize the first letter of subsequent words
+        }, $words, array_keys($words));
+    
+        return implode('', $words); // Join the words back together
     }
+    
 
      /**
      * Generate numeric hash based on seed using lastguest/murmurhash.
@@ -47,6 +53,6 @@ class StringUtils
      */
     public static function generateHash(string $value, int $seed = 9999): int
     {
-        return Murmurhash::hash($value, $seed);
+        return Murmur::hash3_int($value, $seed);
     }
 }

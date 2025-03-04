@@ -1,19 +1,16 @@
 <?php
 namespace ConvertSdk\Utils;
 
-/**
- * Mimics array-utils.ts
- */
 class ArrayUtils
 {
     /**
-     * Validates variable is array and not empty
+     * Validates variable is an array and not empty.
      *
-     * @param array $array
+     * @param mixed $value
      * @return bool
      */
-    public static function arrayNotEmpty(array $array): bool
+    public static function arrayNotEmpty($value): bool
     {
-        return count($array) > 0;
+        return is_array($value) && count($value) > 0;
     }
 }
