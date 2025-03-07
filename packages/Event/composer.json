@@ -22,12 +22,17 @@
         "Logger": {
             "type": "path",
             "url": "../Logger"
+        },
+        "Types": {
+            "type": "path",
+            "url": "../Types"
         }
     },
     "require": {
       "php": ">=7.4",
       "convertcom/php-sdk-enums": ">=1.0.0",
-      "convertcom/php-sdk-logger": ">=1.0.0"
+      "convertcom/php-sdk-logger": ">=1.0.0",
+      "convertcom/php-sdk-types": ">=1.0.0"
     },
     "require-dev": {
       "phpunit/phpunit": "^10.0",

@@ -8,8 +8,9 @@ namespace ConvertSdk\Tests;
 
 use PHPUnit\Framework\TestCase;
 use ConvertSdk\EventManager;
-use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Enums\SystemEvents;
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
 
 class EventManagerTest extends TestCase
 {
@@ -20,9 +21,9 @@ class EventManagerTest extends TestCase
 
     protected function setUp(): void
     {
-        // For tests, we load an empty configuration (or you can load default config if needed)
-        // and pass an empty dependency array.
-        $this->eventManager = new EventManager([], []);
+        // Minimal Config instance for setup
+        $config = new Config(['environment' => 'test', 'sdkKey' => 'test-key']);
+        $this->eventManager = new EventManager($config, []);
     }
 
     public function testShouldExposeEventManager()
@@ -32,7 +33,8 @@ class EventManagerTest extends TestCase
 
     public function testImportedEntityShouldBeConstructorOfEventManagerInstance()
     {
-        $em = new EventManager([], []);
+        $config = new Config(['environment' => 'test', 'sdkKey' => 'test-key']);
+        $em = new EventManager($config, []);
         $this->assertInstanceOf(EventManager::class, $em);
         $reflection = new \ReflectionClass($em);
         $this->assertEquals('EventManager', $reflection->getShortName());
@@ -40,7 +42,9 @@ class EventManagerTest extends TestCase
 
     public function testShouldSuccessfullyCreateNewEventManagerInstanceWithDefaultConfig()
     {
-        $em = new EventManager([], []);
+        // Mimic TypeScript's empty config
+        $config = new Config(['environment' => 'test', 'sdkKey' => 'test-key']); // Adjust based on Config requirements
+        $em = new EventManager($config, []);
         $this->assertInstanceOf(EventManager::class, $em);
         $reflection = new \ReflectionClass($em);
         $this->assertEquals('EventManager', $reflection->getShortName());
@@ -48,12 +52,21 @@ class EventManagerTest extends TestCase
 
     public function testShouldCreateNewEventManagerInstance()
     {
-        // Load test configuration from JSON file.
+        // Load test configuration from JSON file
         $configPath = __DIR__ . '/test-config.json';
-        $config = json_decode(file_get_contents($configPath), true);
+        $configuration = json_decode(file_get_contents($configPath), true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             $this->fail('Invalid JSON in test-config.json: ' . json_last_error_msg());
         }
+        // Ensure required fields (adjust based on actual Config constructor)
+        $configuration['environment'] = $configuration['environment'] ?? 'test';
+        if (!isset($configuration['sdkKey']) && !isset($configuration['data'])) {
+            $configuration['sdkKey'] = 'test-key';
+        }
+        if (isset($configuration['data'])) {
+            $configuration['data'] = new ConfigResponseData($configuration['data']);
+        }
+        $config = new Config($configuration);
         $em = new EventManager($config, []);
         $this->assertInstanceOf(EventManager::class, $em);
         $reflection = new \ReflectionClass($em);
@@ -100,9 +113,7 @@ class EventManagerTest extends TestCase
             $this->assertNull($err);
             $called++;
         };
-        // Fire EVENT2 with deferred = true.
         $this->eventManager->fire('EVENT2', ['deferred' => true], null, true);
-        // Now subscribe to EVENT2; in our implementation, on() immediately fires deferred events.
         $this->eventManager->on('EVENT2', $callback);
         $this->assertEquals(1, $called);
     }

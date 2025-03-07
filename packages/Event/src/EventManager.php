@@ -11,7 +11,7 @@ namespace ConvertSdk;
 use ConvertSdk\Interfaces\EventManagerInterface;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Logger\Interfaces\LogManagerInterface;
-
+use OpenAPI\Client\Config;
 
 class EventManager implements EventManagerInterface
 {
@@ -38,21 +38,22 @@ class EventManager implements EventManagerInterface
     /**
      * Constructor.
      *
-     * @param array|null $config Optional configuration array.
+     * @param Config|null $config Optional configuration object.
      * @param array $dependencies Optional dependencies array. Expected key: 'loggerManager'.
      */
-    public function __construct(?array $config = null, array $dependencies = [])
+    public function __construct(?Config $config = null, array $dependencies = [])
     {
         $this->_listeners = [];
         $this->_deferred = [];
         $this->_loggerManager = isset($dependencies['loggerManager']) ? $dependencies['loggerManager'] : null;
 
         // Use config mapper if provided; otherwise, use identity function.
-        $this->_mapper = (isset($config['mapper']) && is_callable($config['mapper']))
-            ? $config['mapper']
-            : function ($value) {
+        $this->_mapper = ($config !== null) ? $config->getMapper() : null;
+        if (!is_callable($this->_mapper)) {
+            $this->_mapper = function ($value) {
                 return $value;
             };
+        }
     }
 
     /**

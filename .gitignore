@@ -1,3 +1,4 @@
 /vendor/
 /packages/*/vendor/
+/packages/*/composer.lock
 .DS_Store
