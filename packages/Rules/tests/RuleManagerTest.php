@@ -226,7 +226,7 @@ class RuleManagerTest extends TestCase
         $data2 = ['sum' => 44];
 
         // For testRuleSet1: expecting false for data1, true for data2.
-        // $this->assertFalse($rm->isRuleMatched($data1, new RuleObject($testRuleSet1)), 'Expected false for data1 against testRuleSet1');
+        $this->assertFalse($rm->isRuleMatched($data1, new RuleObject($testRuleSet1)), 'Expected false for data1 against testRuleSet1');
         $this->assertTrue($rm->isRuleMatched($data2, new RuleObject($testRuleSet1)), 'Expected true for data2 against testRuleSet1');
 
         // For testRuleSet2 (negation true): expect the reverse.
