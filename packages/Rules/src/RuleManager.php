@@ -17,6 +17,11 @@ use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Utils\Comparisons;
 use ConvertSdk\Utils\StringUtils;
 use ConvertSdk\Logger\LogManagerInterface;
+use OpenAPI\Client\Model\RuleElement;
+use OpenAPI\Client\Model\RuleObject;
+use OpenAPI\Client\RuleAnd;
+use OpenAPI\Client\RuleOrWhen;
+use OpenAPI\Client\Config;
 
 class RuleManager implements RuleManagerInterface
 {
@@ -33,26 +38,31 @@ class RuleManager implements RuleManagerInterface
     /**
      * Constructor to initialize RuleManager with required dependencies.
      *
-     * @param array $config
+     * @param Config|null $config Optional configuration object.
      * @param array $dependencies
      */
-    public function __construct(array $config = [], array $dependencies = [])
+    public function __construct(?Config $config = null, array $dependencies = [])
     {
         $this->_loggerManager = $dependencies['loggerManager'] ?? null;
-        $this->_comparisonProcessor = $config['rules']['comparisonProcessor'] ?? self::DEFAULT_COMPARISON_PROCESSOR;
-        // $this->_comparisonProcessor = $config['rules']['comparisonProcessor'] ?? [
-        //     'isTypeOf' => function ($value, $testAgainst, $negation = false) {
-        //         $actualType = gettype($value);
-        //         if ($actualType === 'integer' || $actualType === 'double') {
-        //             $actualType = 'number';
-        //         }
-        //         return $negation ? $actualType !== $testAgainst : $actualType === $testAgainst;
-        //     }
-        // ];
-      
-        $this->_negation = $config['rules']['negation'] ?? self::DEFAULT_NEGATION;
-        $this->_keys_case_sensitive = $config['rules']['keys_case_sensitive'] ?? self::DEFAULT_KEYS_CASE_SENSITIVE;
-        $this->_mapper = $config['mapper'] ?? function ($value) { return $value; };
+        
+        // Retrieve the 'rules' section from the Config instance using its getter.
+        $rules = $config && method_exists($config, 'getRules') ? $config->getRules() : [];
+
+        // Set the comparison processor. If not provided in the config, use the default.
+        $this->_comparisonProcessor = isset($rules['comparisonProcessor']) 
+            ? $rules['comparisonProcessor']
+            : self::DEFAULT_COMPARISON_PROCESSOR;
+        
+        // Set negation and keys_case_sensitive from the rules section.
+        $this->_negation = isset($rules['negation']) ? (string)$rules['negation'] : self::DEFAULT_NEGATION;
+        $this->_keys_case_sensitive = isset($rules['keys_case_sensitive'])
+            ? $rules['keys_case_sensitive']
+            : self::DEFAULT_KEYS_CASE_SENSITIVE;
+
+        // Set mapper from config if provided, otherwise use the identity function.
+        $this->_mapper = ($config && method_exists($config, 'getMapper') && is_callable($config->getMapper()))
+            ? $config->getMapper()
+            : function ($value) { return $value; };
 
         if ($this->_loggerManager) {
             $this->_loggerManager->trace('RuleManager()', Messages::RULE_CONSTRUCTOR, $this);
@@ -114,11 +124,11 @@ class RuleManager implements RuleManagerInterface
      * Check input data matching to rule set
      *
      * @param array $data Single value or key-value data set to compare
-     * @param array $ruleSet
+     * @param RuleObject $ruleSet
      * @param string|null $logEntry
      * @return bool|RuleError
      */
-    public function isRuleMatched($data, $ruleSet, ?string $logEntry = null)
+    public function isRuleMatched($data, RuleObject $ruleSet, ?string $logEntry = null)
     {
         if ($this->_loggerManager) {
             $this->_loggerManager->trace('RuleManager.isRuleMatched()', call_user_func($this->_mapper, [
@@ -134,7 +144,8 @@ class RuleManager implements RuleManagerInterface
         $match = false;
         if (isset($ruleSet['OR']) && ArrayUtils::arrayNotEmpty($ruleSet['OR'])) {
             foreach ($ruleSet['OR'] as $i => $rule) {
-                $match = $this->_processAND($data, $rule);
+
+                $match = $this->_processAND($data, new RuleAnd($rule));
                 if (in_array($match, RuleError::getConstants(), true)) {
                     if ($this->_loggerManager) {
                         $this->_loggerManager->info('RuleManager.isRuleMatched()', $logEntry ?? '', ErrorMessages::RULE_ERROR);
@@ -155,14 +166,15 @@ class RuleManager implements RuleManagerInterface
         }
         return false;
     }
+    
 
     /**
      * Check if rule object is valid
      *
-     * @param array $rule
+     * @param RuleElement $rule
      * @return bool
      */
-    public function isValidRule(array $rule): bool
+    public function isValidRule(RuleElement $rule): bool
     {
         if ($this->_loggerManager) {
             $this->_loggerManager->trace('RuleManager.isValidRule()', call_user_func($this->_mapper, ['rule' => $rule]));
@@ -177,25 +189,29 @@ class RuleManager implements RuleManagerInterface
      * Process AND block of rule set. Return first false if found
      *
      * @param array $data Single value or key-value data set to compare
-     * @param array $rulesSubset
+     * @param RuleAnd $rulesSubset
      * @return bool|RuleError
      * @private
      */
-    private function _processAND($data, array $rulesSubset)
+    private function _processAND($data, RuleAnd $rulesSubset)
     {
         // Second AND level
         $match = false;
-        if (isset($rulesSubset['AND']) && ArrayUtils::arrayNotEmpty($rulesSubset['AND'])) {
-            foreach ($rulesSubset['AND'] as $rule) {
-                $match = $this->_processORWHEN($data, $rule);
-                if ($match === false) {
-                    return false;
+        if ($rulesSubset instanceof RuleAnd) {
+            $andRules = $rulesSubset->getAnd(); // Get the AND rules
+            if (ArrayUtils::arrayNotEmpty($andRules)) {
+                foreach ($rulesSubset->getAnd() as $rule) {
+
+                    $match = $this->_processORWHEN($data, new RuleOrWhen($rule));
+                    if ($match === false) {
+                        return false;
+                    }
                 }
+                if ($match !== false && $this->_loggerManager) {
+                    $this->_loggerManager->info('RuleManager._processAND()', Messages::RULE_MATCH_AND);
+                }
+                return $match;
             }
-            if ($match !== false && $this->_loggerManager) {
-                $this->_loggerManager->info('RuleManager._processAND()', Messages::RULE_MATCH_AND);
-            }
-            return $match;
         } else {
             if ($this->_loggerManager) {
                 $this->_loggerManager->warn('RuleManager._processAND()', ErrorMessages::RULE_NOT_VALID);
@@ -208,19 +224,24 @@ class RuleManager implements RuleManagerInterface
      * Process OR block of rule set. Return first true if found
      *
      * @param array $data Single value or key-value data set to compare
-     * @param array $rulesSubset
+     * @param RuleOrWhen $rulesSubset
      * @return bool|RuleError
      * @private
      */
-    private function _processORWHEN($data, array $rulesSubset)
+    private function _processORWHEN($data, RuleOrWhen $rulesSubset)
     {
         // Third OR level. Called OR_WHEN.
         $match = false;
-        if (isset($rulesSubset['OR_WHEN']) && ArrayUtils::arrayNotEmpty($rulesSubset['OR_WHEN'])) {
-            foreach ($rulesSubset['OR_WHEN'] as $rule) {
-                $match = $this->_processRuleItem($data, $rule);
-                if ($match !== false) {
-                    return $match;
+        if ($rulesSubset instanceof RuleOrWhen) {
+            $orWhenRules = $rulesSubset->getOrWhen(); // Get the OR_WHEN rules
+            
+            if (ArrayUtils::arrayNotEmpty($orWhenRules)) {
+                foreach ($orWhenRules as $rule) {
+
+                    $match = $this->_processRuleItem($data, new RuleElement($rule));
+                    if ($match !== false) {
+                        return $match;
+                    }
                 }
             }
         } else {
@@ -235,11 +256,11 @@ class RuleManager implements RuleManagerInterface
      * Process single rule item
      *
      * @param array $data Single value or key-value data set to compare
-     * @param array $rule A single rule to compare
+     * @param RuleElement $rule A single rule to compare
      * @return bool|RuleError Comparison result
      * @private
      */
-    private function _processRuleItem($data, array $rule)
+    private function _processRuleItem($data, RuleElement $rule)
     {
         if ($this->isValidRule($rule)) {
             try {

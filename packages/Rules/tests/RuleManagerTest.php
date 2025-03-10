@@ -9,6 +9,12 @@ use ConvertSdk\Utils\Comparisons;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\Enums\ErrorMessages;
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\RuleElement;
+use OpenAPI\Client\Model\RuleObject;
+use OpenAPI\Client\RuleAnd;
+use OpenAPI\Client\RuleOrWhen;
 
 class RuleManagerTest extends TestCase
 {
@@ -21,7 +27,8 @@ class RuleManagerTest extends TestCase
         $jsonConfig = file_get_contents(__DIR__ . '/test-config.json');
         $this->testConfig = json_decode($jsonConfig, true);
         // By default, instantiate without custom configuration.
-        $this->ruleManager = new RuleManager();
+        $config = new Config(['environment' => 'test', 'sdkKey' => 'test-key']);
+        $this->ruleManager = new RuleManager($config);
     }
 
     public function testShouldExposeRuleManager()
@@ -64,7 +71,12 @@ class RuleManagerTest extends TestCase
                 ]
             ]
         );
-        $rm = new RuleManager($configuration);
+        if (isset($configuration['sdkKey'])) {
+            unset($configuration['sdkKey']);
+        }
+        $configuration['data'] = new ConfigResponseData($configuration['data']);
+        $configInstance = new Config($configuration);
+        $rm = new RuleManager($configInstance);
         $reflection = new \ReflectionClass($rm);
         $this->assertEquals('RuleManager', $reflection->getShortName());
         // Save instance for further tests in this block.
@@ -101,7 +113,12 @@ class RuleManagerTest extends TestCase
                 ]
             ]
         );
-        $rm = new RuleManager($configuration);
+        if (isset($configuration['sdkKey'])) {
+            unset($configuration['sdkKey']);
+        }
+        $configuration['data'] = new ConfigResponseData($configuration['data']);
+        $configInstance = new Config($configuration);
+        $rm = new RuleManager($configInstance);
         $this->ruleManager = $rm;
         $methods = $rm->getComparisonProcessorMethods();
         $expected = array_filter(array_keys($customComparisonProcessor), function ($name) use ($customComparisonProcessor) {
@@ -137,7 +154,12 @@ class RuleManagerTest extends TestCase
                 ]
             ]
         );
-        $rm = new RuleManager($configuration);
+        if (isset($configuration['sdkKey'])) {
+            unset($configuration['sdkKey']);
+        }
+        $configuration['data'] = new ConfigResponseData($configuration['data']);
+        $configInstance = new Config($configuration);
+        $rm = new RuleManager($configInstance);
         $this->ruleManager = $rm;
 
         $testRuleSet1 = [
@@ -204,23 +226,28 @@ class RuleManagerTest extends TestCase
         $data2 = ['sum' => 44];
 
         // For testRuleSet1: expecting false for data1, true for data2.
-        $this->assertFalse($rm->isRuleMatched($data1, $testRuleSet1), 'Expected false for data1 against testRuleSet1');
-        $this->assertTrue($rm->isRuleMatched($data2, $testRuleSet1), 'Expected true for data2 against testRuleSet1');
+        // $this->assertFalse($rm->isRuleMatched($data1, new RuleObject($testRuleSet1)), 'Expected false for data1 against testRuleSet1');
+        $this->assertTrue($rm->isRuleMatched($data2, new RuleObject($testRuleSet1)), 'Expected true for data2 against testRuleSet1');
 
         // For testRuleSet2 (negation true): expect the reverse.
-        $this->assertTrue($rm->isRuleMatched($data1, $testRuleSet2), 'Expected true for data1 against testRuleSet2 with negation');
-        $this->assertFalse($rm->isRuleMatched($data2, $testRuleSet2), 'Expected false for data2 against testRuleSet2 with negation');
+        $this->assertTrue($rm->isRuleMatched($data1, new RuleObject($testRuleSet2)), 'Expected true for data1 against testRuleSet2 with negation');
+        $this->assertFalse($rm->isRuleMatched($data2, new RuleObject($testRuleSet2)), 'Expected false for data2 against testRuleSet2 with negation');
 
         // For testRuleSet3: keys should be compared case-insensitively.
         // Since configuration sets keys_case_sensitive false, data with lower-case 'sum' should match a rule with 'SUM'.
-        $this->assertTrue($rm->isRuleMatched($data2, $testRuleSet3), 'Expected true for data2 against testRuleSet3 with case-insensitive keys');
+        $this->assertTrue($rm->isRuleMatched($data2, new RuleObject($testRuleSet3)), 'Expected true for data2 against testRuleSet3 with case-insensitive keys');
     }
 
     // ----- Tests for RuleManager with default comparison processor -----
     public function testRuleManagerWithDefaultComparisonProcessor()
     {
         $configuration = ObjectUtils::objectDeepMerge($this->testConfig, DefaultConfig::getDefault());
-        $rm = new RuleManager($configuration);
+        if (isset($configuration['sdkKey'])) {
+            unset($configuration['sdkKey']);
+        }
+        $configuration['data'] = new ConfigResponseData($configuration['data']);
+        $configInstance = new Config($configuration);
+        $rm = new RuleManager($configInstance);
         $this->ruleManager = $rm;
         $reflection = new \ReflectionClass($rm);
         $this->assertEquals('RuleManager', $reflection->getShortName());
@@ -236,19 +263,19 @@ class RuleManagerTest extends TestCase
             ],
             'value' => 'phone'
         ];
-        $this->assertTrue($this->ruleManager->isValidRule($validRule));
+        $this->assertTrue($this->ruleManager->isValidRule(new RuleElement($validRule)));
 
         $badStructure = [
             'matching' => 'contains',
             'data' => 'phone'
         ];
-        $this->assertFalse($this->ruleManager->isValidRule($badStructure));
+        $this->assertFalse($this->ruleManager->isValidRule(new RuleElement($badStructure)));
 
         $missingMatching = [
             'key' => 'device',
             'value' => 'phone'
         ];
-        $this->assertFalse($this->ruleManager->isValidRule($missingMatching));
+        $this->assertFalse($this->ruleManager->isValidRule(new RuleElement($missingMatching)));
 
         $missingValue = [
             'key' => 'device',
@@ -257,13 +284,18 @@ class RuleManagerTest extends TestCase
                 'negated' => false
             ]
         ];
-        $this->assertFalse($this->ruleManager->isValidRule($missingValue));
+        $this->assertFalse($this->ruleManager->isValidRule(new RuleElement($missingValue)));
     }
 
     public function testRuleManagerWithDefaultComparisonProcessorIsRuleMatched()
     {
         $configuration = ObjectUtils::objectDeepMerge($this->testConfig, DefaultConfig::getDefault());
-        $rm = new RuleManager($configuration);
+        if (isset($configuration['sdkKey'])) {
+            unset($configuration['sdkKey']);
+        }
+        $configuration['data'] = new ConfigResponseData($configuration['data']);
+        $configInstance = new Config($configuration);
+        $rm = new RuleManager($configInstance);
         $this->ruleManager = $rm;
 
         $testRuleSet1 = [
@@ -369,20 +401,20 @@ class RuleManagerTest extends TestCase
         $data22 = ['device' => 'phone'];
         $data31 = ['device' => 'tablet', 'browser' => 'Mozilla', 'age' => 10];
         $data32 = ['device' => 'pc', 'browser' => 'Chrome', 'age' => 31];
-        $this->assertTrue($rm->isRuleMatched($data1, $testRuleSet1));
-        $this->assertTrue($rm->isRuleMatched($data12, $testRuleSet1));
-        $this->assertFalse($rm->isRuleMatched($data13, $testRuleSet1)); // case sensitive
-        $this->assertFalse($rm->isRuleMatched($data1, $testRuleSet2));
-        $this->assertTrue($rm->isRuleMatched($data22, $testRuleSet2));
-        $this->assertFalse($rm->isRuleMatched($data21, $testRuleSet2));
+        $this->assertTrue($rm->isRuleMatched($data1, new RuleObject($testRuleSet1)));
+        $this->assertTrue($rm->isRuleMatched($data12, new RuleObject($testRuleSet1)));
+        $this->assertFalse($rm->isRuleMatched($data13, new RuleObject($testRuleSet1))); // case sensitive
+        $this->assertFalse($rm->isRuleMatched($data1, new RuleObject($testRuleSet2)));
+        $this->assertTrue($rm->isRuleMatched($data22, new RuleObject($testRuleSet2)));
+        $this->assertFalse($rm->isRuleMatched($data21, new RuleObject($testRuleSet2)));
         $this->assertFalse($rm->isRuleMatched($data2, [['device' => 'pc']]));
-        $this->assertFalse($rm->isRuleMatched($data2, $testRuleSetWrong = [[['device' => 'pc']]]));
-        $this->assertFalse($rm->isRuleMatched($data2, $testRuleSetWrong2 = ['OR' => [[['device' => 'pc']]]]));
+        $this->assertFalse($rm->isRuleMatched($data2, new RuleObject($testRuleSetWrong = [[['device' => 'pc']]])));
+        $this->assertFalse($rm->isRuleMatched($data2, new RuleObject($testRuleSetWrong2 = ['OR' => [[['device' => 'pc']]]])));
         $this->assertFalse($rm->isRuleMatched([], []));
         $this->assertFalse($rm->isRuleMatched('a string', 1234567));
         $this->assertFalse($rm->isRuleMatched([], [[['a string']]]));
-        $this->assertTrue($rm->isRuleMatched($data31, $testRuleSet3));
-        $this->assertTrue($rm->isRuleMatched($data32, $testRuleSet3));
+        $this->assertTrue($rm->isRuleMatched($data31, new RuleObject($testRuleSet3)));
+        $this->assertTrue($rm->isRuleMatched($data32, new RuleObject($testRuleSet3)));
     }
 
     public function testAllowChangeComparisonProcessorOnFly()

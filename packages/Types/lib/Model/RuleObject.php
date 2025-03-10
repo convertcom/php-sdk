@@ -58,7 +58,7 @@ class RuleObject implements ModelInterface, ArrayAccess, \JsonSerializable
       * @var string[]
       */
     protected static $openAPITypes = [
-        'or' => '\OpenAPI\Client\Model\RuleObjectORInner[]'
+        'OR' => '\OpenAPI\Client\Model\RuleObjectORInner[]'
     ];
 
     /**
@@ -69,7 +69,7 @@ class RuleObject implements ModelInterface, ArrayAccess, \JsonSerializable
       * @psalm-var array<string, string|null>
       */
     protected static $openAPIFormats = [
-        'or' => null
+        'OR' => null
     ];
 
     /**
@@ -78,7 +78,7 @@ class RuleObject implements ModelInterface, ArrayAccess, \JsonSerializable
       * @var boolean[]
       */
     protected static array $openAPINullables = [
-        'or' => false
+        'OR' => false
     ];
 
     /**
@@ -176,7 +176,7 @@ class RuleObject implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $setters = [
-        'or' => 'setOr'
+        'OR' => 'setOr'
     ];
 
     /**
@@ -185,7 +185,7 @@ class RuleObject implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $getters = [
-        'or' => 'getOr'
+        'OR' => 'getOr'
     ];
 
     /**
@@ -245,7 +245,7 @@ class RuleObject implements ModelInterface, ArrayAccess, \JsonSerializable
      */
     public function __construct(?array $data = null)
     {
-        $this->setIfExists('or', $data ?? [], null);
+        $this->setIfExists('OR', $data ?? [], null);
     }
 
     /**
@@ -297,7 +297,7 @@ class RuleObject implements ModelInterface, ArrayAccess, \JsonSerializable
      */
     public function getOr()
     {
-        return $this->container['or'];
+        return $this->container['OR'];
     }
 
     /**
