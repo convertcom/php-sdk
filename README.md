@@ -16,6 +16,5 @@ A PHP SDK for integrating with Convert’s experimentation and feature flagging 
 ## ⚙️ Installation
 
 ```sh
-git clone https://github.com/convertcom/php-sdk.git
 cd php-sdk
 composer install
