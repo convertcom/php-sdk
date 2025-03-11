@@ -238,7 +238,13 @@ class RuleManager implements RuleManagerInterface
             if (ArrayUtils::arrayNotEmpty($orWhenRules)) {
                 foreach ($orWhenRules as $rule) {
 
-                    $match = $this->_processRuleItem($data, new RuleElement($rule));
+                    $extracted = $rule['OR_WHEN'][0] ?? [];
+                    $ruleData = [
+                        'value'     => $extracted['value'] ?? null,
+                        'matching'  => $extracted['matching'] ?? null,
+                        'key'       => $extracted['key'] ?? null,
+                    ];
+                    $match = $this->_processRuleItem($data, new RuleElement($ruleData));
                     if ($match !== false) {
                         return $match;
                     }

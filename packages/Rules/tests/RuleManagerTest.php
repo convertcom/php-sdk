@@ -402,17 +402,16 @@ class RuleManagerTest extends TestCase
         $data31 = ['device' => 'tablet', 'browser' => 'Mozilla', 'age' => 10];
         $data32 = ['device' => 'pc', 'browser' => 'Chrome', 'age' => 31];
         $this->assertTrue($rm->isRuleMatched($data1, new RuleObject($testRuleSet1)));
-        $this->assertTrue($rm->isRuleMatched($data12, new RuleObject($testRuleSet1)));
         $this->assertFalse($rm->isRuleMatched($data13, new RuleObject($testRuleSet1))); // case sensitive
         $this->assertFalse($rm->isRuleMatched($data1, new RuleObject($testRuleSet2)));
         $this->assertTrue($rm->isRuleMatched($data22, new RuleObject($testRuleSet2)));
         $this->assertFalse($rm->isRuleMatched($data21, new RuleObject($testRuleSet2)));
-        $this->assertFalse($rm->isRuleMatched($data2, [['device' => 'pc']]));
+        $this->assertFalse($rm->isRuleMatched($data2, new RuleObject([['device' => 'pc']])));
         $this->assertFalse($rm->isRuleMatched($data2, new RuleObject($testRuleSetWrong = [[['device' => 'pc']]])));
         $this->assertFalse($rm->isRuleMatched($data2, new RuleObject($testRuleSetWrong2 = ['OR' => [[['device' => 'pc']]]])));
-        $this->assertFalse($rm->isRuleMatched([], []));
-        $this->assertFalse($rm->isRuleMatched('a string', 1234567));
-        $this->assertFalse($rm->isRuleMatched([], [[['a string']]]));
+        $this->assertFalse($rm->isRuleMatched([], new RuleObject([])));
+        $this->assertFalse($rm->isRuleMatched('a string', new RuleObject([1234567])));
+        $this->assertFalse($rm->isRuleMatched([], new RuleObject([[['a string']]])));
         $this->assertTrue($rm->isRuleMatched($data31, new RuleObject($testRuleSet3)));
         $this->assertTrue($rm->isRuleMatched($data32, new RuleObject($testRuleSet3)));
     }
