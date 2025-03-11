@@ -41,6 +41,10 @@
         "Bucketing": {
           "type": "path",
           "url": "../Bucketing"
+        },
+        "Rules": {
+          "type": "path",
+          "url": "../Rules"
         }
       },
     "require": {
@@ -51,7 +55,8 @@
       "convertcom/php-sdk-event": ">=1.0.0",
       "convertcom/php-sdk-logger": ">=1.0.0",
       "convertcom/php-sdk-utils": ">=1.0.0",
-      "convertcom/php-sdk-bucketing": ">=1.0.0"
+      "convertcom/php-sdk-bucketing": ">=1.0.0",
+      "convertcom/php-sdk-rules": ">=1.0.0"
     },
     "require-dev": {
       "phpunit/phpunit": "^9.0",
