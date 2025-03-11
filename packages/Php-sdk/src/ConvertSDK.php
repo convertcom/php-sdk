@@ -12,6 +12,7 @@ use ConvertSdk\Config\Config;
 use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\Experience\ExperienceManager;
+use ConvertSdk\Rules\RuleManager;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
 
@@ -69,6 +70,10 @@ class ConvertSDK extends Core {
 
         // Initialize BucketingManager
         $this->bucketingManager = new BucketingManager($configuration, [
+            'loggerManager' => $this->loggerManager
+        ]);
+
+        $this->ruleManager = new RuleManager($configuration, [
             'loggerManager' => $this->loggerManager
         ]);
 
