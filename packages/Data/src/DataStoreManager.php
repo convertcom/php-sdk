@@ -1,87 +1,58 @@
 <?php
-namespace ConvertSdk\Data;
 
+namespace ConvertSdk;
+
+use ConvertSdk\Interfaces\DataStoreManagerInterface;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Enums\ErrorMessages;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Interfaces\EventManagerInterface;
+use OpenAPI\Client\Config;
 
-class DataStoreManager
+class DataStoreManager implements DataStoreManagerInterface
 {
-    /**
-     * @var array
-     */
     private $requestsQueue = [];
-
-    /**
-     * In a PHP environment, timer IDs are not common; we store it for completeness.
-     * @var mixed
-     */
     private $requestsQueueTimerID;
-
-    /**
-     * @var LogManagerInterface|null
-     */
     private $loggerManager;
-
-    /**
-     * @var EventManagerInterface|null
-     */
     private $eventManager;
-
-    /**
-     * Batch size for releasing queue.
-     * @var int
-     */
     public $batchSize;
-
-    /**
-     * Release interval in milliseconds.
-     * @var int
-     */
     public $releaseInterval;
-
-    /**
-     * @var mixed
-     */
     private $dataStore;
-
-    /**
-     * A callable to map values.
-     * @var callable
-     */
     private $mapper;
 
     const DEFAULT_BATCH_SIZE = 1;
     const DEFAULT_RELEASE_INTERVAL = 5000; // milliseconds
 
     /**
-     * Constructor.
+     * Constructor
      *
-     * @param array|null $config
-     * @param array $dependencies Associative array with optional keys:
-     *                            'dataStore', 'eventManager', 'loggerManager'
+     * @param Config|null $config Optional configuration object.
+     * @param array $dependencies
      */
-    public function __construct($config = null, $dependencies = [])
+    public function __construct(?Config $config = null, $dependencies = [])
     {
         $this->loggerManager = $dependencies['loggerManager'] ?? null;
         $this->eventManager = $dependencies['eventManager'] ?? null;
 
         // Set batch size and release interval from config if available, or use defaults.
-        $this->batchSize = isset($config['events']['batch_size'])
-            ? (int)$config['events']['batch_size']
+        $this->batchSize = $config && isset($config->getEvents()['batch_size']) 
+            ? (int)$config->getEvents()['batch_size'] 
             : self::DEFAULT_BATCH_SIZE;
 
-        $this->releaseInterval = isset($config['events']['release_interval'])
-            ? (int)$config['events']['release_interval']
+        $this->releaseInterval = $config && isset($config->getEvents()['release_interval']) 
+            ? (int)$config->getEvents()['release_interval'] 
             : self::DEFAULT_RELEASE_INTERVAL;
 
         // Use provided dataStore (invokes setDataStore())
-        $this->setDataStore($dependencies['dataStore'] ?? null);
+        $this->setDataStore($dependencies['dataStore'] ?? $config->getDataStore());
 
         // Mapper callable, defaulting to identity function.
-        $this->mapper = $config['mapper'] ?? function ($value) {
-            return $value;
-        };
+        $this->mapper = ($config && method_exists($config, 'getMapper') && null !== $config->getMapper()) 
+            ? $config->getMapper() 
+            : function ($value) {
+                return $value;
+            };
 
         $this->requestsQueue = [];
     }
@@ -92,7 +63,7 @@ class DataStoreManager
      * @param string $key
      * @param mixed  $data
      */
-    public function set($key, $data)
+    public function set(string $key, $data): void
     {
         try {
             if ($this->dataStore !== null && method_exists($this->dataStore, 'set')) {
@@ -132,7 +103,7 @@ class DataStoreManager
      * @param string $key
      * @param mixed  $data
      */
-    public function enqueue($key, $data)
+    public function enqueue(string $key, $data): void
     {
         if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
             // Call the mapper to transform data before logging.
@@ -141,7 +112,6 @@ class DataStoreManager
         }
 
         $addData = [$key => $data];
-        // Use a deep merge function (assumed available)
         $this->requestsQueue = ObjectUtils::objectDeepMerge($this->requestsQueue, $addData);
         $queueLength = count($this->requestsQueue);
 
@@ -178,10 +148,8 @@ class DataStoreManager
     /**
      * Stops the current queue timer.
      */
-    public function stopQueue()
+    public function stopQueue(): void
     {
-        // In PHP, there's no direct equivalent to clearTimeout.
-        // If using a timer mechanism, implement cancellation logic here.
         $this->requestsQueueTimerID = null;
     }
 
@@ -191,11 +159,9 @@ class DataStoreManager
      * Note: This implementation uses a blocking sleep() call.
      * In a real asynchronous environment, you might use an event loop.
      */
-    public function startQueue()
+    public function startQueue(): void
     {
-        // Convert milliseconds to seconds.
         $seconds = $this->releaseInterval / 1000;
-        // Blocking sleep (this is a simulation; adjust as needed).
         sleep($seconds);
         $this->releaseQueue('timeout');
     }

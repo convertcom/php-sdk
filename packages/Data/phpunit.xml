@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php"
+         colors="true"
+         verbose="true"
+         stopOnFailure="false">
+    <!-- Directory where tests are located -->
+    <testsuites>
+        <testsuite name="ConvertSdk Tests">
+            <directory>./tests</directory>
+        </testsuite>
+    </testsuites>
+
+    <!-- Configuration for PHPUnit -->
+    <php>
+        <!-- Include environment variables if needed -->
+        <env name="CONFIG_ENDPOINT" value="http://your-api-endpoint"/>
+        <env name="TRACK_ENDPOINT" value="http://your-track-endpoint"/>
+        <env name="PHPUNIT_DB_HOST" value="localhost"/>
+    </php>
+
+    <!-- Settings for code coverage -->
+    <coverage>
+        <include>
+            <directory suffix=".php">src</directory>
+        </include>
+        <exclude>
+            <directory suffix=".php">src/Tests</directory>
+        </exclude>
+    </coverage>
+</phpunit>
