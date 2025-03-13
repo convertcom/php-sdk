@@ -8,21 +8,20 @@
 
 namespace ConvertSdk\Interfaces;
 
-use ConvertSdk\Types\IdentityField;
+use ConvertSdk\Interfaces\DataStoreManagerInterface;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
 use ConvertSdk\Enums\ConversionSettingKey;
-use ConvertSdk\Interfaces\DataStoreManagerInterface;
-use OpenAPI\Client\ConfigResponseData;
+use OpenAPI\Client\IdentityField;
 use OpenAPI\Client\StoreData;
-use OpenAPI\Client\VisitorSegments;
-use OpenAPI\Client\ConfigExperience;
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\LocationAttributes;
 use OpenAPI\Client\GoalData;
 use OpenAPI\Client\BucketedVariation;
 use OpenAPI\Client\Entity;
-
+use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\ConfigExperience;
+use OpenAPI\Client\Model\VisitorSegments;
 
 /**
  * @typedef Entity OpenAPI\Client\Entity
