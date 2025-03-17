@@ -155,7 +155,9 @@ class Config
 
     public function getMapper() // No return type hint due to PHP 7.4 limitation
     {
-        return $this->mapper;
+        return isset($this->data['mapper']) && is_callable($this->data['mapper']) 
+                                            ? $this->data['mapper'] 
+                                            : null;
     }
 
     public function getSdkKey(): ?string

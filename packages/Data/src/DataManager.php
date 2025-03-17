@@ -63,83 +63,83 @@ class DataManager implements DataManagerInterface
     /**
        * Configuration response data.
        */
-      private ConfigResponseData $_data;
+    private ConfigResponseData $_data;
 
-      /**
-       * Account identifier.
-       */
-      private string $_accountId;
+    /**
+     * Account identifier.
+     */
+    private string $_accountId;
 
-      /**
-       * Project identifier.
-       */
-      private string $_projectId;
+    /**
+     * Project identifier.
+     */
+    private string $_projectId;
 
-      /**
-       * Configuration object.
-       */
-      private Config $_config;
+    /**
+     * Configuration object.
+     */
+    private Config $_config;
 
-      /**
-       * Bucketing manager instance.
-       */
-      private BucketingManagerInterface $_bucketingManager;
+    /**
+     * Bucketing manager instance.
+     */
+    private BucketingManagerInterface $_bucketingManager;
 
-      /**
-       * Logger manager instance.
-       */
-      private LogManagerInterface $_loggerManager;
+    /**
+     * Logger manager instance.
+     */
+    private LogManagerInterface $_loggerManager;
 
-      /**
-       * Event manager instance.
-       */
-      private EventManagerInterface $_eventManager;
+    /**
+     * Event manager instance.
+     */
+    private EventManagerInterface $_eventManager;
 
-      /**
-       * Data store manager instance.
-       */
-      private DataStoreManagerInterface $_dataStoreManager;
+    /**
+     * Data store manager instance.
+     */
+    private DataStoreManagerInterface $_dataStoreManager;
 
-      /**
-       * API manager instance.
-       */
-      private ApiManagerInterface $_apiManager;
+    /**
+     * API manager instance.
+     */
+    private ApiManagerInterface $_apiManager;
 
-      /**
-       * Rule manager instance.
-       */
-      private RuleManagerInterface $_ruleManager;
+    /**
+     * Rule manager instance.
+     */
+    private RuleManagerInterface $_ruleManager;
 
-      /**
-       * Data entities enum.
-       */
-      private array $_dataEntities;
+    /**
+     * Data entities enum.
+     */
+    private array $_dataEntities;
 
-      /**
-       * Local store limit.
-       */
-      private int $_localStoreLimit = self::LOCAL_STORE_LIMIT;
+    /**
+     * Local store limit.
+     */
+    private int $_localStoreLimit = self::LOCAL_STORE_LIMIT;
 
-      /**
-       * Map of bucketed visitors (visitor ID => data).
-       */
-      private array $_bucketedVisitors = [];
+    /**
+     * Map of bucketed visitors (visitor ID => data).
+     */
+    private array $_bucketedVisitors = [];
 
-      /**
-       * Flag indicating if storage is asynchronous.
-       */
-      private bool $_asyncStorage;
+    /**
+     * Flag indicating if storage is asynchronous.
+     */
+    private bool $_asyncStorage;
 
-      /**
-       * Environment string.
-       */
-      private string $_environment;
+    /**
+     * Environment string.
+     */
+    private string $_environment;
 
-      /**
-       * Mapper function for transforming data.
-       * @var callable
-       */
-      private $_mapper;
+    /**
+     * Mapper function for transforming data.
+     * @var callable
+     */
+    private $_mapper;
 
     /**
      * DataManager constructor.

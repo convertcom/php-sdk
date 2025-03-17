@@ -9,83 +9,83 @@
 namespace ConvertSdk\Interfaces;
 
 use GuzzleHttp\Promise\PromiseInterface;
+use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\VisitorTrackingEvents;
+use OpenAPI\Client\Model\VisitorSegments;
 
 /**
- * Interface ApiManagerInterface
- *
- * Defines the API Manager contract.
+ * Interface for ApiManager
  */
 interface ApiManagerInterface
 {
     /**
-     * Sends an API request.
+     * Send request to API server
      *
-     * @param string $method HTTP method (e.g. "GET", "POST", etc.)
-     * @param mixed $path The API path (could be a string or a Path object)
-     * @param array $data An associative array of request data.
-     * @param array $headers An associative array of headers.
-     * @return PromiseInterface Promise that resolves to the response.
+     * @param string $method HTTP method (e.g., 'GET', 'POST')
+     * @param array $path Path with 'base' and 'route' keys
+     * @param array $data Request data
+     * @param array $headers Request headers
+     * @return PromiseInterface Resolves to an HTTP response
      */
-    public function request(string $method, $path, array $data, array $headers): PromiseInterface;
+    public function request(
+        string $method,
+        array $path,
+        array $data = [],
+        array $headers = []
+    ): PromiseInterface;
 
     /**
-     * Enqueues an event request for the given visitor.
+     * Add request to queue
      *
-     * @param string $visitorId
-     * @param mixed $eventRequest (VisitorTrackingEvents)
-     * @param mixed|null $segments (optional VisitorSegments)
-     * @return void
+     * @param string $visitorId Visitor ID
+     * @param VisitorTrackingEvents $eventRequest Event request data
+     * @param VisitorSegments|null $segments Visitor segments (optional)
      */
-    public function enqueue(string $visitorId, $eventRequest, $segments = null): void;
+    public function enqueue(
+        string $visitorId,
+        VisitorTrackingEvents $eventRequest,
+        ?VisitorSegments $segments = null
+    ): void;
 
     /**
-     * Releases the API request queue.
+     * Release queue to server
      *
-     * @param string|null $reason Optional reason for releasing the queue.
-     * @return PromiseInterface Promise that resolves to the result of releasing the queue.
+     * @param string|null $reason Optional reason for releasing the queue
+     * @return PromiseInterface Resolves to an HTTP response
      */
-    public function releaseQueue(string $reason = null): PromiseInterface;
+    public function releaseQueue(?string $reason = null): PromiseInterface;
 
     /**
-     * Stops the API request queue.
-     *
-     * @return void
+     * Stop queue timer
      */
     public function stopQueue(): void;
 
     /**
-     * Starts the API request queue.
-     *
-     * @return void
+     * Start queue timer
      */
     public function startQueue(): void;
 
     /**
-     * Enables tracking.
-     *
-     * @return void
+     * Enable tracking
      */
     public function enableTracking(): void;
 
     /**
-     * Disables tracking.
-     *
-     * @return void
+     * Disable tracking
      */
     public function disableTracking(): void;
 
     /**
-     * Sets the configuration data.
+     * Set configuration data
      *
-     * @param mixed $data (ConfigResponseData)
-     * @return void
+     * @param ConfigResponseData $data Configuration data
      */
-    public function setData($data): void;
+    public function setData(ConfigResponseData $data): void;
 
     /**
-     * Retrieves the current configuration.
+     * Get configuration data
      *
-     * @return PromiseInterface Promise that resolves to the configuration (ConfigResponseData).
+     * @return PromiseInterface Resolves to ConfigResponseData
      */
     public function getConfig(): PromiseInterface;
 }

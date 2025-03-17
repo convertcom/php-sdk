@@ -1,100 +1,129 @@
 <?php
+/**
+ * Convert PHP SDK
+ * Version 1.0.0
+ * Copyright(c) 2020 Convert Insights, Inc
+ * License Apache-2.0
+ */
+
 namespace ConvertSdk\Utils;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Promise\PromiseInterface;
-use GuzzleHttp\Promise\rejection_for;
+use Psr\Http\Message\ResponseInterface;
 
+/**
+ * HTTP Client using GuzzleHttp
+ */
 class HttpClient
 {
-    /**
-     * Sends an HTTP request.
-     *
-     * Expected $config keys:
-     *  - baseURL: (string) the base URL.
-     *  - path: (string, optional) the path to append.
-     *  - method: (string, optional) HTTP method (default GET).
-     *  - headers: (array, optional) headers to send.
-     *  - responseType: (string, optional) 'json', 'arraybuffer', or 'text' (default 'json').
-     *  - data: (array, optional) request data. For methods that don’t support a request body (GET, HEAD, DELETE, TRACE, OPTIONS),
-     *           this data is added as query parameters.
-     *
-     * @param array $config
-     * @return PromiseInterface
-     */
-    public static function request(array $config): PromiseInterface
+    private Client $client;
+
+    public function __construct()
     {
-        // Determine HTTP method (default GET)
-        $method = isset($config['method']) ? strtoupper($config['method']) : 'GET';
+        $this->client = new Client();
+    }
 
-        // Ensure the baseURL has no trailing slash and path has no leading slash.
-        $baseURL = isset($config['baseURL']) ? rtrim($config['baseURL'], '/') : '';
-        $path    = isset($config['path']) ? ltrim($config['path'], '/') : '';
-        $url     = $baseURL . ($path ? '/' . $path : '');
+    /**
+     * Send an HTTP request
+     *
+     * @param array $config Request configuration
+     * @return PromiseInterface<HttpResponse>
+     */
+    public function request(array $config): PromiseInterface
+    {
+        $method = strtoupper($config['method'] ?? HttpMethod::GET);
+        $path = $config['path'] ?? '';
+        if (!empty($path) && !str_starts_with($path, '/')) {
+            $path = '/' . $path;
+        }
+        $baseURL = rtrim($config['baseURL'], '/');
+        $responseType = $config['responseType'] ?? HttpResponseType::JSON;
 
-        // Determine headers and response type.
-        $headers      = $config['headers'] ?? [];
-        $responseType = $config['responseType'] ?? 'json';
-
-        // Determine if the HTTP method supports a request body.
-        $methodsWithoutBody = ['GET', 'HEAD', 'DELETE', 'TRACE', 'OPTIONS'];
-        $supportsRequestBody = !in_array($method, $methodsWithoutBody, true);
-
+        $url = $baseURL . $path;
         $options = [
-            'headers' => $headers,
+            'headers' => $config['headers'] ?? [],
         ];
 
-        // If method does NOT support a request body, serialize data into query string.
-        if (!$supportsRequestBody && !empty($config['data']) && is_array($config['data'])) {
-            $queryString = http_build_query($config['data']);
-            $url .= '?' . $queryString;
-        } elseif ($supportsRequestBody && isset($config['data'])) {
-            // Otherwise, for methods that support a body, encode data as JSON.
-            $options['json'] = $config['data'];
+        if ($this->supportsRequestBody($method)) {
+            if (isset($config['data'])) {
+                $options['json'] = $config['data'];
+            }
+        } else {
+            $query = $this->serialize($config['data'] ?? []);
+            if ($query) {
+                $url .= '?' . $query;
+            }
         }
 
-        // Create a new Guzzle HTTP client.
-        $client = new Client();
-
-        // Make the asynchronous request and return a promise.
-        try {
-            // var_dump($config);
-            $promise = $client->requestAsync($method, $url, $options)
-                ->then(function ($response) use ($responseType) {
-                    $status     = $response->getStatusCode();
+        return $this->client->requestAsync($method, $url, $options)
+            ->then(
+                function (ResponseInterface $response) use ($responseType) {
+                    $status = $response->getStatusCode();
                     $statusText = $response->getReasonPhrase();
-                    $body       = (string) $response->getBody();
-                    $data       = null;
+                    $headers = $response->getHeaders();
+                    $body = $response->getBody()->getContents();
 
+                    $data = null;
                     switch ($responseType) {
-                        case 'json':
+                        case HttpResponseType::JSON:
                             $data = json_decode($body, true);
                             break;
-                        case 'arraybuffer':
-                            // Return raw body contents.
-                            $data = $response->getBody()->getContents();
+                        case HttpResponseType::ARRAYBUFFER:
+                            $data = $body; // In PHP, arraybuffer is represented as a string
                             break;
-                        case 'text':
+                        case HttpResponseType::TEXT:
                             $data = $body;
                             break;
                         default:
-                            throw new \Exception("Unsupported response type: {$responseType}");
+                            throw new \InvalidArgumentException('Unsupported response type');
                     }
 
                     return [
-                        'status'     => $status,
+                        'data' => $data,
+                        'status' => $status,
                         'statusText' => $statusText,
-                        'headers'    => $response->getHeaders(),
-                        'data'       => $data,
+                        'headers' => $headers,
                     ];
-                });
-            return $promise;
-        } catch (\Exception $e) {
-            return rejection_for([
-                'message'    => $e->getMessage(),
-                'status'     => $e->getCode(),
-                'statusText' => $e->getMessage(),
-            ]);
+                },
+                function (RequestException $e) {
+                    $response = $e->hasResponse() ? $e->getResponse() : null;
+                    $status = $response ? $response->getStatusCode() : null;
+                    $statusText = $response ? $response->getReasonPhrase() : null;
+                    throw new \Exception($e->getMessage(), $status ?? 0, $e);
+                }
+            );
+    }
+
+    /**
+     * Check if the HTTP method supports a request body
+     *
+     * @param string $method HTTP method
+     * @return bool
+     */
+    private function supportsRequestBody(string $method): bool
+    {
+        return !in_array(strtoupper($method), [
+            HttpMethod::GET,
+            HttpMethod::HEAD,
+            HttpMethod::DELETE,
+            'TRACE',
+            HttpMethod::OPTIONS
+        ]);
+    }
+
+    /**
+     * Serialize parameters into a query string
+     *
+     * @param array $params Parameters to serialize
+     * @return string
+     */
+    private function serialize(array $params): string
+    {
+        if (empty($params)) {
+            return '';
         }
+        return http_build_query($params);
     }
 }
