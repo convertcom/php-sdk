@@ -129,7 +129,10 @@ class LogManager implements LogManagerInterface
                 } else {
                     error_log("Info: Unable to find method \"{$method}()\" in client sdk: " .
                         (is_object($client['sdk']) ? $this->classBasename($client['sdk']) : gettype($client['sdk'])) . "\n");
-                    error_log(implode(' ', array_map('strval', $args)) . "\n");
+                    $formattedArgs = array_map(function ($arg) {
+                        return is_array($arg) ? json_encode($arg) : strval($arg);
+                    }, $args);
+                    error_log(implode(' ', $formattedArgs) . "\n");
                 }
             }
         }

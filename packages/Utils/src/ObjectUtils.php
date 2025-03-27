@@ -61,7 +61,12 @@ class ObjectUtils
 
     public static function objectNotEmpty($object): bool
     {
-        return is_array($object) && !empty($object);
+        if (is_array($object)) {
+            return !empty($object);
+        } elseif (is_object($object)) {
+            return count(get_object_vars($object)) > 0;
+        }
+        return false;
     }
 
     public static function objectDeepEqual($a, $b): bool

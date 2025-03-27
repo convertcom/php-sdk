@@ -16,47 +16,47 @@ class BucketingAttributes
     /**
      * @var string|null The environment name
      */
-    protected $environment;
+    public $environment;
 
     /**
      * @var array|null Associative array of location properties
      */
-    protected $locationProperties;
+    public $locationProperties;
 
     /**
      * @var array|null Associative array of visitor properties
      */
-    protected $visitorProperties;
+    public $visitorProperties;
 
     /**
      * @var bool|null Whether to enable type casting
      */
-    protected $typeCasting;
+    public $typeCasting;
 
     /**
      * @var string[]|null List of experience keys
      */
-    protected $experienceKeys;
+    public $experienceKeys;
 
     /**
      * @var bool|null Whether to update visitor properties
      */
-    protected $updateVisitorProperties;
+    public $updateVisitorProperties;
 
     /**
      * @var string|null Forced variation ID
      */
-    protected $forceVariationId;
+    public $forceVariationId;
 
     /**
      * @var bool|null Whether to enable tracking
      */
-    protected $enableTracking;
+    public $enableTracking;
 
     /**
      * @var bool|null Whether to ignore location properties
      */
-    protected $ignoreLocationProperties;
+    public $ignoreLocationProperties;
 
     /**
      * Constructor to initialize the object with data.

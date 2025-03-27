@@ -44,7 +44,9 @@ class StoreData
     {
         $this->bucketing = $data['bucketing'] ?? null;
         $this->locations = $data['locations'] ?? null;
-        $this->segments = $data['segments'] ?? null;
+        $this->segments = isset($data['segments']) && is_array($data['segments']) 
+        ? new VisitorSegments($data['segments']) 
+        : ($data['segments'] ?? null);
         $this->goals = $data['goals'] ?? null;
     }
 

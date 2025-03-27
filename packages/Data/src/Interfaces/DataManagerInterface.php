@@ -33,7 +33,9 @@ interface DataManagerInterface
      *
      * @return ConfigResponseData
      */
-    public function getData(): ConfigResponseData;
+    public function getConfigData(): ConfigResponseData;
+
+    public function getData(string $visitorId): ?StoreData;
 
     /**
      * Set the configuration data.
@@ -41,7 +43,7 @@ interface DataManagerInterface
      * @param ConfigResponseData $data
      * @return void
      */
-    public function setData(ConfigResponseData $data): void;
+    public function setConfigData(ConfigResponseData $data): void;
 
     /**
      * Get the data store manager.
@@ -73,14 +75,6 @@ interface DataManagerInterface
      * @return void
      */
     public function putData(string $storeKey, StoreData $storeData): void;
-
-    /**
-     * Retrieve data for a given key.
-     *
-     * @param string $storeKey
-     * @return StoreData
-     */
-    public function getStoreData(string $storeKey): StoreData;
 
     /**
      * Generate a store key from a visitor ID.
@@ -159,7 +153,7 @@ interface DataManagerInterface
      * @param string|null $field IdentityField constant (id or key) (optional)
      * @return array Associative array of Entity objects
      */
-    public function getEntitiesListObject(string $entityType, ?string $field = null): array;
+    public function getEntitiesListObject(string $entityType, string $field): array;
 
     /**
      * Get a single entity by key.
@@ -168,7 +162,7 @@ interface DataManagerInterface
      * @param string $entityType
      * @return Entity
      */
-    public function getEntity(string $key, string $entityType): Entity;
+    public function getEntity(string $key, string $entityType): ?array;
 
     /**
      * Get multiple entities by keys.
@@ -186,7 +180,7 @@ interface DataManagerInterface
      * @param string $entityType
      * @return Entity
      */
-    public function getEntityById(string $id, string $entityType): Entity;
+    public function getEntityById(string $id, string $entityType): ?array;
 
     /**
      * Get multiple entities by IDs.
@@ -233,7 +227,7 @@ interface DataManagerInterface
         string $subEntityIdentity,
         string $identityField,
         string $subIdentityField
-    ): array;
+    ): ?array;
 
     /**
      * Filter report segments based on visitor properties.

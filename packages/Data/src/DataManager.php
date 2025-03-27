@@ -32,6 +32,7 @@ use OpenAPI\Client\Model\ConfigSegment;
 use OpenAPI\Client\Model\ConfigAudienceTypes;
 use OpenAPI\Client\Model\VariationStatuses;
 use OpenAPI\Client\Model\GenericListMatchingOptions;
+use OpenAPI\Client\Model\RuleObject;
 use OpenAPI\Client\Entity;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\IdentityField;
@@ -68,12 +69,12 @@ class DataManager implements DataManagerInterface
     /**
      * Account identifier.
      */
-    private string $_accountId;
+    private ?string $_accountId;
 
     /**
      * Project identifier.
      */
-    private string $_projectId;
+    private ?string $_projectId;
 
     /**
      * Configuration object.
@@ -98,7 +99,7 @@ class DataManager implements DataManagerInterface
     /**
      * Data store manager instance.
      */
-    private DataStoreManagerInterface $_dataStoreManager;
+    private ?DataStoreManagerInterface $_dataStoreManager;
 
     /**
      * API manager instance.
@@ -171,13 +172,15 @@ class DataManager implements DataManagerInterface
       $this->_mapper = $config->getMapper() ?? fn($value) => $value;
       $this->_asyncStorage = $asyncStorage;
       $this->_data = $config->getData() ?? ObjectUtils::deepValue($config, 'data');
-      $this->_accountId = $this->_data?->account_id ?? null;
-      $this->_projectId = $this->_data?->project->id ?? null;
+      $this->_accountId = $this->_data ? $this->_data->getAccountId() : '';
+      $project = $this->_data ? $this->_data->getProject() : null;
+      $this->_projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
       $this->_dataStoreManager = $config->getDataStore();
+      $this->_dataEntities = DataEntities::DATA_ENTITIES;
       $this->_loggerManager?->trace(
           'DataManager()',
           Messages::DATA_CONSTRUCTOR,
-          $this
+          null
       );
     }
 
@@ -271,228 +274,228 @@ class DataManager implements DataManagerInterface
      * @return mixed ConfigExperience or RuleError or null
      */
     public function matchRulesByField(
-      string $visitorId,
-      string $identity,
-      string $identityField = 'key',
-      BucketingAttributes $attributes
+        string $visitorId,
+        string $identity,
+        string $identityField = 'key',
+        BucketingAttributes $attributes
     ): mixed {
-      // Extract attributes properties
-      $visitorProperties = $attributes->visitorProperties ?? null;
-      $locationProperties = $attributes->locationProperties ?? null;
-      $ignoreLocationProperties = $attributes->ignoreLocationProperties ?? false;
-      $environment = $attributes->environment ?? $this->_environment;
-
-      // Log trace information
-      $this->_loggerManager?->trace(
-          'DataManager.matchRulesByField()',
-          $this->_mapper([
-              'visitorId' => $visitorId,
-              'identity' => $identity,
-              'identityField' => $identityField,
-              'visitorProperties' => $visitorProperties,
-              'locationProperties' => $locationProperties,
-              'ignoreLocationProperties' => $ignoreLocationProperties,
-              'environment' => $environment
-          ])
-      );
-
-      // Retrieve the experience
-      $experience = $this->_getEntityByField($identity, 'experiences', $identityField);
-      if (!$experience) {
-          $this->_loggerManager?->debug(
-              'DataManager.matchRulesByField()',
-              Messages::EXPERIENCE_NOT_FOUND,
-              $this->_mapper([
-                  'identity' => $identity,
-                  'identityField' => $identityField
-              ])
-          );
-          return null;
-      }
-
-      // Retrieve archived experiences
-      $archivedExperiences = $this->getEntitiesList('archived_experiences');
-      // Check if the experience is archived
-      $isArchivedExperience = in_array((string)$experience->id, array_map('strval', $archivedExperiences));
-      if ($isArchivedExperience) {
-          $this->_loggerManager?->debug(
-              'DataManager.matchRulesByField()',
-              Messages::EXPERIENCE_ARCHIVED,
-              $this->_mapper([
-                  'identity' => $identity,
-                  'identityField' => $identityField
-              ])
-          );
-          return null;
-      }
-
-      // Check environment match
-      $isEnvironmentMatch = $experience->environment ? $experience->environment === $environment : true; // skip if no environment
-      if (!$isEnvironmentMatch) {
-          $this->_loggerManager?->debug(
-              'DataManager.matchRulesByField()',
-              Messages::EXPERIENCE_ENVIRONMENT_NOT_MATCH,
-              $this->_mapper([
-                  'identity' => $identity,
-                  'identityField' => $identityField
-              ])
-          );
-          return null;
-      }
-
-      // Check bucketing
-      $bucketingData = $this->getData($visitorId)->bucketing ?? [];
-      $variationId = $bucketingData[$experience->id] ?? null;
-      $isBucketed = $variationId && $this->retrieveVariation($experience->id, (string)$variationId);
-
-      // Check location rules
-      $locationMatched = $ignoreLocationProperties === true;
-      if (!$locationMatched && $locationProperties) {
-          if (is_array($experience->locations) && count($experience->locations) > 0) {
-              $locations = $this->getItemsByIds($experience->locations, 'locations');
-              if (count($locations) > 0) {
-                  $matchedLocations = $this->selectLocations($visitorId, $locations, [
-                      'locationProperties' => $locationProperties,
-                      'identityField' => $identityField
-                  ]);
-                  $matchedErrors = array_filter($matchedLocations, fn($match) => in_array($match, RuleError::getConstants()));
-                  if (count($matchedErrors) > 0) {
-                      return reset($matchedErrors);
-                  }
-                  $locationMatched = count($matchedLocations) > 0;
-              }
-          } elseif ($experience->site_area) {
-              $locationMatched = $this->_ruleManager->isRuleMatched(
-                  $locationProperties,
-                  $experience->site_area,
-                  'SiteArea'
-              );
-              if (in_array($locationMatched, RuleError::getConstants())) {
-                  return $locationMatched;
-              }
-          } else {
-              $locationMatched = true;
-              $this->_loggerManager?->info(
-                  'DataManager.matchRulesByField()',
-                  Messages::LOCATION_NOT_RESTRICTED
-              );
-          }
-      }
-      if (!$locationMatched) {
-          $this->_loggerManager?->debug(
-              'DataManager.matchRulesByField()',
-              Messages::LOCATION_NOT_MATCH,
-              $this->_mapper([
-                  'locationProperties' => $locationProperties,
-                  $experience->locations ? 'experiences[].variations[].locations' : 'experiences[].variations[].site_area' => $experience->locations ?? $experience->site_area ?? ''
-              ])
-          );
-          return null;
-      }
-
-      // Check audience rules
-      $audiences = [];
-      $segments = [];
-      $matchedAudiences = [];
-      $matchedSegments = [];
-      $audiencesToCheck = [];
-      $audiencesMatched = false;
-      $segmentsMatched = false;
-
-      if ($visitorProperties) {
-          if (is_array($experience->audiences) && count($experience->audiences) > 0) {
-              $audiences = $this->getItemsByIds($experience->audiences, 'audiences');
-              $audiencesToCheck = array_filter(
-                  $audiences,
-                  fn($audience) => !($isBucketed && $audience->type === ConfigAudienceTypes::PERMANENT)
-              );
-              if (count($audiencesToCheck) > 0) {
-                  $matchedAudiences = $this->filterMatchedRecordsWithRule(
-                      $audiencesToCheck,
-                      $visitorProperties,
-                      'audience',
-                      $identityField
-                  );
-                  $matchedErrors = array_filter($matchedAudiences, fn($match) => in_array($match, RuleError::getConstants()));
-                  if (count($matchedErrors) > 0) {
-                      return reset($matchedErrors);
-                  }
-                  if (count($matchedAudiences) > 0) {
-                      foreach ($matchedAudiences as $item) {
-                          $this->_loggerManager?->info(
-                              'DataManager.matchRulesByField()',
-                              str_replace('#', $item->{$identityField} ?? '', Messages::AUDIENCE_MATCH)
-                          );
-                      }
-                  }
-                  $audiencesMatched = $experience->settings->matching_options->audiences === GenericListMatchingOptions::ALL
-                      ? count($matchedAudiences) === count($audiencesToCheck)
-                      : count($matchedAudiences) > 0;
-              } else {
-                  $audiencesMatched = true;
-                  $this->_loggerManager?->info(
-                      'DataManager.matchRulesByField()',
-                      Messages::NON_PERMANENT_AUDIENCE_NOT_RESTRICTED
-                  );
-              }
-          } else {
-              $audiencesMatched = true;
-              $this->_loggerManager?->info(
-                  'DataManager.matchRulesByField()',
-                  Messages::AUDIENCE_NOT_RESTRICTED
-              );
-          }
-      }
-
-      $segments = $this->getItemsByIds($experience->audiences, 'segments');
-      if (count($segments) > 0) {
-          $matchedSegments = $this->filterMatchedCustomSegments($segments, $visitorId);
-          if (count($matchedSegments) > 0) {
-              foreach ($matchedSegments as $item) {
-                  $this->_loggerManager?->info(
-                      'DataManager.matchRulesByField()',
-                      str_replace('#', $item->{$identityField} ?? '', Messages::SEGMENTATION_MATCH)
-                  );
-              }
-          }
-          $segmentsMatched = count($matchedSegments) > 0;
-      } else {
-          $segmentsMatched = true;
-          $this->_loggerManager?->info(
-              'DataManager.matchRulesByField()',
-              Messages::SEGMENTATION_NOT_RESTRICTED
-          );
-      }
-
-      // Final check and return
-      if ($audiencesMatched && $segmentsMatched) {
-          if (is_array($experience->variations) && count($experience->variations) > 0) {
-              $this->_loggerManager?->info(
-                  'DataManager.matchRulesByField()',
-                  Messages::EXPERIENCE_RULES_MATCHED
-              );
-              return $experience;
-          } else {
-              $this->_loggerManager?->debug(
-                  'DataManager.matchRulesByField()',
-                  Messages::VARIATIONS_NOT_FOUND,
-                  $this->_mapper([
-                      'visitorProperties' => $visitorProperties,
-                      'audiences' => $audiences
-                  ])
-              );
-          }
-      } else {
-          $this->_loggerManager?->debug(
-              'DataManager.matchRulesByField()',
-              Messages::AUDIENCE_NOT_MATCH,
-              $this->_mapper([
-                  'visitorProperties' => $visitorProperties,
-                  'audiences' => $audiences
-              ])
-          );
-      }
-      return null;
+        // Extract attributes properties
+        $visitorProperties = $attributes->visitorProperties ?? null;
+        $locationProperties = $attributes->locationProperties ?? null;
+        $ignoreLocationProperties = $attributes->ignoreLocationProperties ?? false;
+        $environment = $attributes->environment ?? $this->_environment;
+    
+        // Log trace information
+        $this->_loggerManager?->trace(
+            'DataManager.matchRulesByField()',
+            json_encode(($this->_mapper)([
+                'visitorId' => $visitorId,
+                'identity' => $identity,
+                'identityField' => $identityField,
+                'visitorProperties' => $visitorProperties,
+                'locationProperties' => $locationProperties,
+                'ignoreLocationProperties' => $ignoreLocationProperties,
+                'environment' => $environment
+            ]))
+        );
+    
+        // Retrieve the experience
+        $experience = $this->_getEntityByField($identity, 'experiences', $identityField);
+        if (!$experience) {
+            $this->_loggerManager?->debug(
+                'DataManager.matchRulesByField()',
+                Messages::EXPERIENCE_NOT_FOUND,
+                ($this->_mapper)([
+                    'identity' => $identity,
+                    'identityField' => $identityField
+                ])
+            );
+            return null;
+        }
+    
+        // Retrieve archived experiences
+        $archivedExperiences = $this->getEntitiesList('archived_experiences');
+        // Check if the experience is archived
+        $isArchivedExperience = in_array((string)$experience['id'], array_map('strval', $archivedExperiences));
+        if ($isArchivedExperience) {
+            $this->_loggerManager?->debug(
+                'DataManager.matchRulesByField()',
+                Messages::EXPERIENCE_ARCHIVED,
+                ($this->_mapper)([
+                    'identity' => $identity,
+                    'identityField' => $identityField
+                ])
+            );
+            return null;
+        }
+    
+        // Check environment match
+        $isEnvironmentMatch = isset($experience['environment']) ? $experience['environment'] === $environment : true;
+        if (!$isEnvironmentMatch) {
+            $this->_loggerManager?->debug(
+                'DataManager.matchRulesByField()',
+                Messages::EXPERIENCE_ENVIRONMENT_NOT_MATCH,
+                ($this->_mapper)([
+                    'identity' => $identity,
+                    'identityField' => $identityField
+                ])
+            );
+            return null;
+        }
+    
+        // Check bucketing
+        $bucketingData = $this->getData($visitorId)->bucketing ?? [];
+        $variationId = $bucketingData[$experience['id']] ?? null;
+        $isBucketed = $variationId && $this->retrieveVariation($experience['id'], (string)$variationId);
+    
+        // Check location rules
+        $locationMatched = $ignoreLocationProperties === true;
+        if (!$locationMatched && $locationProperties) {
+            if (isset($experience['locations']) && is_array($experience['locations']) && count($experience['locations']) > 0) {
+                $locations = $this->getItemsByIds($experience['locations'], 'locations');
+                if (count($locations) > 0) {
+                    $matchedLocations = $this->selectLocations($visitorId, $locations, [
+                        'locationProperties' => $locationProperties,
+                        'identityField' => $identityField
+                    ]);
+                    $matchedErrors = array_filter($matchedLocations, fn($match) => in_array($match, RuleError::getConstants()));
+                    if (count($matchedErrors) > 0) {
+                        return reset($matchedErrors);
+                    }
+                    $locationMatched = count($matchedLocations) > 0;
+                }
+            } elseif (isset($experience['site_area'])) {
+                $locationMatched = $this->_ruleManager->isRuleMatched(
+                    $locationProperties,
+                    new RuleObject($experience['site_area']),
+                    'SiteArea'
+                );
+                if (in_array($locationMatched, RuleError::getConstants())) {
+                    return $locationMatched;
+                }
+            } else {
+                $locationMatched = true;
+                $this->_loggerManager?->info(
+                    'DataManager.matchRulesByField()',
+                    Messages::LOCATION_NOT_RESTRICTED
+                );
+            }
+        }
+        if (!$locationMatched) {
+            $this->_loggerManager?->debug(
+                'DataManager.matchRulesByField()',
+                Messages::LOCATION_NOT_MATCH,
+                json_encode(($this->_mapper)([
+                    'locationProperties' => $locationProperties,
+                    isset($experience['locations']) ? 'experiences[].variations[].locations' : 'experiences[].variations[].site_area' => $experience['locations'] ?? $experience['site_area'] ?? ''
+                ]))
+            );
+            return null;
+        }
+    
+        // Check audience rules
+        $audiences = [];
+        $segments = [];
+        $matchedAudiences = [];
+        $matchedSegments = [];
+        $audiencesToCheck = [];
+        $audiencesMatched = false;
+        $segmentsMatched = false;
+    
+        if ($visitorProperties) {
+            if (isset($experience['audiences']) && is_array($experience['audiences']) && count($experience['audiences']) > 0) {
+                $audiences = $this->getItemsByIds($experience['audiences'], 'audiences');
+                $audiencesToCheck = array_filter(
+                    $audiences,
+                    fn($audience) => !($isBucketed && $audience['type'] === ConfigAudienceTypes::PERMANENT)
+                );
+                if (count($audiencesToCheck) > 0) {
+                    $matchedAudiences = $this->filterMatchedRecordsWithRule(
+                        $audiencesToCheck,
+                        $visitorProperties,
+                        'audience',
+                        $identityField
+                    );
+                    $matchedErrors = array_filter($matchedAudiences, fn($match) => in_array($match, RuleError::getConstants()));
+                    if (count($matchedErrors) > 0) {
+                        return reset($matchedErrors);
+                    }
+                    if (count($matchedAudiences) > 0) {
+                        foreach ($matchedAudiences as $item) {
+                            $this->_loggerManager?->info(
+                                'DataManager.matchRulesByField()',
+                                str_replace('#', $item[$identityField] ?? '', Messages::AUDIENCE_MATCH)
+                            );
+                        }
+                    }
+                    $audiencesMatched = $experience['settings']['matching_options']['audiences'] === GenericListMatchingOptions::ALL
+                        ? count($matchedAudiences) === count($audiencesToCheck)
+                        : count($matchedAudiences) > 0;
+                } else {
+                    $audiencesMatched = true;
+                    $this->_loggerManager?->info(
+                        'DataManager.matchRulesByField()',
+                        Messages::NON_PERMANENT_AUDIENCE_NOT_RESTRICTED
+                    );
+                }
+            } else {
+                $audiencesMatched = true;
+                $this->_loggerManager?->info(
+                    'DataManager.matchRulesByField()',
+                    Messages::AUDIENCE_NOT_RESTRICTED
+                );
+            }
+        }
+    
+        $segments = $this->getItemsByIds($experience['audiences'], 'segments');
+        if (count($segments) > 0) {
+            $matchedSegments = $this->filterMatchedCustomSegments($segments, $visitorId);
+            if (count($matchedSegments) > 0) {
+                foreach ($matchedSegments as $item) {
+                    $this->_loggerManager?->info(
+                        'DataManager.matchRulesByField()',
+                        str_replace('#', $item[$identityField] ?? '', Messages::SEGMENTATION_MATCH)
+                    );
+                }
+            }
+            $segmentsMatched = count($matchedSegments) > 0;
+        } else {
+            $segmentsMatched = true;
+            $this->_loggerManager?->info(
+                'DataManager.matchRulesByField()',
+                Messages::SEGMENTATION_NOT_RESTRICTED
+            );
+        }
+    
+        // Final check and return
+        if ($audiencesMatched && $segmentsMatched) {
+            if (isset($experience['variations']) && is_array($experience['variations']) && count($experience['variations']) > 0) {
+                $this->_loggerManager?->info(
+                    'DataManager.matchRulesByField()',
+                    Messages::EXPERIENCE_RULES_MATCHED
+                );
+                return $experience;
+            } else {
+                $this->_loggerManager?->debug(
+                    'DataManager.matchRulesByField()',
+                    Messages::VARIATIONS_NOT_FOUND,
+                    ($this->_mapper)([
+                        'visitorProperties' => $visitorProperties,
+                        'audiences' => $audiences
+                    ])
+                );
+            }
+        } else {
+            $this->_loggerManager?->debug(
+                'DataManager.matchRulesByField()',
+                Messages::AUDIENCE_NOT_MATCH,
+                ($this->_mapper)([
+                    'visitorProperties' => $visitorProperties,
+                    'audiences' => $audiences
+                ])
+            );
+        }
+        return null;
     }
 
 
@@ -530,17 +533,17 @@ class DataManager implements DataManagerInterface
       // Log trace information
       $this->_loggerManager?->trace(
           'DataManager._getBucketingByField()',
-          $this->_mapper([
-              'visitorId' => $visitorId,
-              'identity' => $identity,
-              'identityField' => $identityField,
-              'visitorProperties' => $visitorProperties,
-              'locationProperties' => $locationProperties,
-              'forceVariationId' => $forceVariationId,
-              'enableTracking' => $enableTracking,
-              'ignoreLocationProperties' => $ignoreLocationProperties,
-              'environment' => $environment
-          ])
+          json_encode(($this->_mapper)([
+            'visitorId' => $visitorId,
+            'identity' => $identity,
+            'identityField' => $identityField,
+            'visitorProperties' => $visitorProperties,
+            'locationProperties' => $locationProperties,
+            'forceVariationId' => $forceVariationId,
+            'enableTracking' => $enableTracking,
+            'ignoreLocationProperties' => $ignoreLocationProperties,
+            'environment' => $environment
+        ]))
       );
 
       // Retrieve the experience
@@ -779,58 +782,73 @@ class DataManager implements DataManagerInterface
      * @return void
      * @private
      */
-    private function putData(string $visitorId, ?StoreData $newData = null): void {
-      $storeKey = $this->getStoreKey($visitorId);
-      $storeDataObj = $this->getData($visitorId);
-      $storeData = [
-          'bucketing' => $storeDataObj?->getBucketing() ?? [],
-          'locations' => $storeDataObj?->getLocations() ?? [],
-          'segments' => $storeDataObj?->getSegments() ? (array)$storeDataObj->getSegments()->jsonSerialize() : [],
-          'goals' => $storeDataObj?->getGoals() ?? []
-      ];
-      $newDataObj = $newData ?? new StoreData();
-      $newDataArray = [
-          'bucketing' => $newDataObj->getBucketing() ?? [],
-          'locations' => $newDataObj->getLocations() ?? [],
-          'segments' => $newDataObj->getSegments() ? (array)$newDataObj->getSegments()->jsonSerialize() : [],
-          'goals' => $newDataObj->getGoals() ?? []
-      ];
-      $isChanged = !ObjectUtils::objectDeepEqual($storeData, $newDataArray);
+    public function putData(string $visitorId, ?StoreData $newData = null): void
+    {
+        // Step 1: Get the store key
+        $storeKey = $this->getStoreKey($visitorId);
+        // Step 2: Retrieve existing data or use an empty array
+        $storeDataObj = $this->getData($visitorId);
+        $storeData = $storeDataObj ? [
+            'bucketing' => $storeDataObj->getBucketing() ?? [],
+            'locations' => $storeDataObj->getLocations() ?? [],
+            'segments' => $storeDataObj->getSegments() ? (array)$storeDataObj->getSegments()->jsonSerialize() : [],
+            'goals' => $storeDataObj->getGoals() ?? []
+        ] : [];
 
-      if ($isChanged) {
-          $updatedData = ObjectUtils::objectDeepMerge($storeData, $newDataArray);
-          $this->_bucketedVisitors[$storeKey] = $updatedData;
+        // Step 3: Handle newData, defaulting to an empty StoreData object
+        $newDataObj = $newData ?? new StoreData();
+        $newDataArray = [
+            'bucketing' => $newDataObj->getBucketing() ?? [],
+            'locations' => $newDataObj->getLocations() ?? [],
+            'segments' => $newDataObj->getSegments() ? (array)$newDataObj->getSegments()->jsonSerialize() : [],
+            'goals' => $newDataObj->getGoals() ?? []
+        ];
 
-          if (count($this->_bucketedVisitors) > $this->_localStoreLimit) {
-              reset($this->_bucketedVisitors);
-              $oldestKey = key($this->_bucketedVisitors);
-              unset($this->_bucketedVisitors[$oldestKey]);
-          }
+        // Step 4: Check if data has changed
+        $isChanged = !ObjectUtils::objectDeepEqual($storeData, $newDataArray);
 
-          if ($this->_dataStoreManager) {
-              $storedSegments = $storeDataObj?->getSegments() ? (array)$storeDataObj->getSegments()->jsonSerialize() : [];
-              $dataWithoutSegments = array_diff_key($storeData, ['segments' => '']);
-              $reportSegments = $this->filterReportSegments($storedSegments);
-              $newSegments = $newDataObj->getSegments() ? (array)$newDataObj->getSegments()->jsonSerialize() : $this->filterReportSegments([]);
 
-              if (!empty($newSegments)) {
-                  $mergedData = ObjectUtils::objectDeepMerge($dataWithoutSegments, [
-                      'segments' => array_merge($reportSegments, $newSegments)
-                  ]);
-                  if ($this->_asyncStorage) {
-                      $this->_dataStoreManager->enqueue($storeKey, $mergedData);
-                  } else {
-                      $this->_dataStoreManager->set($storeKey, $mergedData);
-                  }
-              } else {
-                  if ($this->_asyncStorage) {
-                      $this->_dataStoreManager->enqueue($storeKey, $updatedData);
-                  } else {
-                      $this->_dataStoreManager->set($storeKey, $updatedData);
-                  }
-              }
-          }
-      }
+        if ($isChanged) {
+            // Step 5: Merge data if changed
+            $updatedData = ObjectUtils::objectDeepMerge($storeData, $newDataArray);
+            $this->_bucketedVisitors[$storeKey] = $updatedData;
+
+            // Step 6: Enforce local store limit
+            if (count($this->_bucketedVisitors) > $this->_localStoreLimit) {
+                reset($this->_bucketedVisitors);
+                $oldestKey = key($this->_bucketedVisitors);
+                unset($this->_bucketedVisitors[$oldestKey]);
+            }
+
+            // Step 7: Handle data store manager
+            if ($this->_dataStoreManager) {
+                // Extract segments and remaining data
+                $storedSegments = $storeData['segments'] ?? [];
+                $dataWithoutSegments = $storeData;
+                unset($dataWithoutSegments['segments']);
+
+                // Filter segments
+                $reportSegments = $this->filterReportSegments($storedSegments);
+                $newSegments = $this->filterReportSegments($newDataArray['segments'] ?? []);
+                if (!empty(array_filter($newSegments, fn($value) => $value !== null))) {
+                    // Merge data with filtered segments
+                    $mergedData = ObjectUtils::objectDeepMerge($dataWithoutSegments, [
+                        'segments' => array_merge($reportSegments, $newSegments)
+                    ]);
+                    if ($this->_asyncStorage) {
+                        $this->_dataStoreManager->enqueue($storeKey, $mergedData);
+                    } else {
+                        $this->_dataStoreManager->set($storeKey, $mergedData);
+                    }
+                } else {
+                    if ($this->_asyncStorage) {
+                        $this->_dataStoreManager->enqueue($storeKey, $updatedData);
+                    } else {
+                        $this->_dataStoreManager->set($storeKey, $updatedData);
+                    }
+                }
+            }
+        }
     }
 
   /**
@@ -840,7 +858,7 @@ class DataManager implements DataManagerInterface
    * @return StoreData|null Stored data
    * @private
    */
-  private function getData(string $visitorId): ?StoreData {
+  public function getData(string $visitorId): ?StoreData {
     $storeKey = $this->getStoreKey($visitorId);
     $memoryData = $this->_bucketedVisitors[$storeKey] ?? null;
 
@@ -850,6 +868,7 @@ class DataManager implements DataManagerInterface
             $memoryData ?? [],
             $dataStoreData
         );
+
         return new StoreData($mergedData);
     }
 
@@ -867,7 +886,7 @@ class DataManager implements DataManagerInterface
    * @return string Store key
    * @private
    */
-  private function getStoreKey(string $visitorId): string {
+  public function getStoreKey(string $visitorId): string {
     return "{$this->_accountId}-{$this->_projectId}-{$visitorId}";
   }
 
@@ -1030,9 +1049,8 @@ class DataManager implements DataManagerInterface
     $goal = is_string($goalId)
         ? $this->getEntity($goalId, 'goals')
         : $this->getEntityById($goalId, 'goals');
-
     // Check if goal exists and has an ID
-    if ($goal === null || !isset($goal->id)) {
+    if ($goal === null || !isset($goal["id"])) {
         $this->_loggerManager?->error(
             'DataManager.convert()',
             Messages::GOAL_NOT_FOUND
@@ -1042,12 +1060,12 @@ class DataManager implements DataManagerInterface
 
     // Handle goal rule matching if provided
     if ($goalRule !== null) {
-        if (empty($goal->rules)) {
+        if (empty($goal["rules"])) {
             return false;
         }
         $ruleMatched = $this->_ruleManager->isRuleMatched(
             $goalRule,
-            $goal->rules,
+            new RuleObject($goal["rules"]),
             "ConfigGoal #{$goalId}"
         );
         if ($ruleMatched instanceof RuleError) {
@@ -1091,12 +1109,12 @@ class DataManager implements DataManagerInterface
 
     // Send conversion event if goal wasn't previously triggered
     if (!$goalTriggered) {
-        $this->sendConversion($visitorId, $goal->id, $bucketingData, $segments);
+        $this->sendConversion($visitorId, $goal["id"], $bucketingData, $segments);
     }
 
     // Send transaction event if goalData exists and conditions are met
     if ($goalData !== null && (!$goalTriggered || $forceMultipleTransactions)) {
-        $this->sendTransaction($visitorId, $goal->id, $goalData, $bucketingData, $segments);
+        $this->sendTransaction($visitorId, $goal["id"], $goalData, $bucketingData, $segments);
     }
 
     return true;
@@ -1117,13 +1135,13 @@ class DataManager implements DataManagerInterface
         $data['bucketingData'] = $bucketingData;
     }
     $event = [
-        'eventType' => EventType::CONVERSION,
+        'eventType' => SystemEvents::CONVERSION,
         'data' => $data
     ];
-    $this->_apiManager->enqueue($visitorId, $event, $segments);
+    $this->_apiManager->enqueue($visitorId, new VisitorTrackingEvents($event), $segments);
     $this->_loggerManager?->trace(
         'DataManager.convert()',
-        $this->_mapper(['event' => $event])
+        ($this->_mapper)(['event' => $event])
     );
   }
 
@@ -1146,13 +1164,13 @@ class DataManager implements DataManagerInterface
         $data['bucketingData'] = $bucketingData;
     }
     $event = [
-        'eventType' => EventType::CONVERSION,
+        'eventType' => SystemEvents::CONVERSION,
         'data' => $data
     ];
-    $this->_apiManager->enqueue($visitorId, $event, $segments);
+    $this->_apiManager->enqueue($visitorId, new VisitorTrackingEvents($event), $segments);
     $this->_loggerManager?->trace(
         'DataManager.convert()',
-        $this->_mapper(['event' => $event])
+        ($this->_mapper)(['event' => $event])
     );
   }
 
@@ -1298,22 +1316,45 @@ class DataManager implements DataManagerInterface
    */
   public function getEntitiesList(string $entityType): array {
     $list = [];
-    $mappedEntityType = self::DATA_ENTITIES_MAP[$entityType] ?? $entityType;
-
+    $mappedEntityType = DataEntities::DATA_ENTITIES_MAP[$entityType] ?? $entityType;
     if (in_array($mappedEntityType, $this->_dataEntities, true)) {
-        $list = ObjectUtils::objectDeepValue($this->_data, $mappedEntityType) ?? [];
+        switch ($mappedEntityType) {
+            case 'experiences':
+                $list = $this->_data->getExperiences() ?? [];
+                break;
+            case 'audiences':
+                $list = $this->_data->getAudiences() ?? [];
+                break;
+            case 'features':
+                $list = $this->_data->getFeatures() ?? [];
+                break;
+            case 'segments':
+                $list = $this->_data->getSegments() ?? [];
+                break;
+            case 'locations':
+                $list = $this->_data->getLocations() ?? [];
+                break;
+            case 'archived_experiences':
+                $list = $this->_data->getArchivedExperiences() ?? [];
+                break;
+            case 'goals':
+                $list = $this->_data->getGoals() ?? [];
+                break;
+            default:
+                $list = [];
+        }
     }
 
     $this->_loggerManager?->trace(
         'DataManager.getEntitiesList()',
-        $this->_mapper([
+        json_encode(($this->_mapper)([
             'entityType' => $mappedEntityType,
             'list' => $list
-        ])
+        ]))
     );
 
     return $list;
-  }
+}
 
   /**
    * Get list of data entities grouped by field.
@@ -1341,17 +1382,16 @@ class DataManager implements DataManagerInterface
   * @private
   */
   private function _getEntityByField(string $identity, string $entityType, string $identityField = IdentityField::KEY): ?array {
-    $mappedEntityType = self::DATA_ENTITIES_MAP[$entityType] ?? $entityType;
+    $mappedEntityType = DataEntities::DATA_ENTITIES_MAP[$entityType] ?? $entityType;
 
     $this->_loggerManager?->trace(
         'DataManager._getEntityByField()',
-        $this->_mapper([
+        json_encode(($this->_mapper)([
             'identity' => $identity,
             'entityType' => $mappedEntityType,
             'identityField' => $identityField
-        ])
+        ]))
     );
-
     $list = $this->getEntitiesList($mappedEntityType);
     if (ArrayUtils::arrayNotEmpty($list)) {
         foreach ($list as $entity) {
@@ -1372,7 +1412,7 @@ class DataManager implements DataManagerInterface
   * @return array|null Entity as an associative array or null if not found
   */
   public function getEntity(string $key, string $entityType): ?array {
-    return $this->_getEntityByField($key, $entityType, IdentityField::KEY);
+    return $this->_getEntityByField($key, $entityType, 'key');
   }
 
   /**
@@ -1405,7 +1445,7 @@ class DataManager implements DataManagerInterface
   * @return array Array of matched entities
   */
   public function getEntitiesByIds(array $ids, string $entityType): array {
-    return $this->getItemsByKeys($ids, $entityType); // Assuming getItemsByIds should use 'id', adjusted below
+    return $this->getItemsByIds($ids, $entityType);
   }
 
   /**
@@ -1438,7 +1478,7 @@ class DataManager implements DataManagerInterface
   public function getItemsByIds(array $ids, string $path): array {
     $this->_loggerManager?->trace(
         'DataManager.getItemsByIds()',
-        $this->_mapper([
+        ($this->_mapper)([
             'ids' => $ids,
             'path' => $path
         ])
@@ -1495,13 +1535,10 @@ class DataManager implements DataManagerInterface
   * @param array|null $data Configuration data to validate
   * @return bool True if data is valid, false otherwise
   */
-  public function isValidConfigData(?array $data): bool {
+  public function isValidConfigData(ConfigResponseData $data): bool {
     return (
-        ObjectUtils::objectNotEmpty($data) &&
-        (
-            (!empty($data['account_id']) && !empty($data['project']['id'])) ||
-            !empty($data['error'])
-        )
+        (!empty($data->getAccountId()) && !empty($data->getProject()["id"])) ||
+        !empty($data->getError())
     );
   }
 }

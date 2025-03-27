@@ -6,6 +6,7 @@ use ConvertSdk\Interfaces\BucketingManagerInterface;
 use ConvertSdk\Utils\StringUtils;
 use ConvertSdk\Logger\LogManagerInterface;
 use ConvertSdk\Enums\Messages;
+use OpenAPI\Client\Config;
 
 class BucketingManager implements BucketingManagerInterface
 {
@@ -21,14 +22,17 @@ class BucketingManager implements BucketingManagerInterface
      * @param array $dependencies
      * @param LogManagerInterface|null $dependencies['loggerManager']
      */
-    public function __construct($config = null, $dependencies = [])
+    public function __construct(?Config $config = null, $dependencies = [])
     {
         $this->_loggerManager = $dependencies['loggerManager'] ?? null;
-
-        // Initialize the max_traffic and hash_seed values from config if available
-        $this->_max_traffic = $config['bucketing']['max_traffic'] ?? $this->_max_traffic;
-        $this->_hash_seed = $config['bucketing']['hash_seed'] ?? $this->_hash_seed;
-
+    
+        // Initialize max_traffic and hash_seed from config if available
+        if ($config) {
+            $bucketingConfig = $config->getBucketing();
+            $this->_max_traffic = $bucketingConfig['max_traffic'] ?? $this->_max_traffic;
+            $this->_hash_seed = $bucketingConfig['hash_seed'] ?? $this->_hash_seed;
+        }
+    
         if ($this->_loggerManager) {
             $this->_loggerManager->trace('BucketingManager()', Messages::BUCKETING_CONSTRUCTOR, $this);
         }
