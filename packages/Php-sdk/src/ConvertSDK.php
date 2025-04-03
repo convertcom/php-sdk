@@ -79,10 +79,12 @@ class ConvertSDK extends Core {
 
         // Initialize DataManager
         $this->dataManager = new DataManager($configuration, [
+            'bucketingManager' => $this->bucketingManager,
+            'ruleManager' => $this->ruleManager,
+            'eventManager' => $this->eventManager,
             'apiManager' => $this->apiManager,
             'loggerManager' => $this->loggerManager
         ]);
-
         // Initialize ExperienceManager
         $this->experienceManager = new ExperienceManager($configuration, [
             'dataManager' => $this->dataManager,

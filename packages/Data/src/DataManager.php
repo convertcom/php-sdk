@@ -370,7 +370,7 @@ class DataManager implements DataManagerInterface
                     new RuleObject($experience['site_area']),
                     'SiteArea'
                 );
-                if (in_array($locationMatched, RuleError::getConstants())) {
+                if (in_array($locationMatched, RuleError::getConstants(), true)) {
                     return $locationMatched;
                 }
             } else {
@@ -529,7 +529,6 @@ class DataManager implements DataManagerInterface
       $enableTracking = $attributes->enableTracking ?? true;
       $ignoreLocationProperties = $attributes->ignoreLocationProperties ?? false;
       $environment = $attributes->environment ?? $this->_environment;
-
       // Log trace information
       $this->_loggerManager?->trace(
           'DataManager._getBucketingByField()',
@@ -567,7 +566,7 @@ class DataManager implements DataManagerInterface
               $visitorId,
               $visitorProperties,
               $updateVisitorProperties,
-              $experience,
+              new ConfigExperience($experience),
               $forceVariationId,
               $enableTracking
           );
@@ -591,13 +590,13 @@ class DataManager implements DataManagerInterface
     private function _retrieveBucketing(
       string $visitorId,
       ?array $visitorProperties,
-      bool $updateVisitorProperties,
+      ?bool $updateVisitorProperties,
       ConfigExperience $experience,
       ?string $forceVariationId = null,
       bool $enableTracking = true
     ): mixed {
       // Initial validation
-      if (empty($visitorId) || $experience === null || empty($experience->id)) {
+      if (empty($visitorId) || $experience === null || empty($experience->getId())) {
           return null;
       }
 
@@ -609,7 +608,7 @@ class DataManager implements DataManagerInterface
       $storeKey = $this->getStoreKey($visitorId);
 
       // Handle forced variation
-      if (!empty($forceVariationId) && ($variation = $this->retrieveVariation($experience->id, (string)$forceVariationId))) {
+      if (!empty($forceVariationId) && ($variation = $this->retrieveVariation($experience->getId(), (string)$forceVariationId))) {
           $variationId = $forceVariationId;
           $this->_loggerManager?->info(
               'DataManager._retrieveBucketing()',
@@ -629,12 +628,12 @@ class DataManager implements DataManagerInterface
       $data = $this->getData($visitorId);
       $bucketing = $data?->getBucketing() ?? [];
       $segments = $data?->getSegments() ? (array)$data->getSegments()->jsonSerialize() : [];
-      $storedVariationId = $bucketing[(string)$experience->id] ?? null;
+      $storedVariationId = $bucketing[(string)$experience->getId()] ?? null;
 
       if (
           !empty($storedVariationId) &&
           (empty($variationId) || (string)$variationId === (string)$storedVariationId) &&
-          ($variation = $this->retrieveVariation($experience->id, (string)$storedVariationId))
+          ($variation = $this->retrieveVariation($experience->getId(), (string)$storedVariationId))
       ) {
           $variationId = $storedVariationId;
           $this->_loggerManager?->info(
@@ -652,25 +651,27 @@ class DataManager implements DataManagerInterface
       } else {
           // Build buckets from variations
           $buckets = array_reduce(
-              array_filter(
-                  $experience->variations,
-                  fn($variation) =>
-                      (isset($variation->status) ? $variation->status === VariationStatuses::RUNNING : true) &&
-                      ($variation->traffic_allocation > 0 || !is_numeric($variation->traffic_allocation))
-              ),
-              function($carry, $variation) {
-                  if (!empty($variation->id)) {
-                      $carry[$variation->id] = $variation->traffic_allocation ?? 100.0;
-                  }
-                  return $carry;
-              },
-              []
-          );
+            array_filter(
+                $experience->getVariations(),
+                fn($variation) =>
+                    (isset($variation['status']) ? $variation['status'] === VariationStatuses::RUNNING : true) &&
+                    (array_key_exists('traffic_allocation', $variation) ? 
+                        ($variation['traffic_allocation'] > 0 || !is_numeric($variation['traffic_allocation'])) : 
+                        true)
+            ),
+            function($carry, $variation) {
+                if (!empty($variation['id'])) {
+                    $carry[$variation['id']] = $variation['traffic_allocation'] ?? 100.0;
+                }
+                return $carry;
+            },
+            []
+        );
 
           // Determine bucket for visitor
           $bucketingParams = $this->_config->bucketing->excludeExperienceIdHash ?? false
               ? null
-              : ['experienceId' => (string)$experience->id];
+              : ['experienceId' => (string)$experience->getId()];
           $bucketing = $this->_bucketingManager->getBucketForVisitor(
               $buckets,
               $visitorId,
@@ -684,14 +685,14 @@ class DataManager implements DataManagerInterface
               $this->_loggerManager?->debug(
                   'DataManager._retrieveBucketing()',
                   ErrorMessages::UNABLE_TO_SELECT_BUCKET_FOR_VISITOR,
-                  $this->_mapper([
+                  json_encode(($this->_mapper)([
                       'visitorId' => $visitorId,
                       'experience' => $experience,
                       'buckets' => $buckets,
                       'bucketing' => $bucketing
-                  ])
+                  ]))
               );
-              return BucketingError::VARIAION_NOT_DECIDED;
+              return BucketingError::VARIATION_NOT_DECIDED;
           }
 
           $this->_loggerManager?->info(
@@ -700,7 +701,7 @@ class DataManager implements DataManagerInterface
           );
 
           $storeDataObj = new StoreData([
-            'bucketing' => [(string)$experience->id => $variationId]
+            'bucketing' => [(string)$experience->getId() => $variationId]
           ]);
           if ($updateVisitorProperties && !empty($visitorProperties)) {
               $storeDataObj->setSegments(new VisitorSegments($visitorProperties));
@@ -710,30 +711,30 @@ class DataManager implements DataManagerInterface
           // Track bucketing event if enabled
           if ($enableTracking) {
               $bucketingEvent = [
-                  'experienceId' => (string)$experience->id,
+                  'experienceId' => (string)$experience->getId(),
                   'variationId' => (string)$variationId
               ];
               $visitorEvent = [
                   'eventType' => VisitorTrackingEvents::EVENT_TYPE_BUCKETING,
                   'data' => $bucketingEvent
               ];
-              $this->_apiManager->enqueue($visitorId, $visitorEvent, $segments);
+              $this->_apiManager->enqueue($visitorId, new VisitorTrackingEvents($visitorEvent), new VisitorSegments($segments));
               $this->_loggerManager?->trace(
                   'DataManager._retrieveBucketing()',
-                  $this->_mapper(['visitorEvent' => $visitorEvent])
+                  json_encode(($this->_mapper)(['visitorEvent' => $visitorEvent]))
               );
           }
 
-          $variation = $this->retrieveVariation($experience->id, (string)$variationId);
+          $variation = $this->retrieveVariation($experience->getId(), (string)$variationId);
       }
 
       // Build and return the bucketed variation
       if ($variation) {
           $bucketedVariation = array_merge(
               [
-                  'experienceId' => $experience->id,
-                  'experienceName' => $experience->name,
-                  'experienceKey' => $experience->key
+                  'experienceId' => $experience->getId(),
+                  'experienceName' => $experience->getName(),
+                  'experienceKey' => $experience->getKey()
               ],
               ['bucketingAllocation' => $bucketingAllocation],
               (array)$variation
@@ -755,14 +756,14 @@ class DataManager implements DataManagerInterface
       string $experienceId,
       string $variationId
     ): ExperienceVariationConfig {
-      return $this->getSubItem(
+      return new ExperienceVariationConfig($this->getSubItem(
           'experiences',
           $experienceId,
           'variations',
           $variationId,
           'id',
           'id'
-      );
+      ));
     }
 
     /**
@@ -1192,11 +1193,11 @@ class DataManager implements DataManagerInterface
   ): array {
       $this->_loggerManager?->trace(
           'DataManager.filterMatchedRecordsWithRule()',
-          $this->_mapper([
+          json_encode(($this->_mapper)([
               'items' => $items,
               'visitorProperties' => $visitorProperties
           ])
-      );
+      ));
 
       $matchedRecords = [];
       if (ArrayUtils::arrayNotEmpty($items)) {
@@ -1207,7 +1208,7 @@ class DataManager implements DataManagerInterface
 
               $match = $this->_ruleManager->isRuleMatched(
                   $visitorProperties,
-                  $item['rules'],
+                  new RuleObject($item['rules']),
                   StringUtils::camelCase($entityType) . " #{$item[$field]}"
               );
 
@@ -1222,9 +1223,9 @@ class DataManager implements DataManagerInterface
 
       $this->_loggerManager?->debug(
           'DataManager.filterMatchedRecordsWithRule()',
-          $this->_mapper([
+          json_encode(($this->_mapper)([
               'matchedRecords' => $matchedRecords
-          ])
+          ]))
       );
 
       return $matchedRecords;

@@ -1,141 +1,164 @@
 <?php
 
-namespace ConvertSdk\Experience;
+/**
+ * Convert PHP SDK
+ * Version 1.0.0
+ * Copyright(c) 2020 Convert Insights, Inc
+ * License Apache-2.0
+ */
 
-use ConvertSdk\Data\DataManagerInterface;
-use ConvertSdk\Logger\LogManagerInterface;
-use ConvertSdk\Enums\BucketingError;
-use ConvertSdk\Enums\RuleError;
-use ConvertSdk\Enums\Messages;
-use ConvertSdk\Config\Config;
+namespace ConvertSdk;
+
+use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigExperience;
+use OpenAPI\Client\Model\ExperienceVariationConfig;
+use OpenAPI\Client\BucketedVariation;
+use OpenAPI\Client\BucketingAttributes;
+use ConvertSdk\Enums\RuleError;
+use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\Messages;
 
+/**
+ * Provides experiences specific logic
+ * @category Modules
+ * @implements ExperienceManagerInterface
+ */
 class ExperienceManager implements ExperienceManagerInterface
 {
-    private $_dataManager;
-    private $_loggerManager;
+    /** @var DataManagerInterface */
+    private $dataManager;
+
+    /** @var LogManagerInterface|null */
+    private $loggerManager;
 
     /**
-     * Constructor to initialize ExperienceManager with required dependencies.
+     * Constructor for ExperienceManager.
      *
-     * @param Config $config
-     * @param array $dependencies
-     * @param DataManagerInterface $dataManager
-     * @param LogManagerInterface $loggerManager
+     * @param Config $config Configuration object
+     * @param array $dependencies Dependencies array
+     * @param DataManagerInterface $dependencies['dataManager'] Data manager instance
+     * @param LogManagerInterface|null $dependencies['loggerManager'] Optional logger manager instance
      */
-    public function __construct(
-        Config $config,
-        array $dependencies
-    ) {
-        $this->_dataManager = $dependencies['dataManager'];
-        $this->_loggerManager = $dependencies['loggerManager'] ?? null;
-
-        if ($this->_loggerManager) {
-            $this->_loggerManager->trace('ExperienceManager()', Messages::EXPERIENCE_CONSTRUCTOR);
+    public function __construct(Config $config, array $dependencies)
+    {
+        $this->dataManager = $dependencies['dataManager'];
+        $this->loggerManager = $dependencies['loggerManager'] ?? null;
+        if ($this->loggerManager) {
+            $this->loggerManager->trace('ExperienceManager()', Messages::EXPERIENCE_CONSTRUCTOR);
         }
     }
 
     /**
-     * Get a list of all experiences
+     * Get a list of all experiences.
      *
-     * @return array List of experiences
+     * @return ConfigExperience[] Array of experience configurations
      */
     public function getList(): array
     {
-        return $this->_dataManager->getEntitiesList('experiences');
+        return $this->dataManager->getEntitiesList('experiences');
     }
 
     /**
-     * Get the experience by key
+     * Get an experience by its key.
      *
-     * @param string $key Experience key
-     * @return mixed Experience data
+     * @param string $key The experience key
+     * @return ConfigExperience The experience configuration
      */
-    public function getExperience(string $key)
+    public function getExperience(string $key): ?ConfigExperience
     {
-        return $this->_dataManager->getEntity($key, 'experiences');
+        $entityData = $this->dataManager->getEntity($key, 'experiences');
+        if ($entityData === null) {
+            return null;
+        }
+        return new ConfigExperience($entityData);
     }
 
     /**
-     * Get the experience by ID
+     * Get an experience by its ID.
      *
-     * @param string $id Experience ID
-     * @return mixed Experience data
+     * @param string $id The experience ID
+     * @return ConfigExperience The experience configuration
      */
-    public function getExperienceById(string $id)
+    public function getExperienceById(string $id): ?ConfigExperience
     {
-        return $this->_dataManager->getEntityById($id, 'experiences');
+        $entityData = $this->dataManager->getEntityById($id, 'experiences');
+        if ($entityData === null) {
+            return null;
+        }
+        return new ConfigExperience($entityData);
     }
 
     /**
-     * Get experiences by a list of keys
+     * Get multiple experiences by their keys.
      *
-     * @param array $keys List of experience keys
-     * @return array List of experiences
+     * @param string[] $keys Array of experience keys
+     * @return ConfigExperience[] Array of experience configurations
      */
     public function getExperiences(array $keys): array
     {
-        return $this->_dataManager->getItemsByKeys($keys, 'experiences');
+        return $this->dataManager->getItemsByKeys($keys, 'experiences');
     }
 
     /**
-     * Select a variation for a specific visitor
+     * Select a variation for a visitor based on experience key.
      *
-     * @param string $visitorId Visitor ID
-     * @param string $experienceKey Experience key
-     * @param array $attributes Attributes for bucketing (no type)
-     * @return mixed Selected variation or error
+     * @param string $visitorId The visitor's ID
+     * @param string $experienceKey The experience key
+     * @param BucketingAttributes $attributes Bucketing attributes for variation selection
+     * @return BucketedVariation|RuleError|BucketingError The selected variation or an error
      */
-    public function selectVariation(string $visitorId, string $experienceKey, array $attributes)
+    public function selectVariation(string $visitorId, string $experienceKey, BucketingAttributes $attributes)
     {
-        return $this->_dataManager->getBucketing($visitorId, $experienceKey, $attributes);
+        return $this->dataManager->getBucketing($visitorId, $experienceKey, $attributes);
     }
 
     /**
-     * Select a variation for a specific visitor using experience ID
+     * Select a variation for a visitor based on experience ID.
      *
-     * @param string $visitorId Visitor ID
-     * @param string $experienceId Experience ID
-     * @param array $attributes Attributes for bucketing (no type)
-     * @return mixed Selected variation or error
+     * @param string $visitorId The visitor's ID
+     * @param string $experienceId The experience ID
+     * @param BucketingAttributes $attributes Bucketing attributes for variation selection
+     * @return BucketedVariation|RuleError|BucketingError The selected variation or an error
      */
-    public function selectVariationById(string $visitorId, string $experienceId, array $attributes)
+    public function selectVariationById(string $visitorId, string $experienceId, BucketingAttributes $attributes)
     {
-        return $this->_dataManager->getBucketingById($visitorId, $experienceId, $attributes);
+        return $this->dataManager->getBucketingById($visitorId, $experienceId, $attributes);
     }
 
     /**
-     * Select all variations across all experiences for a specific visitor
+     * Select variations for a visitor across all experiences.
      *
-     * @param string $visitorId Visitor ID
-     * @param array $attributes Attributes for bucketing (no type)
-     * @return array List of selected variations or errors
+     * @param string $visitorId The visitor's ID
+     * @param BucketingAttributes $attributes Bucketing attributes for variation selection
+     * @return array Array of BucketedVariation|RuleError|BucketingError
      */
-    public function selectVariations(string $visitorId, array $attributes): array
+    public function selectVariations(string $visitorId, BucketingAttributes $attributes): array
     {
-        return array_filter(
-            array_map(
-                function ($experience) use ($visitorId, $attributes) {
-                    return $this->selectVariation($visitorId, $experience['key'], $attributes);
-                },
-                $this->getList()
-            ),
-            function ($variation) {
-                return !in_array($variation, [RuleError::class, BucketingError::class], true);
-            }
-        );
+        $experiences = $this->getList();
+        $variations = array_map(function ($experience) use ($visitorId, $attributes) {
+            return $this->selectVariation($visitorId, $experience["key"], $attributes);
+        }, $experiences);
+        $filteredVariations = array_filter($variations, function ($variation) {
+            return $variation !== null &&
+            !in_array($variation, RuleError::getConstants(), true) &&
+                   !in_array($variation, [BucketingError::VARIATION_NOT_DECIDED], true);
+        });
+        return array_values($filteredVariations); // Re-index array after filtering
     }
 
     /**
-     * Get a variation by experience key and variation key
+     * Get a variation by experience key and variation key.
      *
-     * @param string $experienceKey Experience key
-     * @param string $variationKey Variation key
-     * @return mixed Variation data
+     * @param string $experienceKey The experience key
+     * @param string $variationKey The variation key
+     * @return ExperienceVariationConfig The variation configuration
      */
-    public function getVariation(string $experienceKey, string $variationKey)
+    public function getVariation(string $experienceKey, string $variationKey): ExperienceVariationConfig
     {
-        return $this->_dataManager->getSubItem(
+        $variationData = $this->dataManager->getSubItem(
             'experiences',
             $experienceKey,
             'variations',
@@ -143,18 +166,20 @@ class ExperienceManager implements ExperienceManagerInterface
             'key',
             'key'
         );
+
+        return new ExperienceVariationConfig($variationData);
     }
 
     /**
-     * Get a variation by experience ID and variation ID
+     * Get a variation by experience ID and variation ID.
      *
-     * @param string $experienceId Experience ID
-     * @param string $variationId Variation ID
-     * @return mixed Variation data
+     * @param string $experienceId The experience ID
+     * @param string $variationId The variation ID
+     * @return ExperienceVariationConfig The variation configuration
      */
-    public function getVariationById(string $experienceId, string $variationId)
+    public function getVariationById(string $experienceId, string $variationId): ExperienceVariationConfig
     {
-        return $this->_dataManager->getSubItem(
+        $variationData = $this->dataManager->getSubItem(
             'experiences',
             $experienceId,
             'variations',
@@ -162,5 +187,7 @@ class ExperienceManager implements ExperienceManagerInterface
             'id',
             'id'
         );
+
+        return new ExperienceVariationConfig($variationData);
     }
 }

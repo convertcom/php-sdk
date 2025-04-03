@@ -1,119 +1,262 @@
 <?php
+
+namespace ConvertSdk\Tests;
+
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\BucketingAttributes;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\Utils\ObjectUtils;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\RuleManager;
+use ConvertSdk\EventManager;
+use ConvertSdk\ApiManager;
+use ConvertSdk\LogManager;
+use ConvertSdk\DataManager;
+use ConvertSdk\ExperienceManager;
 use PHPUnit\Framework\TestCase;
-use ConvertSdk\Experience\ExperienceManager;
-use ConvertSdk\Data\DataManager;
-use ConvertSdk\Event\EventManager;
-use ConvertSdk\Api\ApiManager;
-use ConvertSdk\Logger\LogManager;
-use ConvertSdk\Enums\SystemEvents;
-use ConvertSdk\Config\Config;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use GuzzleHttp\Psr7\Response;
 
-class ExperienceTest extends TestCase
+/**
+ * Test class for ExperienceManager.
+ */
+class ExperienceManagerTest extends TestCase
 {
-    private $experienceManager;
+    /** @var DataManager */
     private $dataManager;
-    private $eventManager;
-    private $apiManager;
-    private $logManager;
-    
+
+    /** @var ExperienceManager */
+    private $experienceManager;
+
+    /** @var string */
+    private $accountId;
+
+    /** @var string */
+    private $projectId;
+
+    /** @var string Visitor ID for testing */
     private $visitorId = 'XXX';
-    private $configuration;
-    
-    public function setUp(): void
+
+    /** @var int Release timeout in milliseconds */
+    private $releaseTimeout = 1000;
+
+    /** @var int Test timeout in milliseconds */
+    private $testTimeout = 1100; // release_timeout + 100
+
+    /** @var int Batch size for events */
+    private $batchSize = 5;
+
+    /**
+     * Set up the test environment before each test.
+     */
+    protected function setUp(): void
     {
-        // Setup configuration and dependencies
-        $this->configuration = [
-            'sdkKey' => '100414055/100415443',
-            'data' => [
-                'account_id' => '100414055',
-                'project' => [
-                    'id' => '100415443',
-                    'name' => 'Project #100415443'
-                ]
-            ]
-        ];
+        // Load test configuration from JSON file
+        $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
+        $defaultConfig = DefaultConfig::getDefault();
 
-        // Initialize dependencies
-        $this->logManager = new LogManager();
-        $this->eventManager = new EventManager($this->configuration, ['loggerManager' => $this->logManager]);
-        $this->apiManager = new ApiManager($this->configuration, ['eventManager' => $this->eventManager]);
-        $this->dataManager = new DataManager($this->configuration, [
-          'apiManager' => $this->apiManager,
-          'loggerManager' => $this->logManager,
-          'eventManager' => $this->eventManager  // Add this line
-      ]);
-
-        // Initialize ExperienceManager
-        $this->experienceManager = new ExperienceManager($this->configuration, [
-            'dataManager' => $this->dataManager
+        // Merge configurations
+        $configuration = array_replace_recursive($defaultConfig, $testConfig, [
+            'api' => [
+                'endpoint' => [
+                    'config' => 'http://localhost:8090',
+                    'track' => 'http://localhost:8090',
+                ],
+            ],
+            'events' => [
+                'batch_size' => $this->batchSize,
+                'release_interval' => $this->releaseTimeout,
+            ],
         ]);
+        $configuration['data'] = new ConfigResponseData($configuration['data']);
+        if (isset($configuration['sdkKey'])) {
+            unset($configuration['sdkKey']);
+          }
+        // Create Config object
+        $config = new Config($configuration);
+
+        // Extract account and project IDs
+        $this->accountId = $configuration['data']['account_id'];
+        $this->projectId = $configuration['data']['project']['id'];
+
+        // Instantiate managers with dependencies
+        $bucketingManager = new BucketingManager($config);
+        $ruleManager = new RuleManager($config);
+        $eventManager = new EventManager($config);
+        $apiManager = new ApiManager($config, $eventManager);
+        $loggerManager = new LogManager($config);
+        $this->dataManager = new DataManager(
+            $config,
+            $bucketingManager,
+            $ruleManager,
+            $eventManager,
+            $apiManager,
+            $loggerManager
+        );
+
+        $this->experienceManager = new ExperienceManager($config, ['dataManager' => $this->dataManager]);
     }
 
-    public function testExperienceManagerInitialization()
+    /**
+     * Test that the ExperienceManager class is defined.
+     */
+    public function testExperienceManagerIsDefined(): void
+    {
+        $this->assertTrue(class_exists(ExperienceManager::class));
+    }
+
+    /**
+     * Test that the ExperienceManager instance is correctly constructed.
+     */
+    public function testExperienceManagerConstructor(): void
     {
         $this->assertInstanceOf(ExperienceManager::class, $this->experienceManager);
     }
 
-    public function testGetList()
+    /**
+     * Test getting the list of all experiences.
+     */
+    public function testGetList(): void
     {
-        // Simulating the behavior of getList method
-        $experiences = $this->experienceManager->getList();
-        $this->assertIsArray($experiences);
-        $this->assertNotEmpty($experiences); // Assuming the configuration contains at least one experience
+        $entities = $this->experienceManager->getList();
+        $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
+
+        $this->assertIsArray($entities);
+        $this->assertCount(3, $entities);
+        $this->assertEquals($testConfig['data']['experiences'], $entities);
     }
 
-    public function testGetExperienceByKey()
+    /**
+     * Test getting an experience by key.
+     */
+    public function testGetExperience(): void
     {
-        $experienceKey = 'test-experience-key';
-        $experience = $this->experienceManager->getExperience($experienceKey);
-        $this->assertIsArray($experience);
-        $this->assertArrayHasKey('key', $experience);
-        $this->assertEquals($experienceKey, $experience['key']);
+        $experienceKey = 'test-experience-ab-fullstack-2';
+        $experienceId = '100218245';
+        $entity = $this->experienceManager->getExperience($experienceKey);
+
+        $this->assertIsObject($entity);
+        $this->assertEquals($experienceId, $entity['id']);
     }
 
-    public function testSelectVariation()
+    /**
+     * Test getting an experience by ID.
+     */
+    public function testGetExperienceById(): void
     {
-        // Example for testing selectVariation
-        $experienceKey = 'test-experience-key';
-        $attributes = [
-            'visitorProperties' => ['varName3' => 'something'],
-            'locationProperties' => ['url' => 'https://convert.com/']
+        $experienceKey = 'test-experience-ab-fullstack-2';
+        $experienceId = '100218245';
+        $entity = $this->experienceManager->getExperienceById($experienceId);
+
+        $this->assertIsObject($entity);
+        $this->assertEquals($experienceKey, $entity['key']);
+    }
+
+    /**
+     * Test getting multiple experiences by an array of keys.
+     */
+    public function testGetExperiences(): void
+    {
+        $experienceKeys = [
+            'test-experience-ab-fullstack-2',
+            'test-experience-ab-fullstack-3',
+            'test-experience-ab-fullstack-4',
         ];
-        
-        $variation = $this->experienceManager->selectVariation($this->visitorId, $experienceKey, $attributes);
+        $entities = $this->experienceManager->getExperiences($experienceKeys);
+        $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
 
+        $this->assertIsArray($entities);
+        $this->assertCount(3, $entities);
+        $this->assertEquals($testConfig['data']['experiences'], $entities);
+    }
+
+    /**
+     * Test selecting a variation for a specific visitor by experience key.
+     */
+    public function testSelectVariation(): void
+    {
+        $experienceKey = 'test-experience-ab-fullstack-2';
+        $variation = $this->experienceManager->selectVariation(
+            $this->visitorId,
+            $experienceKey,
+            new BucketingAttributes([
+                'visitorProperties' => ['varName3' => 'something'],
+                'locationProperties' => ['url' => 'https://convert.com/'],
+            ])
+        );
         $this->assertIsArray($variation);
-        $this->assertArrayHasKey('experienceKey', $variation);
         $this->assertEquals($experienceKey, $variation['experienceKey']);
     }
 
-    public function testGetVariation()
+    /**
+     * Test selecting a variation for a specific visitor by experience ID.
+     */
+    public function testSelectVariationById(): void
     {
-        $experienceKey = 'test-experience-key';
-        $variationKey = 'test-variation-key';
-        $variation = $this->experienceManager->getVariation($experienceKey, $variationKey);
-        
+        $experienceId = '100218245';
+        $variation = $this->experienceManager->selectVariationById(
+            $this->visitorId,
+            $experienceId,
+            new BucketingAttributes([
+                'visitorProperties' => ['varName3' => 'something'],
+                'locationProperties' => ['url' => 'https://convert.com/'],
+            ])
+        );
+
         $this->assertIsArray($variation);
-        $this->assertArrayHasKey('key', $variation);
-        $this->assertEquals($variationKey, $variation['key']);
+        $this->assertEquals($experienceId, $variation['experienceId']);
     }
 
-    public function testSelectVariations()
+    /**
+     * Test selecting all variations across all experiences for a specific visitor.
+     */
+    public function testSelectVariations(): void
     {
-        // Example for testing selectVariations
-        $attributes = [
-            'visitorProperties' => ['varName3' => 'something'],
-            'locationProperties' => ['url' => 'https://convert.com/']
-        ];
-        
-        $variations = $this->experienceManager->selectVariations($this->visitorId, $attributes);
-        
+        $variationIds = ['100299456', '100299457', '100299460', '100299461'];
+        $variations = $this->experienceManager->selectVariations(
+            $this->visitorId,
+            new BucketingAttributes([
+                'visitorProperties' => ['varName3' => 'something'],
+                'locationProperties' => ['url' => 'https://convert.com/'],
+            ])
+        );
+
         $this->assertIsArray($variations);
-        $this->assertNotEmpty($variations); // Assuming at least one variation is returned
+        $this->assertCount(2, $variations);
+        $selectedVariationIds = array_column($variations, 'id');
+        foreach ($selectedVariationIds as $id) {
+            $this->assertContains($id, $variationIds);
+        }
     }
 
-    public function tearDown(): void
+    /**
+     * Test getting a variation by experience key and variation key.
+     */
+    public function testGetVariation(): void
     {
-        // Clean up after each test if necessary
+        $experienceKey = 'test-experience-ab-fullstack-2';
+        $variationKey = '100299457-variation-1';
+        $variationId = '100299457';
+        $variation = $this->experienceManager->getVariation($experienceKey, $variationKey);
+
+        $this->assertIsObject($variation);
+        $this->assertEquals($variationId, $variation['id']);
+    }
+
+    /**
+     * Test getting a variation by experience ID and variation ID.
+     */
+    public function testGetVariationById(): void
+    {
+        $experienceId = '100218245';
+        $variationKey = '100299457-variation-1';
+        $variationId = '100299457';
+        $variation = $this->experienceManager->getVariationById($experienceId, $variationId);
+
+        $this->assertIsObject($variation);
+        $this->assertEquals($variationKey, $variation['key']);
     }
 }
