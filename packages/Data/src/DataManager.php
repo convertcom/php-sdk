@@ -795,7 +795,6 @@ class DataManager implements DataManagerInterface
             'segments' => $storeDataObj->getSegments() ? (array)$storeDataObj->getSegments()->jsonSerialize() : [],
             'goals' => $storeDataObj->getGoals() ?? []
         ] : [];
-
         // Step 3: Handle newData, defaulting to an empty StoreData object
         $newDataObj = $newData ?? new StoreData();
         $newDataArray = [
@@ -807,7 +806,6 @@ class DataManager implements DataManagerInterface
 
         // Step 4: Check if data has changed
         $isChanged = !ObjectUtils::objectDeepEqual($storeData, $newDataArray);
-
 
         if ($isChanged) {
             // Step 5: Merge data if changed
@@ -862,7 +860,6 @@ class DataManager implements DataManagerInterface
   public function getData(string $visitorId): ?StoreData {
     $storeKey = $this->getStoreKey($visitorId);
     $memoryData = $this->_bucketedVisitors[$storeKey] ?? null;
-
     if ($this->_dataStoreManager) {
         $dataStoreData = $this->_dataStoreManager->get($storeKey) ?? [];
         $mergedData = ObjectUtils::objectDeepMerge(
@@ -1288,7 +1285,7 @@ class DataManager implements DataManagerInterface
         'campaign',
         'visitor_type',
         'country',
-        'custom_segments'
+        'customSegments'
     ];
 
     $segments = [];

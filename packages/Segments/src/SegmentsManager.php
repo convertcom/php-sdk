@@ -1,0 +1,184 @@
+<?php
+
+namespace ConvertSdk;
+
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\ConfigSegment;
+use OpenAPI\Client\Model\VisitorSegments;
+use OpenAPI\Client\Model\RuleObject;
+use OpenAPI\Client\StoreData;
+use ConvertSdk\Enums\Messages;
+use ConvertSdk\Enums\SegmentsKeys;
+use ConvertSdk\Enums\RuleError;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Interfaces\DataManagerInterface;
+use ConvertSdk\Interfaces\RuleManagerInterface;
+use ConvertSdk\Interfaces\SegmentsManagerInterface;
+use ConvertSdk\Utils\ObjectUtils;
+
+/**
+ * Provides segments specific logic
+ * @category Modules
+ */
+class SegmentsManager implements SegmentsManagerInterface
+{
+    /** @var ConfigResponseData */
+    private $data;
+
+    /** @var DataManagerInterface */
+    private $dataManager;
+
+    /** @var RuleManagerInterface */
+    private $ruleManager;
+
+    /** @var LogManagerInterface|null */
+    private $loggerManager;
+
+    /**
+     * SegmentsManager constructor.
+     *
+     * @param Config $config
+     * @param DataManagerInterface $dataManager
+     * @param RuleManagerInterface $ruleManager
+     * @param LogManagerInterface|null $loggerManager
+     */
+    public function __construct(
+        Config $config,
+        DataManagerInterface $dataManager,
+        RuleManagerInterface $ruleManager,
+        ?LogManagerInterface $loggerManager = null
+    ) {
+        $this->dataManager = $dataManager;
+        $this->ruleManager = $ruleManager;
+        $this->loggerManager = $loggerManager;
+        $this->data = $config ? $config->getData() : null;
+    }
+
+    /**
+     * Get segments in DataStore
+     *
+     * @param string $visitorId
+     * @return VisitorSegments
+     */
+    public function getSegments(string $visitorId): VisitorSegments
+    {
+        $storeData = $this->dataManager->getData($visitorId) ?? [];
+        $segments = $this->dataManager->filterReportSegments($storeData['segments'] ?? []);
+        return $segments['segments'] ?? new VisitorSegments();
+    }
+
+    /**
+     * Update segments in DataStore
+     *
+     * @param string $visitorId
+     * @param VisitorSegments $segments
+     * @return void
+     */
+    public function putSegments(string $visitorId, ?array $segments): void
+    {
+        $reportSegments = $this->dataManager->filterReportSegments($segments);
+        if ($reportSegments['segments'] ?? false) {
+            $this->dataManager->putData($visitorId, new StoreData(['segments' => $reportSegments['segments']]));
+        }
+    }
+
+    /**
+     * Set custom segments for a visitor
+     *
+     * @param string $visitorId
+     * @param array<ConfigSegment> $segments
+     * @param array|null $segmentRule
+     * @return mixed VisitorSegments or RuleError
+     */
+    private function setCustomSegments(
+        string $visitorId,
+        array $segments,
+        ?array $segmentRule = null
+    ) {
+        $storeData = $this->dataManager->getData($visitorId) ?? new StoreData();
+        $customSegments = $storeData->getSegments()[SegmentsKeys::CUSTOM_SEGMENTS] ?? [];
+        $segmentIds = [];
+        $segmentsMatched = false;
+    
+        foreach ($segments as $segment) {
+            if ($segmentRule && !$segmentsMatched) {
+                $segmentsMatched = $this->ruleManager->isRuleMatched(
+                    $segmentRule,
+                    new RuleObject($segment['rules']) ?? [],
+                    "ConfigSegment #{$segment['id']}"
+                );
+    
+                if (in_array($segmentsMatched, RuleError::getConstants(), true)) {
+                    return $segmentsMatched;
+                }
+            }
+    
+            if (!$segmentRule || $segmentsMatched) {
+                $segmentId = (string)$segment['id'];
+    
+                if (in_array($segmentId, $customSegments)) {
+                    if ($this->loggerManager !== null) {
+                        $this->loggerManager->warn(
+                            'SegmentsManager.setCustomSegments()',
+                            Messages::CUSTOM_SEGMENTS_KEY_FOUND
+                        );
+                    }
+                } else {
+                    $segmentIds[] = $segmentId;
+                }
+            }
+        }
+    
+        if (!empty($segmentIds)) {
+            $segmentsData = array_merge(
+                $storeData->getSegments() ?? [],
+                [SegmentsKeys::CUSTOM_SEGMENTS => array_merge($customSegments, $segmentIds)]
+            );
+            $this->putSegments($visitorId, $segmentsData);
+            return new VisitorSegments($segmentsData);
+        } else {
+            if ($this->loggerManager !== null) {
+                $this->loggerManager->warn(
+                    'SegmentsManager.setCustomSegments()',
+                    Messages::SEGMENTS_NOT_FOUND
+                );
+            }
+            return null; // Return null when no new segments are added
+        }
+    }
+
+    /**
+     * Update custom segments for specific visitor by segment keys
+     *
+     * @param string $visitorId
+     * @param array<string> $segmentKeys A list of segment keys
+     * @param array|null $segmentRule An object of key-value pairs for segments matching
+     * @return mixed VisitorSegments or RuleError
+     */
+    public function selectCustomSegments(
+        string $visitorId,
+        array $segmentKeys,
+        ?array $segmentRule = null
+    ) {
+        $segments = $this->dataManager->getEntities($segmentKeys, 'segments');
+        return $this->setCustomSegments($visitorId, $segments, $segmentRule);
+    }
+
+    /**
+     * Update custom segments for specific visitor by segment IDs
+     *
+     * @param string $visitorId
+     * @param array<string> $segmentIds A list of segment IDs
+     * @param array|null $segmentRule An object of key-value pairs for segments matching
+     * @return mixed VisitorSegments or RuleError
+     */
+    public function selectCustomSegmentsByIds(
+        string $visitorId,
+        array $segmentIds,
+        ?array $segmentRule = null
+    ) {
+        $segments = $this->dataManager->getEntitiesByIds($segmentIds, 'segments');
+        return $this->setCustomSegments($visitorId, $segments, $segmentRule);
+    }
+}

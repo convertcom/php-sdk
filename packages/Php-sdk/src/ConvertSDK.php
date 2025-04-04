@@ -13,6 +13,7 @@ use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\Experience\ExperienceManager;
 use ConvertSdk\Rules\RuleManager;
+use ConvertSdk\Segments\SegmentsManager;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
 
@@ -20,7 +21,8 @@ class ConvertSDK extends Core {
     public $dataManager;
     public $apiManager;
     public $loggerManager;
-    public $experienceManager; // Declare ExperienceManager
+    public $experienceManager;
+    public $segmentsManager;
 
     public function __construct(array $config = []) {
         if (empty($config['sdkKey']) && empty($config['data'])) {
@@ -90,6 +92,11 @@ class ConvertSDK extends Core {
             'dataManager' => $this->dataManager,
             'loggerManager' => $this->loggerManager
         ]);
+        $this->segmentsManager = new SegmentsManager($configuration, [
+            'dataManager' => $this->dataManager,
+            'ruleManager' => $this->ruleManager,
+            'loggerManager' => $this->loggerManager
+        ]);
 
         // Call parent constructor
         parent::__construct($configuration, [
@@ -97,7 +104,8 @@ class ConvertSDK extends Core {
             'eventManager'      => $this->eventManager,
             'apiManager'        => $this->apiManager,
             'loggerManager'     => $this->loggerManager,
-            'experienceManager' => $this->experienceManager // Add ExperienceManager to parent
+            'experienceManager' => $this->experienceManager,
+            'segmentsManager'   => $this->segmentsManager,
         ]);
     }
 
