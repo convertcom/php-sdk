@@ -866,14 +866,12 @@ class DataManager implements DataManagerInterface
             $memoryData ?? [],
             $dataStoreData
         );
-
         return new StoreData($mergedData);
     }
 
     if ($memoryData === null) {
         return null;
     }
-
     return new StoreData($memoryData);
   }
 
@@ -1285,7 +1283,7 @@ class DataManager implements DataManagerInterface
         'campaign',
         'visitor_type',
         'country',
-        'customSegments'
+        'custom_segments'
     ];
 
     $segments = [];

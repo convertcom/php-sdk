@@ -7,8 +7,8 @@ class SegmentsKeys {
     const DEVICES        = 'devices';
     const SOURCE         = 'source';
     const CAMPAIGN       = 'campaign';
-    const VISITOR_TYPE   = 'visitorType';
-    const CUSTOM_SEGMENTS = 'customSegments';
+    const VISITOR_TYPE   = 'visitor_type';
+    const CUSTOM_SEGMENTS = 'custom_segments';
 
     /**
      * Returns an array of all segment key constants.

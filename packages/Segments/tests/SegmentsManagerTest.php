@@ -19,7 +19,7 @@ use ConvertSdk\Utils\ObjectUtils;
 class SegmentsManagerTest extends TestCase
 {
     /** @var array Configuration array */
-    private $configuration;
+    protected static $configuration;
 
     /** @var BucketingManager */
     private $bucketingManager;
@@ -34,10 +34,10 @@ class SegmentsManagerTest extends TestCase
     private $apiManager;
 
     /** @var DataManager */
-    private $dataManager;
+    protected static $dataManager;
 
     /** @var SegmentsManager */
-    private $segmentsManager;
+    protected static $segmentsManager;
 
     /** @var string Visitor ID for testing */
     private $visitorId = 'XXX';
@@ -48,46 +48,50 @@ class SegmentsManagerTest extends TestCase
     /**
      * Set up dependencies before each test.
      */
-    protected function setUp(): void
+    public static function setUpBeforeClass(): void
     {
-        // Load configuration from a test-config.php file
+        // Load configuration from a test-config.json file
         $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
         $defaultConfig = DefaultConfig::getDefault();
-        $this->configuration = ObjectUtils::ObjectDeepMerge($defaultConfig, $testConfig, [
-          'api' => [
-              'endpoint' => [
-                  'config' => 'http://localhost:8090',
-                  'track' => 'http://localhost:8090',
-              ],
-          ],
-          'events' => [
-              'batch_size' => $this->batchSize,
-              'release_interval' => $this->releaseTimeout,
-          ],
-      ]);
-      $this->configuration['data'] = new ConfigResponseData($this->configuration['data']);
-          if (isset($this->configuration['sdkKey'])) {
-              unset($this->configuration['sdkKey']);
-            }
+        self::$configuration = ObjectUtils::ObjectDeepMerge($defaultConfig, $testConfig, [
+            'api' => [
+                'endpoint' => [
+                    'config' => 'http://localhost:8090',
+                    'track' => 'http://localhost:8090',
+                ],
+            ],
+            'events' => [
+                'batch_size' => 10, // Adjust as needed
+                'release_interval' => 1000, // Adjust as needed
+            ],
+        ]);
+        self::$configuration['data'] = new ConfigResponseData(self::$configuration['data']);
+        if (isset(self::$configuration['sdkKey'])) {
+            unset(self::$configuration['sdkKey']);
+        }
+
         // Create Config object
-        $config = new Config($this->configuration);
+        $config = new Config(self::$configuration);
+
         // Initialize all manager instances with dependencies
-        $this->bucketingManager = new BucketingManager($config);
-        $this->ruleManager = new RuleManager($config);
-        $this->eventManager = new EventManager($config);
-        $this->apiManager = new ApiManager($config, $this->eventManager);
-        $this->loggerManager = new LogManager($config);
-        $this->dataManager = new DataManager($config,
-          $this->bucketingManager,
-          $this->ruleManager,
-          $this->eventManager,
-          $this->apiManager,
-          $this->loggerManager
+        $bucketingManager = new BucketingManager($config);
+        $ruleManager = new RuleManager($config);
+        $eventManager = new EventManager($config);
+        $apiManager = new ApiManager($config, $eventManager);
+        $loggerManager = new LogManager($config);
+        self::$dataManager = new DataManager(
+            $config,
+            $bucketingManager,
+            $ruleManager,
+            $eventManager,
+            $apiManager,
+            $loggerManager
         );
-        $this->segmentsManager = new SegmentsManager($config,
-        $this->dataManager,
-        $this->ruleManager
-        );
+        self::$segmentsManager = new SegmentsManager($config, self::$dataManager, $ruleManager);
+    }
+
+    protected function setUp(): void
+    {
     }
 
     /**
@@ -103,7 +107,7 @@ class SegmentsManagerTest extends TestCase
      */
     public function testInstanceIsCorrect(): void
     {
-        $this->assertInstanceOf(SegmentsManager::class, $this->segmentsManager);
+        $this->assertInstanceOf(SegmentsManager::class, self::$segmentsManager);
     }
 
     /**
@@ -111,7 +115,7 @@ class SegmentsManagerTest extends TestCase
      */
     public function testCreateNewSegmentsManagerInstance(): void
     {
-        $this->assertInstanceOf(SegmentsManager::class, $this->segmentsManager);
+        $this->assertInstanceOf(SegmentsManager::class, self::$segmentsManager);
     }
 
     /**
@@ -120,19 +124,19 @@ class SegmentsManagerTest extends TestCase
     public function testUpdateSegmentsInDataStore(): void
     {
         $segments = ['country' => 'US'];
-        $this->segmentsManager->putSegments($this->visitorId, $segments);
-        $localSegments = $this->dataManager->getData($this->visitorId);
-        $this->assertEquals($segments['country'], $localSegments->getSegments()['country'] ?? null);
+        self::$segmentsManager->putSegments($this->visitorId, $segments);
+        $localSegments = self::$dataManager->getData($this->visitorId);
+        $this->assertEquals($segments['country'], $localSegments->getSegments()->getCountry() ?? null);
     }
 
-    /**
-     * Test that custom segments are successfully updated for a specific visitor.
-     */
     public function testUpdateCustomSegments(): void
     {
+        $segments = ['country' => 'US'];
+        self::$segmentsManager->putSegments($this->visitorId, $segments);
+
         $segmentKey = 'test-segments-1';
         $segmentId = '200299434';
-        $updatedSegments = $this->segmentsManager->selectCustomSegments(
+        $updatedSegments = self::$segmentsManager->selectCustomSegments(
             $this->visitorId,
             [$segmentKey],
             ['enabled' => true]
@@ -141,20 +145,17 @@ class SegmentsManagerTest extends TestCase
         $this->assertEquals([$segmentId], $updatedSegments->getCustomSegments());
     }
 
-    /**
-     * Test that custom segments remain intact if already set for a visitor.
-     */
     public function testKeepCustomSegmentsIntactIfAlreadySet(): void
     {
         $segmentKey = 'test-segments-1';
         // First call to set the segment
-        $this->segmentsManager->selectCustomSegments(
+        self::$segmentsManager->selectCustomSegments(
             $this->visitorId,
             [$segmentKey],
             ['enabled' => true]
         );
-        // Second call should return null if no update occurs
-        $updatedSegments = $this->segmentsManager->selectCustomSegments(
+        // Second call should return null since segment is already set
+        $updatedSegments = self::$segmentsManager->selectCustomSegments(
             $this->visitorId,
             [$segmentKey],
             ['enabled' => true]
@@ -168,7 +169,7 @@ class SegmentsManagerTest extends TestCase
     public function testKeepCustomSegmentsIntactIfKeyNotFound(): void
     {
         $segmentKey = 'test-segments-2';
-        $updatedSegments = $this->segmentsManager->selectCustomSegments(
+        $updatedSegments = self::$segmentsManager->selectCustomSegments(
             $this->visitorId,
             [$segmentKey]
         );

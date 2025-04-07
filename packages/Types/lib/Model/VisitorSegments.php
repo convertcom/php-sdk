@@ -191,7 +191,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         'campaign' => 'campaign',
         'visitor_type' => 'visitorType',
         'country' => 'country',
-        'custom_segments' => 'customSegments'
+        'custom_segments' => 'custom_segments'
     ];
 
     /**
@@ -371,7 +371,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('campaign', $data ?? [], null);
         $this->setIfExists('visitor_type', $data ?? [], null);
         $this->setIfExists('country', $data ?? [], null);
-        $this->setIfExists('customSegments', $data ?? [], null);
+        $this->setIfExists('custom_segments', $data ?? [], null);
     }
 
     /**
@@ -666,7 +666,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
      */
     public function getCustomSegments()
     {
-        return $this->container['customSegments'];
+        return $this->container['custom_segments'];
     }
 
     /**
@@ -681,7 +681,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         if (is_null($custom_segments)) {
             throw new \InvalidArgumentException('non-nullable custom_segments cannot be null');
         }
-        $this->container['customSegments'] = $custom_segments;
+        $this->container['custom_segments'] = $custom_segments;
 
         return $this;
     }

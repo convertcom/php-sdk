@@ -97,7 +97,8 @@ class SegmentsManager implements SegmentsManagerInterface
         ?array $segmentRule = null
     ) {
         $storeData = $this->dataManager->getData($visitorId) ?? new StoreData();
-        $customSegments = $storeData->getSegments()[SegmentsKeys::CUSTOM_SEGMENTS] ?? [];
+        $visitorSegments = $storeData->getSegments() ?? new VisitorSegments();
+        $customSegments = $visitorSegments->getCustomSegments() ?? [];
         $segmentIds = [];
         $segmentsMatched = false;
     
@@ -105,10 +106,9 @@ class SegmentsManager implements SegmentsManagerInterface
             if ($segmentRule && !$segmentsMatched) {
                 $segmentsMatched = $this->ruleManager->isRuleMatched(
                     $segmentRule,
-                    new RuleObject($segment['rules']) ?? [],
+                    new RuleObject($segment['rules'] ?? []),
                     "ConfigSegment #{$segment['id']}"
                 );
-    
                 if (in_array($segmentsMatched, RuleError::getConstants(), true)) {
                     return $segmentsMatched;
                 }
@@ -116,7 +116,6 @@ class SegmentsManager implements SegmentsManagerInterface
     
             if (!$segmentRule || $segmentsMatched) {
                 $segmentId = (string)$segment['id'];
-    
                 if (in_array($segmentId, $customSegments)) {
                     if ($this->loggerManager !== null) {
                         $this->loggerManager->warn(
@@ -132,20 +131,14 @@ class SegmentsManager implements SegmentsManagerInterface
     
         if (!empty($segmentIds)) {
             $segmentsData = array_merge(
-                $storeData->getSegments() ?? [],
+                json_decode(json_encode($visitorSegments), true),
                 [SegmentsKeys::CUSTOM_SEGMENTS => array_merge($customSegments, $segmentIds)]
             );
             $this->putSegments($visitorId, $segmentsData);
             return new VisitorSegments($segmentsData);
-        } else {
-            if ($this->loggerManager !== null) {
-                $this->loggerManager->warn(
-                    'SegmentsManager.setCustomSegments()',
-                    Messages::SEGMENTS_NOT_FOUND
-                );
-            }
-            return null; // Return null when no new segments are added
         }
+    
+        return null;
     }
 
     /**

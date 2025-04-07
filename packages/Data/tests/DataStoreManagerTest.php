@@ -81,7 +81,7 @@ class DataStoreManagerTest extends TestCase
             'campaign' => 'test',
             'visitorType' => 'new',
             'country' => 'US',
-            'customSegments' => ['seg1', 'seg2']
+            'custom_segments' => ['seg1', 'seg2']
         ]
     ];
 

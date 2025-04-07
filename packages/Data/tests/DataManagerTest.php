@@ -348,15 +348,15 @@ class DataManagerTest extends TestCase
             [
                 'properties' => [
                     'visitorType' => $this->segments['visitor_type'],
-                    'customSegments' => $this->segments['custom_segments']
                 ],
                 'segments' => [
                     'browser' => $this->segments['browser'],
                     'devices' => $this->segments['devices'],
                     'source' => $this->segments['source'],
                     'campaign' => $this->segments['campaign'],
-                    'country' => $this->segments['country']
-                ]
+                    'country' => $this->segments['country'],
+                    'custom_segments' => $this->segments['custom_segments']            
+                    ]
             ],
             $check['segments']
         );
@@ -380,14 +380,14 @@ class DataManagerTest extends TestCase
             [
                 'properties' => [
                     'visitorType' => $this->segments['visitor_type'],
-                    'customSegments' => $this->segments['custom_segments']
                 ],
                 'segments' => [
                     'browser' => $this->segments['browser'],
                     'devices' => $this->segments['devices'],
                     'source' => $this->segments['source'],
                     'campaign' => $this->segments['campaign'],
-                    'country' => $this->segments['country']
+                    'country' => $this->segments['country'],
+                    'custom_segments' => $this->segments['custom_segments']
                 ]
             ],
             $check['segments']
@@ -461,14 +461,14 @@ class DataManagerTest extends TestCase
             [
                 'properties' => [
                     'visitorType' => $this->segments['visitor_type'],
-                    'customSegments' => $this->segments['custom_segments']
                 ],
                 'segments' => [
                     'browser' => $this->segments['browser'],
                     'devices' => $this->segments['devices'],
                     'source' => $this->segments['source'],
                     'campaign' => $this->segments['campaign'],
-                    'country' => $this->segments['country']
+                    'country' => $this->segments['country'],
+                    'custom_segments' => $this->segments['custom_segments']
                 ]
             ],
             $check['segments']
@@ -500,15 +500,15 @@ class DataManagerTest extends TestCase
         $this->assertEquals(
             [
                 'properties' => [
-                    'visitorType' => $this->segments['visitor_type'],
-                    'customSegments' => $this->segments['custom_segments']
+                    'visitorType' => $this->segments['visitor_type']
                 ],
                 'segments' => [
                     'browser' => $this->segments['browser'],
                     'devices' => $this->segments['devices'],
                     'source' => $this->segments['source'],
                     'campaign' => $this->segments['campaign'],
-                    'country' => $this->segments['country']
+                    'country' => $this->segments['country'],
+                    'custom_segments' => $this->segments['custom_segments']
                 ]
             ],
             $check['segments']
