@@ -12,6 +12,7 @@ use ConvertSdk\Config\Config;
 use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\Experience\ExperienceManager;
+use ConvertSdk\FeatureManager;
 use ConvertSdk\Rules\RuleManager;
 use ConvertSdk\Segments\SegmentsManager;
 use Monolog\Logger;
@@ -22,6 +23,7 @@ class ConvertSDK extends Core {
     public $apiManager;
     public $loggerManager;
     public $experienceManager;
+    public $featureManager;
     public $segmentsManager;
 
     public function __construct(array $config = []) {
@@ -65,10 +67,7 @@ class ConvertSDK extends Core {
         $this->eventManager = new EventManager($configuration, ['loggerManager' => $this->loggerManager]);
 
         // Initialize ApiManager
-        $this->apiManager = new ApiManager($configuration, [
-            'eventManager' => $this->eventManager,
-            'loggerManager' => $this->loggerManager
-        ]);
+        $this->apiManager = new ApiManager($configuration, $this->eventManager, $this->loggerManager);
 
         // Initialize BucketingManager
         $this->bucketingManager = new BucketingManager($configuration, [
@@ -80,23 +79,20 @@ class ConvertSDK extends Core {
         ]);
 
         // Initialize DataManager
-        $this->dataManager = new DataManager($configuration, [
-            'bucketingManager' => $this->bucketingManager,
-            'ruleManager' => $this->ruleManager,
-            'eventManager' => $this->eventManager,
-            'apiManager' => $this->apiManager,
-            'loggerManager' => $this->loggerManager
-        ]);
+        $this->dataManager = new DataManager($configuration,
+            $this->bucketingManager,
+            $this->ruleManager,
+            $this->eventManager,
+            $this->apiManager,
+            $this->loggerManager
+    );;
         // Initialize ExperienceManager
         $this->experienceManager = new ExperienceManager($configuration, [
             'dataManager' => $this->dataManager,
             'loggerManager' => $this->loggerManager
         ]);
-        $this->segmentsManager = new SegmentsManager($configuration, [
-            'dataManager' => $this->dataManager,
-            'ruleManager' => $this->ruleManager,
-            'loggerManager' => $this->loggerManager
-        ]);
+        $this->featureManager = new FeatureManager($configuration, $this->dataManager, $this->loggerManager);
+        $this->segmentsManager = new SegmentsManager($configuration, $this->dataManager, $this->ruleManager, $this->loggerManager);
 
         // Call parent constructor
         parent::__construct($configuration, [
@@ -105,6 +101,7 @@ class ConvertSDK extends Core {
             'apiManager'        => $this->apiManager,
             'loggerManager'     => $this->loggerManager,
             'experienceManager' => $this->experienceManager,
+            'featureManager'    => $this->featureManager,
             'segmentsManager'   => $this->segmentsManager,
         ]);
     }

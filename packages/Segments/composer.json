@@ -66,7 +66,8 @@
         "friendsofphp/php-cs-fixer": "^3.13",
         "phpstan/phpstan": "^1.10",
         "infection/infection": "^0.26",
-        "vimeo/psalm": "^4.30"
+        "vimeo/psalm": "^4.30",
+        "ext-swoole": "*"
     },
     "autoload": {
         "psr-4": {

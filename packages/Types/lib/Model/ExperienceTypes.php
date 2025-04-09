@@ -44,6 +44,8 @@ class ExperienceTypes
      */
     public const A_B = 'a/b';
 
+    public const A_B_FULLSTACK = 'a/b_fullstack';
+
     public const A_A = 'a/a';
 
     public const MVT = 'mvt';
@@ -62,6 +64,7 @@ class ExperienceTypes
     {
         return [
             self::A_B,
+            self::A_B_FULLSTACK,
             self::A_A,
             self::MVT,
             self::SPLIT_URL,
