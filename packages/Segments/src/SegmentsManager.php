@@ -64,6 +64,7 @@ class SegmentsManager implements SegmentsManagerInterface
     public function getSegments(string $visitorId): VisitorSegments
     {
         $storeData = $this->dataManager->getData($visitorId) ?? [];
+        $storeData = (array)$storeData;
         $segments = $this->dataManager->filterReportSegments($storeData['segments'] ?? []);
         return $segments['segments'] ?? new VisitorSegments();
     }
@@ -79,7 +80,7 @@ class SegmentsManager implements SegmentsManagerInterface
     {
         $reportSegments = $this->dataManager->filterReportSegments($segments);
         if ($reportSegments['segments'] ?? false) {
-            $this->dataManager->putData($visitorId, new StoreData(['segments' => $reportSegments['segments']]));
+            $this->dataManager->putData($visitorId, ['segments' => $reportSegments['segments']]);
         }
     }
 

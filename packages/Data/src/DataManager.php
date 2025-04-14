@@ -171,7 +171,7 @@ class DataManager implements DataManagerInterface
       $this->_config = $config;
       $this->_mapper = $config->getMapper() ?? fn($value) => $value;
       $this->_asyncStorage = $asyncStorage;
-      $this->_data = $config->getData() ?? ObjectUtils::deepValue($config, 'data');
+      $this->_data = $config->getData();
       $this->_accountId = $this->_data ? $this->_data->getAccountId() : '';
       $project = $this->_data ? $this->_data->getProject() : null;
       $this->_projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
@@ -626,8 +626,8 @@ class DataManager implements DataManagerInterface
 
       // Check stored bucketing
       $data = $this->getData($visitorId);
-      $bucketing = $data?->getBucketing() ?? [];
-      $segments = $data?->getSegments() ? (array)$data->getSegments()->jsonSerialize() : [];
+      $bucketing = $data['bucketing'] ?? [];
+      $segments = $data['segments'] ?? [];
       $storedVariationId = $bucketing[(string)$experience->getId()] ?? null;
 
       if (
@@ -700,9 +700,9 @@ class DataManager implements DataManagerInterface
               str_replace('#', '#' . $variationId, Messages::BUCKETED_VISITOR)
           );
 
-          $storeDataObj = new StoreData([
+          $storeDataObj = [
             'bucketing' => [(string)$experience->getId() => $variationId]
-          ]);
+          ];
           if ($updateVisitorProperties && !empty($visitorProperties)) {
               $storeDataObj->setSegments(new VisitorSegments($visitorProperties));
           }
@@ -783,35 +783,32 @@ class DataManager implements DataManagerInterface
      * @return void
      * @private
      */
-    public function putData(string $visitorId, ?StoreData $newData = null): void
+    public function putData(string $visitorId, ?array $newData): void
     {
         // Step 1: Get the store key
         $storeKey = $this->getStoreKey($visitorId);
         // Step 2: Retrieve existing data or use an empty array
         $storeDataObj = $this->getData($visitorId);
         $storeData = $storeDataObj ? [
-            'bucketing' => $storeDataObj->getBucketing() ?? [],
-            'locations' => $storeDataObj->getLocations() ?? [],
-            'segments' => $storeDataObj->getSegments() ? (array)$storeDataObj->getSegments()->jsonSerialize() : [],
-            'goals' => $storeDataObj->getGoals() ?? []
+            'bucketing' => $storeDataObj['bucketing'] ?? [],
+            'locations' => $storeDataObj['locations'] ?? [],
+            'segments' => $storeDataObj['segments'] ?? [],
+            'goals' => $storeDataObj['goals'] ?? []
         ] : [];
         // Step 3: Handle newData, defaulting to an empty StoreData object
-        $newDataObj = $newData ?? new StoreData();
+        $newDataObj = $newData ?? [];
         $newDataArray = [
-            'bucketing' => $newDataObj->getBucketing() ?? [],
-            'locations' => $newDataObj->getLocations() ?? [],
-            'segments' => $newDataObj->getSegments() ? (array)$newDataObj->getSegments()->jsonSerialize() : [],
-            'goals' => $newDataObj->getGoals() ?? []
+            'bucketing' => $newDataObj['bucketing'] ?? [],
+            'locations' => $newDataObj['locations'] ?? [],
+            'segments' => $newDataObj['segments'] ?? [],
+            'goals' => $newDataObj['goals'] ?? []
         ];
-
         // Step 4: Check if data has changed
         $isChanged = !ObjectUtils::objectDeepEqual($storeData, $newDataArray);
-
         if ($isChanged) {
             // Step 5: Merge data if changed
             $updatedData = ObjectUtils::objectDeepMerge($storeData, $newDataArray);
             $this->_bucketedVisitors[$storeKey] = $updatedData;
-
             // Step 6: Enforce local store limit
             if (count($this->_bucketedVisitors) > $this->_localStoreLimit) {
                 reset($this->_bucketedVisitors);
@@ -857,7 +854,7 @@ class DataManager implements DataManagerInterface
    * @return StoreData|null Stored data
    * @private
    */
-  public function getData(string $visitorId): ?StoreData {
+  public function getData(string $visitorId): ?array {
     $storeKey = $this->getStoreKey($visitorId);
     $memoryData = $this->_bucketedVisitors[$storeKey] ?? null;
     if ($this->_dataStoreManager) {
@@ -866,13 +863,13 @@ class DataManager implements DataManagerInterface
             $memoryData ?? [],
             $dataStoreData
         );
-        return new StoreData($mergedData);
+        return $mergedData;
     }
 
     if ($memoryData === null) {
         return null;
     }
-    return new StoreData($memoryData);
+    return $memoryData;
   }
 
   /**
@@ -1101,7 +1098,7 @@ class DataManager implements DataManagerInterface
     }
 
     // Store the goal as triggered
-    $this->putData($visitorId, new StoreData(['goals' => [$goalId => true]]));
+    $this->putData($visitorId, ['goals' => [$goalId => true]]);
 
     // Send conversion event if goal wasn't previously triggered
     if (!$goalTriggered) {

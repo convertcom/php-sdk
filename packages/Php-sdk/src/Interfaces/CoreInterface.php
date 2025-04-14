@@ -14,7 +14,7 @@ interface CoreInterface
      * @param array|null $visitorAttributes Optional associative array.
      * @return ContextInterface
      */
-    public function createContext(string $visitorId, ?array $visitorAttributes = null);
+    public function createContext(string $visitorId, ?array $visitorAttributes = null): ?ContextInterface;
 
     /**
      * Attach an event handler to a system event.
@@ -23,7 +23,7 @@ interface CoreInterface
      * @param callable $fn Callback function with optional arguments.
      * @return void
      */
-    public function on($event, callable $fn): void;
+    public function on(string $event, callable $fn): void;
 
     /**
      * Returns a promise that resolves when the core is ready.

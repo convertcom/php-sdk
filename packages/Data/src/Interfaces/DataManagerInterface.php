@@ -35,7 +35,7 @@ interface DataManagerInterface
      */
     public function getConfigData(): ConfigResponseData;
 
-    public function getData(string $visitorId): ?StoreData;
+    public function getData(string $visitorId): ?array;
 
     /**
      * Set the configuration data.
@@ -74,7 +74,7 @@ interface DataManagerInterface
      * @param StoreData $storeData
      * @return void
      */
-    public function putData(string $storeKey, StoreData $storeData): void;
+    public function putData(string $storeKey, ?array $storeData): void;
 
     /**
      * Generate a store key from a visitor ID.

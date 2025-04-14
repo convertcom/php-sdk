@@ -1,210 +1,247 @@
 <?php
+/**
+ * Convert PHP SDK
+ * Version 1.0.0
+ * Copyright (c) 2020 Convert Insights, Inc
+ * License Apache-2.0
+ */
 
 namespace ConvertSdk;
 
-use GuzzleHttp\Promise\PromiseInterface;
-use ConvertSdk\Enums\ErrorMessages;
-use ConvertSdk\Enums\Messages;
-use ConvertSdk\Enums\SystemEvents;
-use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Interfaces\CoreInterface;
-use ConvertSdk\Experience\ExperienceManager;
+use ConvertSdk\Interfaces\ContextInterface;
+use ConvertSdk\Interfaces\DataManagerInterface;
+use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Interfaces\ExperienceManagerInterface;
+use ConvertSdk\Interfaces\FeatureManagerInterface;
+use ConvertSdk\Interfaces\SegmentsManagerInterface;
+use ConvertSdk\Interfaces\ApiManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use GuzzleHttp\Promise\PromiseInterface;
+use GuzzleHttp\Promise\Promise;
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
+use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Enums\Messages;
+use ConvertSdk\Enums\ErrorMessages;
+use ConvertSdk\Utils\ObjectUtils;
+use ConvertSdk\Context;
 
+/**
+ * Core
+ * @category Main
+ * @implements CoreInterface
+ */
 class Core implements CoreInterface
 {
-    protected $dataManager;       // DataManagerInterface
-    protected $eventManager;      // EventManagerInterface
-    protected $experienceManager; // ExperienceManager
-    protected $loggerManager;     // LogManagerInterface
-    protected $apiManager;        // ApiManagerInterface
-    protected $config;            // Array holding configuration settings
-    protected $promise;           // PromiseInterface resolving with config response data
-    protected $fetchConfigTimerID; // Timer identifier (if using an event loop)
-    protected $environment;       // string
-    protected $initialized;       // bool
+    /** Default data refresh interval in milliseconds (5 minutes) */
+    const DEFAULT_DATA_REFRESH_INTERVAL = 300000;
 
-    const DEFAULT_DATA_REFRESH_INTERVAL = 300000; // 5 minutes in milliseconds
+    /** @var DataManagerInterface */
+    private $_dataManager;
+
+    /** @var EventManagerInterface */
+    private $_eventManager;
+
+    /** @var ExperienceManagerInterface */
+    private $_experienceManager;
+
+    /** @var FeatureManagerInterface */
+    private $_featureManager;
+
+    /** @var SegmentsManagerInterface */
+    private $_segmentsManager;
+
+    /** @var ApiManagerInterface */
+    private $_apiManager;
+
+    /** @var LogManagerInterface|null */
+    private $_loggerManager;
+
+    /** @var Config */
+    private $_config;
+
+    /** @var string|null */
+    private $_environment;
+
+    /** @var bool */
+    private $_initialized = false;
 
     /**
-     * Core constructor.
+     * Constructor
      *
-     * @param array $config Configuration array.
-     * @param array $dependencies {
-     *      @type DataManagerInterface       $dataManager
-     *      @type EventManagerInterface      $eventManager
-     *      @type ApiManagerInterface        $apiManager
-     *      @type LogManagerInterface|null   $loggerManager
-     *      @type ExperienceManager          $experienceManager
-     * }
+     * @param Config $config Configuration object
+     * @param array $dependencies Dependencies array
+     * @param DataManagerInterface $dependencies['dataManager'] Data manager instance
+     * @param EventManagerInterface $dependencies['eventManager'] Event manager instance
+     * @param ExperienceManagerInterface $dependencies['experienceManager'] Experience manager instance
+     * @param FeatureManagerInterface $dependencies['featureManager'] Feature manager instance
+     * @param SegmentsManagerInterface $dependencies['segmentsManager'] Segments manager instance
+     * @param ApiManagerInterface $dependencies['apiManager'] API manager instance
+     * @param LogManagerInterface|null $dependencies['loggerManager'] Optional logger manager instance
      */
-    public function __construct(array $config, array $dependencies)
+    public function __construct(Config $config, array $dependencies)
     {
-        $this->initialized   = false;
-        $this->environment   = $config['environment'] ?? '';
-        $this->dataManager   = $dependencies['dataManager'];
-        $this->eventManager  = $dependencies['eventManager'];
-        $this->apiManager    = $dependencies['apiManager'];
-        $this->loggerManager = $dependencies['loggerManager'] ?? null;
-        $this->experienceManager = $dependencies['experienceManager']; // Initialize the ExperienceManager
-
-        // Log constructor call if a logger is available.
-        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-            $this->loggerManager->trace('Core()', Messages::CORE_CONSTRUCTOR, $this);
-        }
+        $this->_dataManager = $dependencies['dataManager'];
+        $this->_eventManager = $dependencies['eventManager'];
+        $this->_experienceManager = $dependencies['experienceManager'];
+        $this->_featureManager = $dependencies['featureManager'];
+        $this->_segmentsManager = $dependencies['segmentsManager'];
+        $this->_apiManager = $dependencies['apiManager'];
+        $this->_loggerManager = $dependencies['loggerManager'] ?? null;
+        $this->_environment = $config->getEnvironment() ?? null;
         $this->initialize($config);
     }
 
     /**
-     * Initialize credentials, configuration data, etc.
+     * Initialize credentials, configData etc..
      *
-     * @param array $config
+     * @param Config $config Configuration object
+     * @return void
      */
-    protected function initialize(array $config): void
+    private function initialize(Config $config): void
     {
-        if (empty($config)) {
+        if (!$config) {
             return;
         }
-        $this->config = $config;
-
-        if (isset($config['sdkKey']) && !empty($config['sdkKey'])) {
-            // If an SDK key is provided, fetch remote configuration.
-            $this->fetchConfig();
-        } elseif (isset($config['data'])) {
-            // If static configuration data is provided, use it directly.
-            $this->dataManager->setData($config['data']);
-            if (isset($config['data']['error'])) {
-                if ($this->loggerManager !== null && method_exists($this->loggerManager, 'error')) {
-                    $this->loggerManager->error('Core.initialize()', ['error' => $config['data']['error']]);
+        $this->_config = $config;
+        if ($config->getSdkKey() && strlen($config->getSdkKey()) > 0) {
+            $this->fetchConfig()->then(
+                function () {
+                    $this->_eventManager->fire(SystemEvents::READY, null, null, true);
+                    $this->_loggerManager?->trace('Core.initialize()', Messages::CORE_INITIALIZED);
+                    $this->_initialized = true;
+                },
+                function (\Exception $e) {
+                    $this->_loggerManager?->error('Core.initialize()', ['error' => $e->getMessage()]);
+                    $this->_eventManager->fire(
+                        SystemEvents::READY,
+                        [],
+                        $e,
+                        true
+                    );
                 }
+            );
+        } elseif ($config->getData()) {
+            $this->_dataManager->setConfigData($config->getData());
+            $configData = $this->_dataManager->getConfigData();
+            if (!$configData->getAccountId() || !$configData->getProject()) {
+                $this->_loggerManager?->error('Core.initialize()', ['error' => 'Invalid configuration data: missing account_id or project']);
+                $this->_eventManager->fire(
+                    SystemEvents::READY,
+                    [],
+                    new \Exception('Invalid configuration data: missing account_id or project'),
+                    true
+                );
             } else {
-                $this->eventManager->fire(SystemEvents::READY, null, null, true);
-                if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-                    $this->loggerManager->trace('Core.initialize()', Messages::CORE_INITIALIZED);
-                }
-                $this->initialized = true;
+                $this->_eventManager->fire(SystemEvents::READY, null, null, true);
+                $this->_loggerManager?->trace('Core.initialize()', Messages::CORE_INITIALIZED);
+                $this->_initialized = true;
             }
         } else {
-            if ($this->loggerManager !== null && method_exists($this->loggerManager, 'error')) {
-                $this->loggerManager->error('Core.initialize()', ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED);
-            }
-            $this->eventManager->fire(SystemEvents::READY, [], new \Exception(ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED), true);
+            $this->_loggerManager?->error('Core.initialize()', ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED);
+            $this->_eventManager->fire(
+                SystemEvents::READY,
+                [],
+                new \Exception(ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED),
+                true
+            );
         }
     }
-
     /**
-     * Create visitor context.
+     * Create visitor context
      *
-     * @param string $visitorId A visitor ID.
-     * @param array|null $visitorAttributes Optional attributes for audience/segments targeting.
-     * @return Context|null Returns a new Context or null if not initialized.
+     * @param string $visitorId A visitor ID
+     * @param array|null $visitorAttributes An object of key-value pairs for audience/segments targeting
+     * @return ContextInterface|null
      */
-    public function createContext(string $visitorId, ?array $visitorAttributes = null)
+    public function createContext(string $visitorId, ?array $visitorAttributes = null): ?ContextInterface
     {
-        if (!$this->initialized) {
+        if (!$this->_initialized) {
             return null;
         }
         return new Context(
-            $this->config,
+            $this->_config,
             $visitorId,
             [
-                'eventManager'      => $this->eventManager,
-                'experienceManager' => $this->experienceManager, // Pass ExperienceManager here
-                'apiManager'        => $this->apiManager,
-                'dataManager'       => $this->dataManager,
-                'loggerManager'     => $this->loggerManager
+                'eventManager' => $this->_eventManager,
+                'experienceManager' => $this->_experienceManager,
+                'featureManager' => $this->_featureManager,
+                'segmentsManager' => $this->_segmentsManager,
+                'apiManager' => $this->_apiManager,
+                'dataManager' => $this->_dataManager,
+                'loggerManager' => $this->_loggerManager
             ],
             $visitorAttributes
         );
     }
 
     /**
-     * Attach an event handler.
+     * Add event handler to event
      *
-     * @param string $event Event name.
-     * @param callable $fn Callback function to fire.
+     * @param string $event Event name (SystemEvents)
+     * @param callable $fn A callback function which will be fired
+     * @return void
      */
-    public function on($event, callable $fn): void
+    public function on(string $event, callable $fn): void
     {
-        $this->eventManager->on($event, $fn);
+        $this->_eventManager->on($event, $fn);
     }
 
     /**
-     * Promisified ready event.
-     *
-     * Returns a promise that resolves when configuration data is available.
+     * Check if the system is ready
      *
      * @return PromiseInterface
      */
     public function onReady(): PromiseInterface
     {
-        return $this->promise->then(function ($data) {
-            if (ObjectUtils::objectNotEmpty($this->dataManager->getData())) {
-                return null; // resolved successfully.
+        $promise = new Promise(function ($resolve, $reject) {
+            $configData = $this->_dataManager->getConfigData();
+            if ($this->_initialized && $configData->getAccountId() && $configData->getProject()) {
+                $resolve();
             } else {
-                throw new \Exception(ErrorMessages::DATA_OBJECT_MISSING);
+                $reject(new \Exception(ErrorMessages::DATA_OBJECT_MISSING));
             }
         });
+
+        return $promise;
     }
 
-    /**
-     * Fetch remote configuration data.
+   /**
+     * Fetch remote config data
      *
-     * This method sets $this->promise to the promise returned by the API manager's getConfig().
-     * Once the promise resolves, it processes the data, fires events, and updates internal state.
-     *
-     * Note: Periodic refresh is simulated here. In production, use an event loop or scheduler.
+     * @return PromiseInterface
      */
-    protected function fetchConfig(): void
+    public function fetchConfig(): PromiseInterface
     {
-        // Assume that getConfig() returns a PromiseInterface.
-        $this->promise = $this->apiManager->getConfig();
-        $this->promise->then(function ($data) {
-            if (isset($data['error'])) {
-                $this->dataManager->setData($data);
-                if ($this->loggerManager !== null && method_exists($this->loggerManager, 'error')) {
-                    $this->loggerManager->error('Core.fetchConfig()', ['error' => $data['error']]);
+        return $this->_apiManager->getConfig()->then(
+            function (ConfigResponseData $data) {
+                $this->_dataManager->setConfigData($data);
+                $configData = $this->_dataManager->getConfigData();
+
+                if (!$configData->getAccountId() || !$configData->getProject()) {
+                    $this->_loggerManager?->error('Core.fetchConfig()', ['error' => 'Invalid configuration data: missing account_id or project']);
+                    throw new \Exception('Invalid configuration data: missing account_id or project');
                 }
-            } else {
-                if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-                    $this->loggerManager->trace('Core.fetchConfig()', ['data' => $data]);
-                }
-                $event = ObjectUtils::objectNotEmpty($this->dataManager->getData())
-                    ? SystemEvents::CONFIG_UPDATED
-                    : SystemEvents::READY;
-                $this->eventManager->fire($event, null, null, true);
-                if (ObjectUtils::objectNotEmpty($this->dataManager->getData())) {
-                    if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-                        $this->loggerManager->trace('Core.fetchConfig()', Messages::CONFIG_DATA_UPDATED);
-                    }
+
+                $this->_loggerManager?->trace('Core.fetchConfig()', ['data' => $data]);
+                $event = ($configData->getAccountId() && $configData->getProject()) ? SystemEvents::CONFIG_UPDATED : SystemEvents::READY;
+                $this->_eventManager->fire($event, null, null, true);
+                $this->_apiManager->setData($data);
+
+                if ($configData->getAccountId() && $configData->getProject()) {
+                    $this->_loggerManager?->trace('Core.fetchConfig()', Messages::CONFIG_DATA_UPDATED);
                 } else {
-                    if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-                        $this->loggerManager->trace('Core.fetchConfig()', Messages::CORE_INITIALIZED);
-                    }
-                    $this->initialized = true;
+                    $this->_loggerManager?->trace('Core.fetchConfig()', Messages::CORE_INITIALIZED);
+                    $this->_initialized = true;
                 }
-                $this->dataManager->setData($data);
-                $this->apiManager->setData($data);
+                // Note: Periodic refresh omitted, as PHP doesn't support long-running timers.
+                // Consider implementing via cron job or external scheduler if needed.
+            },
+            function ($error) {
+                $this->_loggerManager?->error('Core.fetchConfig()', ['error' => $error->getMessage()]);
+                throw $error;
             }
-
-            // Clear previous timer if set.
-            if ($this->fetchConfigTimerID) {
-                // In PHP, you’d cancel the timer via your event loop or scheduler.
-                // For this example, we simply reset the timer ID.
-                $this->fetchConfigTimerID = null;
-            }
-
-            // Schedule the next fetch.
-            // Note: Blocking sleep is used here for demonstration only.
-            $interval = $this->config['dataRefreshInterval'] ?? self::DEFAULT_DATA_REFRESH_INTERVAL;
-            // In a non-blocking environment, integrate with an event loop here.
-            // For example:
-            // sleep($interval / 1000);
-            // $this->fetchConfig();
-
-        })->otherwise(function ($error) {
-            if ($this->loggerManager !== null && method_exists($this->loggerManager, 'error')) {
-                $this->loggerManager->error('Core.fetchConfig()', ['error' => $error->getMessage()]);
-            }
-        });
+        );
     }
 }

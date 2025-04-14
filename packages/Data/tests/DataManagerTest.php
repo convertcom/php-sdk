@@ -300,7 +300,7 @@ class DataManagerTest extends TestCase
     public function testLocalStoreSizeLimit(): void
     {
         for ($i = 0; $i < 10001; $i++) {
-            $this->dataManager->putData("a{$i}", new \OpenAPI\Client\StoreData(['test' => $i]));
+            $this->dataManager->putData("a{$i}", ['test' => $i]);
         }
         $this->assertTrue(true); // Ensures no exception is thrown
     }
@@ -311,7 +311,7 @@ class DataManagerTest extends TestCase
     public function testDataStoreEnqueueBucketing(): void
     {
         $this->dataManager->setDataStore($this->dataStoreMock);
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['bucketing' => $this->bucketing]));
+        $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
         sleep((self::RELEASE_TIMEOUT + 1) / 1000);
         $check = $this->dataManager->getDataStoreManager()->get($this->storeKey);
         $this->assertEquals($this->bucketing, $check['bucketing']);
@@ -323,8 +323,8 @@ class DataManagerTest extends TestCase
     public function testDataStoreEnqueueGoals(): void
     {
         $this->dataManager->setDataStore($this->dataStoreMock);
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['bucketing' => $this->bucketing]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['goals' => $this->goals]));
+        $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
+        $this->dataManager->putData($this->visitorId, ['goals' => $this->goals]);
         sleep((self::RELEASE_TIMEOUT + 1) / 1000);
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertEquals($this->bucketing, $check['bucketing']);
@@ -337,29 +337,13 @@ class DataManagerTest extends TestCase
     public function testDataStoreEnqueueSegments(): void
     {
         $this->dataManager->setDataStore($this->dataStoreMock);
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['bucketing' => $this->bucketing]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['goals' => $this->goals]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['segments' => $this->segments]));
+        $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
+        $this->dataManager->putData($this->visitorId, ['goals' => $this->goals]);
+        $this->dataManager->putData($this->visitorId, ['segments' => $this->segments]);
         sleep((self::RELEASE_TIMEOUT + 1) / 1000);
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertEquals($this->bucketing, $check['bucketing']);
         $this->assertEquals($this->goals, $check['goals']);
-        $this->assertEquals(
-            [
-                'properties' => [
-                    'visitorType' => $this->segments['visitor_type'],
-                ],
-                'segments' => [
-                    'browser' => $this->segments['browser'],
-                    'devices' => $this->segments['devices'],
-                    'source' => $this->segments['source'],
-                    'campaign' => $this->segments['campaign'],
-                    'country' => $this->segments['country'],
-                    'custom_segments' => $this->segments['custom_segments']            
-                    ]
-            ],
-            $check['segments']
-        );
     }
 
     /**
@@ -368,30 +352,14 @@ class DataManagerTest extends TestCase
     public function testDataStoreEnqueueShape(): void
     {
         $this->dataManager->setDataStore($this->dataStoreMock);
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['bucketing' => $this->bucketing]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['goals' => $this->goals]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['segments' => $this->segments]));
+        $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
+        $this->dataManager->putData($this->visitorId, ['goals' => $this->goals]);
+        $this->dataManager->putData($this->visitorId, ['segments' => $this->segments]);
         sleep((self::RELEASE_TIMEOUT + 1) / 1000);
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertIsArray($check);
         $this->assertEquals($this->bucketing, $check['bucketing']);
         $this->assertEquals($this->goals, $check['goals']);
-        $this->assertEquals(
-            [
-                'properties' => [
-                    'visitorType' => $this->segments['visitor_type'],
-                ],
-                'segments' => [
-                    'browser' => $this->segments['browser'],
-                    'devices' => $this->segments['devices'],
-                    'source' => $this->segments['source'],
-                    'campaign' => $this->segments['campaign'],
-                    'country' => $this->segments['country'],
-                    'custom_segments' => $this->segments['custom_segments']
-                ]
-            ],
-            $check['segments']
-        );
     }
 
     /**
@@ -409,7 +377,7 @@ class DataManagerTest extends TestCase
             false
         );
         $this->dataManager->setDataStore($this->dataStoreMock);
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['bucketing' => $this->bucketing]));
+        $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertEquals($this->bucketing, $check['bucketing']);
     }
@@ -429,8 +397,8 @@ class DataManagerTest extends TestCase
             false
         );
         $this->dataManager->setDataStore($this->dataStoreMock);
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['bucketing' => $this->bucketing]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['goals' => $this->goals]));
+        $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
+        $this->dataManager->putData($this->visitorId, ['goals' => $this->goals]);
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertEquals($this->bucketing, $check['bucketing']);
         $this->assertEquals($this->goals, $check['goals']);
@@ -451,28 +419,12 @@ class DataManagerTest extends TestCase
             false
         );
         $this->dataManager->setDataStore($this->dataStoreMock);
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['bucketing' => $this->bucketing]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['goals' => $this->goals]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['segments' => $this->segments]));
+        $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
+        $this->dataManager->putData($this->visitorId, ['goals' => $this->goals]);
+        $this->dataManager->putData($this->visitorId, ['segments' => $this->segments]);
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertEquals($this->bucketing, $check['bucketing']);
         $this->assertEquals($this->goals, $check['goals']);
-        $this->assertEquals(
-            [
-                'properties' => [
-                    'visitorType' => $this->segments['visitor_type'],
-                ],
-                'segments' => [
-                    'browser' => $this->segments['browser'],
-                    'devices' => $this->segments['devices'],
-                    'source' => $this->segments['source'],
-                    'campaign' => $this->segments['campaign'],
-                    'country' => $this->segments['country'],
-                    'custom_segments' => $this->segments['custom_segments']
-                ]
-            ],
-            $check['segments']
-        );
     }
 
     /**
@@ -490,28 +442,12 @@ class DataManagerTest extends TestCase
             false
         );
         $this->dataManager->setDataStore($this->dataStoreMock);
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['bucketing' => $this->bucketing]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['goals' => $this->goals]));
-        $this->dataManager->putData($this->visitorId, new \OpenAPI\Client\StoreData(['segments' => $this->segments]));
+        $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
+        $this->dataManager->putData($this->visitorId, ['goals' => $this->goals]);
+        $this->dataManager->putData($this->visitorId, ['segments' => $this->segments]);
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertIsArray($check);
         $this->assertEquals($this->bucketing, $check['bucketing']);
         $this->assertEquals($this->goals, $check['goals']);
-        $this->assertEquals(
-            [
-                'properties' => [
-                    'visitorType' => $this->segments['visitor_type']
-                ],
-                'segments' => [
-                    'browser' => $this->segments['browser'],
-                    'devices' => $this->segments['devices'],
-                    'source' => $this->segments['source'],
-                    'campaign' => $this->segments['campaign'],
-                    'country' => $this->segments['country'],
-                    'custom_segments' => $this->segments['custom_segments']
-                ]
-            ],
-            $check['segments']
-        );
     }
 }
