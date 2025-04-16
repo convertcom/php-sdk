@@ -97,9 +97,9 @@ class SegmentsManager implements SegmentsManagerInterface
         array $segments,
         ?array $segmentRule = null
     ) {
-        $storeData = $this->dataManager->getData($visitorId) ?? new StoreData();
-        $visitorSegments = $storeData->getSegments() ?? new VisitorSegments();
-        $customSegments = $visitorSegments->getCustomSegments() ?? [];
+        $storeData = $this->dataManager->getData($visitorId) ?? [];
+        $visitorSegments = $storeData["segments"] ?? [];
+        $customSegments = $visitorSegments["custom_segments"] ?? [];
         $segmentIds = [];
         $segmentsMatched = false;
     

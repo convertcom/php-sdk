@@ -40,7 +40,7 @@ class FileLoggerTest extends TestCase
             $logger->log('testing invalid file');
             $this->fail('Expected ValueError was not thrown.');
         } catch (\ValueError $e) {
-            $this->assertStringContainsString('Path must not be empty', $e->getMessage());
+            $this->assertStringContainsString('Path cannot be empty', $e->getMessage());
         }
     }
 

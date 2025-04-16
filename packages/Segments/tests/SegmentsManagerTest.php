@@ -126,7 +126,7 @@ class SegmentsManagerTest extends TestCase
         $segments = ['country' => 'US'];
         self::$segmentsManager->putSegments($this->visitorId, $segments);
         $localSegments = self::$dataManager->getData($this->visitorId);
-        $this->assertEquals($segments['country'], $localSegments->getSegments()->getCountry() ?? null);
+        $this->assertEquals($segments['country'], $localSegments["segments"]["country"] ?? null);
     }
 
     public function testUpdateCustomSegments(): void
