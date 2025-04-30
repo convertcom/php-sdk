@@ -148,6 +148,7 @@ class ApiManager implements ApiManagerInterface
         $this->trackEndpoint = $config && $config->getApi() && isset($config->getApi()['endpoint']['track'])
             ? $config->getApi()['endpoint']['track']
             : self::DEFAULT_TRACK_ENDPOINT;
+        
         $this->data = $config ? $config->getData() : null;
         $this->enrichData = $config ? ($config->getDataStore() === null) : true;
         $this->environment = $config ? $config->getEnvironment() : null;
@@ -216,7 +217,6 @@ class ApiManager implements ApiManagerInterface
             'data' => $data,
             'responseType' => HttpResponseType::JSON
         ];
-
         return $this->httpClient->request($requestConfig);
     }
 
@@ -239,9 +239,9 @@ class ApiManager implements ApiManagerInterface
                 call_user_func($this->mapper, ['eventRequest' => $eventRequest])
             );
         }
-        $this->requestsQueue->push($visitorId, $eventRequest, $segments);
-
+        $this->requestsQueue->push($visitorId, end($eventRequest), end($segments));
         if ($this->trackingEnabled) {
+            $this->releaseQueue('size');
             if ($this->requestsQueue->length === $this->getBatchSize()) {
                 $this->releaseQueue('size');
             } elseif ($this->requestsQueue->length === 1) {
@@ -274,7 +274,6 @@ class ApiManager implements ApiManagerInterface
         $payload = $this->trackingEvent;
         $payload['visitors'] = $this->requestsQueue->getItems();
         $payload['source'] = $this->trackingSource;
-
         $promise = $this->request(
             'POST',
             [
@@ -312,7 +311,7 @@ class ApiManager implements ApiManagerInterface
                     );
                 }
             }
-        );
+        )->wait();
 
         return $promise;
     }
@@ -378,7 +377,7 @@ class ApiManager implements ApiManagerInterface
     {
         $this->data = $data;
         $this->accountId = $data->getAccountId() ?? '';
-        $this->projectId = $data->getProject() ? $data->getProject()->getId() : '';
+        $this->projectId = $data->getProject() ? $data->getProject()["id"] : '';
         $this->trackingEvent['accountId'] = $this->accountId;
         $this->trackingEvent['projectId'] = $this->projectId;
     }

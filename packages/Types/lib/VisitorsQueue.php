@@ -45,7 +45,7 @@ class VisitorsQueue
      * @param VisitorSegments|null $segments Optional segments for the visitor
      * @return void
      */
-    public function push(string $visitorId, VisitorTrackingEvents $eventRequest, ?VisitorSegments $segments = null): void
+    public function push(string $visitorId, array $eventRequest, array $segments): void
     {
         $visitorIndex = -1;
         foreach ($this->items as $index => $item) {

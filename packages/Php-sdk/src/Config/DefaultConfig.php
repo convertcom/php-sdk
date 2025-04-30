@@ -19,7 +19,7 @@ class DefaultConfig
                     'track'  => getenv('TRACK_ENDPOINT')
                 ]
             ],
-            'environment' => 'staging',
+            'environment' => 'production',
             'bucketing' => [
                 'max_traffic' => 10000,
                 'hash_seed'   => 9999

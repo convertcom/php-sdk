@@ -12,6 +12,7 @@ class Config
      * @param array $config Optional custom configuration.
      * @return array The merged configuration.
      */
+
     public static function create(array $config = []): array
     {
         $defaultLoggerSettings = [
@@ -22,7 +23,7 @@ class Config
         ];
 
         $defaultEnvironmentSettings = [
-            'environment' => 'staging'
+            'environment' => 'production'
         ];
 
         // Retrieve the default configuration.

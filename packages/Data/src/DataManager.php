@@ -171,7 +171,7 @@ class DataManager implements DataManagerInterface
       $this->_config = $config;
       $this->_mapper = $config->getMapper() ?? fn($value) => $value;
       $this->_asyncStorage = $asyncStorage;
-      $this->_data = $config->getData();
+      $this->_data = $config->getData() ?? new ConfigResponseData();
       $this->_accountId = $this->_data ? $this->_data->getAccountId() : '';
       $project = $this->_data ? $this->_data->getProject() : null;
       $this->_projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
@@ -347,17 +347,16 @@ class DataManager implements DataManagerInterface
         $bucketingData = $this->getData($visitorId)->bucketing ?? [];
         $variationId = $bucketingData[$experience['id']] ?? null;
         $isBucketed = $variationId && $this->retrieveVariation($experience['id'], (string)$variationId);
-    
         // Check location rules
         $locationMatched = $ignoreLocationProperties === true;
         if (!$locationMatched && $locationProperties) {
             if (isset($experience['locations']) && is_array($experience['locations']) && count($experience['locations']) > 0) {
                 $locations = $this->getItemsByIds($experience['locations'], 'locations');
                 if (count($locations) > 0) {
-                    $matchedLocations = $this->selectLocations($visitorId, $locations, [
+                    $matchedLocations = $this->selectLocations($visitorId, $locations, new LocationAttributes([
                         'locationProperties' => $locationProperties,
                         'identityField' => $identityField
-                    ]);
+                    ]));
                     $matchedErrors = array_filter($matchedLocations, fn($match) => in_array($match, RuleError::getConstants()));
                     if (count($matchedErrors) > 0) {
                         return reset($matchedErrors);
@@ -557,6 +556,16 @@ class DataManager implements DataManagerInterface
               'environment' => $environment
           ])
       );
+    //   $abc = $this->_retrieveBucketing(
+    //     $visitorId,
+    //     $visitorProperties,
+    //     $updateVisitorProperties,
+    //     new ConfigExperience($experience),
+    //     $forceVariationId,
+    //     $enableTracking
+    // );
+    //   dd($abc);
+
 
       if ($experience) {
           if (in_array($experience, RuleError::getConstants())) {
@@ -606,7 +615,6 @@ class DataManager implements DataManagerInterface
       $bucketedVariation = null;
       $bucketingAllocation = null;
       $storeKey = $this->getStoreKey($visitorId);
-
       // Handle forced variation
       if (!empty($forceVariationId) && ($variation = $this->retrieveVariation($experience->getId(), (string)$forceVariationId))) {
           $variationId = $forceVariationId;
@@ -642,12 +650,12 @@ class DataManager implements DataManagerInterface
           );
           $this->_loggerManager?->debug(
               'DataManager._retrieveBucketing()',
-              $this->_mapper([
+              json_encode(($this->_mapper)([
                   'storeKey' => $storeKey,
                   'visitorId' => $visitorId,
                   'variationId' => $variationId
               ])
-          );
+          ));
       } else {
           // Build buckets from variations
           $buckets = array_reduce(
@@ -667,7 +675,6 @@ class DataManager implements DataManagerInterface
             },
             []
         );
-
           // Determine bucket for visitor
           $bucketingParams = $this->_config->bucketing->excludeExperienceIdHash ?? false
               ? null
@@ -677,6 +684,7 @@ class DataManager implements DataManagerInterface
               $visitorId,
               $bucketingParams
           );
+
           $variationId = $variationId ?? $bucketing['variationId'] ?? null;
           $bucketingAllocation = $bucketing['bucketingAllocation'] ?? null;
 
@@ -707,7 +715,6 @@ class DataManager implements DataManagerInterface
               $storeDataObj->setSegments(new VisitorSegments($visitorProperties));
           }
           $this->putData($visitorId, $storeDataObj);
-
           // Track bucketing event if enabled
           if ($enableTracking) {
               $bucketingEvent = [
@@ -789,6 +796,7 @@ class DataManager implements DataManagerInterface
         $storeKey = $this->getStoreKey($visitorId);
         // Step 2: Retrieve existing data or use an empty array
         $storeDataObj = $this->getData($visitorId);
+       
         $storeData = $storeDataObj ? [
             'bucketing' => $storeDataObj['bucketing'] ?? [],
             'locations' => $storeDataObj['locations'] ?? [],
@@ -806,16 +814,20 @@ class DataManager implements DataManagerInterface
         // Step 4: Check if data has changed
         $isChanged = !ObjectUtils::objectDeepEqual($storeData, $newDataArray);
         if ($isChanged) {
+            
             // Step 5: Merge data if changed
             $updatedData = ObjectUtils::objectDeepMerge($storeData, $newDataArray);
             $this->_bucketedVisitors[$storeKey] = $updatedData;
+            if($storeDataObj['bucketing'] ?? false){
+                file_put_contents('demo.txt', '');
+                file_put_contents('demo.txt', json_encode($storeDataObj['bucketing']));
+            }
             // Step 6: Enforce local store limit
             if (count($this->_bucketedVisitors) > $this->_localStoreLimit) {
                 reset($this->_bucketedVisitors);
                 $oldestKey = key($this->_bucketedVisitors);
                 unset($this->_bucketedVisitors[$oldestKey]);
             }
-
             // Step 7: Handle data store manager
             if ($this->_dataStoreManager) {
                 // Extract segments and remaining data
@@ -857,8 +869,10 @@ class DataManager implements DataManagerInterface
   public function getData(string $visitorId): ?array {
     $storeKey = $this->getStoreKey($visitorId);
     $memoryData = $this->_bucketedVisitors[$storeKey] ?? null;
+
     if ($this->_dataStoreManager) {
         $dataStoreData = $this->_dataStoreManager->get($storeKey) ?? [];
+
         $mergedData = ObjectUtils::objectDeepMerge(
             $memoryData ?? [],
             $dataStoreData
@@ -898,15 +912,15 @@ class DataManager implements DataManagerInterface
 
     $this->_loggerManager?->trace(
         'DataManager.selectLocations()',
-        $this->_mapper([
+        json_encode(($this->_mapper)([
             'items' => $items,
             'locationProperties' => $locationProperties
-        ])
+        ]))
     );
 
     // Get locations from DataStore
     $data = $this->getData($visitorId);
-    $locations = $data?->getLocations() ?? [];
+    $locations = $data["locations"] ?? [];
 
     $matchedRecords = [];
     if (ArrayUtils::arrayNotEmpty($items)) {
@@ -917,7 +931,7 @@ class DataManager implements DataManagerInterface
 
             $match = $this->_ruleManager->isRuleMatched(
                 $locationProperties,
-                $item['rules'],
+                new RuleObject($item['rules']),
                 "ConfigLocation #{$item[$identityField]}"
             );
             $identity = (string)($item[$identityField] ?? '');
@@ -982,13 +996,13 @@ class DataManager implements DataManagerInterface
     }
 
     // Store the data
-    $this->putData($visitorId, new StoreData(['locations' => $locations]));
+    $this->putData($visitorId, ['locations' => $locations]);
 
     $this->_loggerManager?->debug(
         'DataManager.selectLocations()',
-        $this->_mapper([
+        json_encode(($this->_mapper)([
             'matchedRecords' => $matchedRecords
-        ])
+        ]))
     );
 
     return $matchedRecords;
@@ -1075,22 +1089,20 @@ class DataManager implements DataManagerInterface
 
     // Check for force multiple transactions setting
     $forceMultipleTransactions = $conversionSetting[ConversionSettingKey::FORCE_MULTIPLE_TRANSACTIONS] ?? null;
-
     // Retrieve stored data for the visitor
     $data = $this->getData($visitorId);
-    $bucketingData = $data?->getBucketing() ?? [];
-    $goals = $data?->getGoals() ?? [];
+    $bucketingData = json_decode(file_get_contents('demo.txt'),true);
+    $goals = $data["goals"] ?? [];
     $goalTriggered = $goals[$goalId] ?? false;
-
     // Log and skip if goal was already triggered and multiple transactions aren't forced
     if ($goalTriggered) {
         $this->_loggerManager?->debug(
             'DataManager.convert()',
             str_replace('#', $goalId, Messages::GOAL_FOUND),
-            $this->_mapper([
+            json_encode(($this->_mapper)([
                 'visitorId' => $visitorId,
                 'goalId' => $goalId
-            ])
+            ]))
         );
         if (!$forceMultipleTransactions) {
             return true;
@@ -1104,7 +1116,6 @@ class DataManager implements DataManagerInterface
     if (!$goalTriggered) {
         $this->sendConversion($visitorId, $goal["id"], $bucketingData, $segments);
     }
-
     // Send transaction event if goalData exists and conditions are met
     if ($goalData !== null && (!$goalTriggered || $forceMultipleTransactions)) {
         $this->sendTransaction($visitorId, $goal["id"], $goalData, $bucketingData, $segments);
@@ -1233,10 +1244,10 @@ class DataManager implements DataManagerInterface
   public function filterMatchedCustomSegments(array $items, string $visitorId): array {
     $this->_loggerManager?->trace(
         'DataManager.filterMatchedCustomSegments()',
-        $this->_mapper([
+        json_encode(($this->_mapper)([
             'items' => $items,
             'visitorId' => $visitorId
-        ])
+        ]))
     );
 
     // Get custom segments ID from DataStore
@@ -1257,9 +1268,9 @@ class DataManager implements DataManagerInterface
 
     $this->_loggerManager?->debug(
         'DataManager.filterMatchedCustomSegments()',
-        $this->_mapper([
+        json_encode(($this->_mapper)([
             'matchedRecords' => $matchedRecords
-        ])
+        ]))
     );
 
     return $matchedRecords;
@@ -1285,7 +1296,6 @@ class DataManager implements DataManagerInterface
 
     $segments = [];
     $properties = [];
-
     // Split visitor properties into segments and other properties
     foreach ($visitorProperties ?? [] as $key => $value) {
         if (in_array($key, $segmentsKeys, true)) {
@@ -1471,10 +1481,10 @@ class DataManager implements DataManagerInterface
   public function getItemsByIds(array $ids, string $path): array {
     $this->_loggerManager?->trace(
         'DataManager.getItemsByIds()',
-        ($this->_mapper)([
+        json_encode(($this->_mapper)([
             'ids' => $ids,
             'path' => $path
-        ])
+        ]))
     );
 
     $items = [];

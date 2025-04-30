@@ -70,9 +70,9 @@ class Config
         $hasSdkKey = isset($options['sdkKey']);
         $hasData = isset($options['data']);
 
-        if ($hasSdkKey && $hasData) {
-            throw new InvalidArgumentException("Cannot provide both sdkKey and data");
-        }
+        // if ($hasSdkKey && $hasData) {
+        //     throw new InvalidArgumentException("Cannot provide both sdkKey and data");
+        // }
 
         if (!$hasSdkKey && !$hasData) {
             throw new InvalidArgumentException("Must provide either sdkKey or data");

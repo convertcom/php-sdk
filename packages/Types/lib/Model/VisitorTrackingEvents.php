@@ -58,7 +58,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
       * @var string[]
       */
     protected static $openAPITypes = [
-        'event_type' => 'string',
+        'eventType' => 'string',
         'data' => '\OpenAPI\Client\Model\VisitorTrackingEventsData'
     ];
 
@@ -70,7 +70,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
       * @psalm-var array<string, string|null>
       */
     protected static $openAPIFormats = [
-        'event_type' => null,
+        'eventType' => null,
         'data' => null
     ];
 
@@ -80,7 +80,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
       * @var boolean[]
       */
     protected static array $openAPINullables = [
-        'event_type' => false,
+        'eventType' => false,
         'data' => false
     ];
 
@@ -170,7 +170,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
      * @var string[]
      */
     protected static $attributeMap = [
-        'event_type' => 'eventType',
+        'eventType' => 'eventType',
         'data' => 'data'
     ];
 
@@ -180,7 +180,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
      * @var string[]
      */
     protected static $setters = [
-        'event_type' => 'setEventType',
+        'eventType' => 'setEventType',
         'data' => 'setData'
     ];
 
@@ -190,7 +190,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
      * @var string[]
      */
     protected static $getters = [
-        'event_type' => 'getEventType',
+        'eventType' => 'getEventType',
         'data' => 'getData'
     ];
 
@@ -266,7 +266,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
      */
     public function __construct(?array $data = null)
     {
-        $this->setIfExists('event_type', $data ?? [], null);
+        $this->setIfExists('eventType', $data ?? [], null);
         $this->setIfExists('data', $data ?? [], null);
     }
 
@@ -298,10 +298,10 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
         $invalidProperties = [];
 
         $allowedValues = $this->getEventTypeAllowableValues();
-        if (!is_null($this->container['event_type']) && !in_array($this->container['event_type'], $allowedValues, true)) {
+        if (!is_null($this->container['eventType']) && !in_array($this->container['eventType'], $allowedValues, true)) {
             $invalidProperties[] = sprintf(
-                "invalid value '%s' for 'event_type', must be one of '%s'",
-                $this->container['event_type'],
+                "invalid value '%s' for 'eventType', must be one of '%s'",
+                $this->container['eventType'],
                 implode("', '", $allowedValues)
             );
         }
@@ -328,7 +328,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
      */
     public function getEventType()
     {
-        return $this->container['event_type'];
+        return $this->container['eventType'];
     }
 
     /**
@@ -353,7 +353,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
                 )
             );
         }
-        $this->container['event_type'] = $event_type;
+        $this->container['eventType'] = $event_type;
 
         return $this;
     }

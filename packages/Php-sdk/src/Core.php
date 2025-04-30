@@ -105,14 +105,16 @@ class Core implements CoreInterface
             return;
         }
         $this->_config = $config;
+
         if ($config->getSdkKey() && strlen($config->getSdkKey()) > 0) {
+
             $this->fetchConfig()->then(
                 function () {
                     $this->_eventManager->fire(SystemEvents::READY, null, null, true);
                     $this->_loggerManager?->trace('Core.initialize()', Messages::CORE_INITIALIZED);
                     $this->_initialized = true;
                 },
-                function (\Exception $e) {
+                function ($e) {
                     $this->_loggerManager?->error('Core.initialize()', ['error' => $e->getMessage()]);
                     $this->_eventManager->fire(
                         SystemEvents::READY,
@@ -121,7 +123,7 @@ class Core implements CoreInterface
                         true
                     );
                 }
-            );
+            )->wait();
         } elseif ($config->getData()) {
             $this->_dataManager->setConfigData($config->getData());
             $configData = $this->_dataManager->getConfigData();
@@ -193,17 +195,23 @@ class Core implements CoreInterface
      *
      * @return PromiseInterface
      */
+
     public function onReady(): PromiseInterface
     {
-        $promise = new Promise(function ($resolve, $reject) {
+        $promise = new Promise();
+        
+        // Check condition immediately and fulfill/reject accordingly
+        try {
             $configData = $this->_dataManager->getConfigData();
             if ($this->_initialized && $configData->getAccountId() && $configData->getProject()) {
-                $resolve();
+                $promise->resolve(true);
             } else {
-                $reject(new \Exception(ErrorMessages::DATA_OBJECT_MISSING));
+                $promise->reject(new \Exception("Data object missing"));
             }
-        });
-
+        } catch (\Exception $e) {
+            $promise->reject($e);
+        }
+        
         return $promise;
     }
 

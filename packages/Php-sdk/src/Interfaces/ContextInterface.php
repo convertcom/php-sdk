@@ -112,7 +112,7 @@ interface ContextInterface
      *
      * @return StoreData The visitor's data
      */
-    public function getVisitorData(): StoreData;
+    public function getVisitorData(): array;
 
     /**
      * Releases any queued operations with an optional reason.

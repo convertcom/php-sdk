@@ -66,7 +66,7 @@ class SegmentsManager implements SegmentsManagerInterface
         $storeData = $this->dataManager->getData($visitorId) ?? [];
         $storeData = (array)$storeData;
         $segments = $this->dataManager->filterReportSegments($storeData['segments'] ?? []);
-        return $segments['segments'] ?? new VisitorSegments();
+        return new VisitorSegments($segments['segments']) ?? new VisitorSegments();
     }
 
     /**

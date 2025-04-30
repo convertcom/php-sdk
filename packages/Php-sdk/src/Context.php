@@ -98,7 +98,6 @@ class Context implements ContextInterface
 
         // Get visitor properties, defaulting to null if not provided
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
-
         // Select variation using experience manager
         $bucketedVariation = $this->_experienceManager->selectVariation(
             $this->_visitorId,
@@ -110,6 +109,7 @@ class Context implements ContextInterface
                 'environment' => $attributes?->getEnvironment() ?? $this->_environment // Fallback to default environment
             ])
         );
+
 
         // Check if the result is a RuleError
         if (in_array($bucketedVariation, RuleError::getConstants(), true)) {
@@ -380,7 +380,6 @@ class Context implements ContextInterface
         if (in_array($triggered, RuleError::getConstants(), true)) {
             return $triggered;
         }
-
         if ($triggered) {
             $this->_eventManager->fire(
                 SystemEvents::CONVERSION,
@@ -508,7 +507,7 @@ class Context implements ContextInterface
      * Get visitor data
      * @return array
      */
-    public function getVisitorData(): StoreData
+    public function getVisitorData(): array
     {
         return $this->_dataManager->getData($this->_visitorId) ?? [];
     }
@@ -535,8 +534,8 @@ class Context implements ContextInterface
     private function getVisitorProperties(?array $attributes = null): array
     {
         $data = $this->_dataManager->getData($this->_visitorId);
-        $segments = $data && $data->getSegments() ? (array)$data->getSegments() : [];
-        $segments = $segments ? end($segments) : [];
+        $segments = $data && $data["segments"] ? $data["segments"] : [];
+        $segments = $segments ? $segments : [];
         $visitorProperties = $attributes
             ? ObjectUtils::objectDeepMerge($this->_visitorProperties ?? [], $attributes)
             : $this->_visitorProperties;

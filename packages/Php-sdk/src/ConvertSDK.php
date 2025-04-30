@@ -3,18 +3,20 @@
 namespace ConvertSdk;
 
 use GuzzleHttp\Promise\PromiseInterface;
-use ConvertSdk\Api\ApiManager;
-use ConvertSdk\Data\DataManager;
-use ConvertSdk\Bucketing\BucketingManager;
-use ConvertSdk\Event\EventManager;
-use ConvertSdk\Logger\LogManager;
+use ConvertSdk\ApiManager;
+use ConvertSdk\DataManager;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\EventManager;
+use ConvertSdk\LogManager;
 use ConvertSdk\Config\Config;
+use OpenAPI\Client\Config as OpenApiConfig;
+use OpenAPI\Client\Model\ConfigResponseData;
 use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\Messages;
-use ConvertSdk\Experience\ExperienceManager;
+use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
-use ConvertSdk\Rules\RuleManager;
-use ConvertSdk\Segments\SegmentsManager;
+use ConvertSdk\RuleManager;
+use ConvertSdk\SegmentsManager;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
 
@@ -30,20 +32,18 @@ class ConvertSDK extends Core {
         if (empty($config['sdkKey']) && empty($config['data'])) {
             error_log(ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED);
         }
-
         // Load configuration
         $configuration = Config::create($config);
         if (!isset($configuration['network']['source'])) {
             $configuration['network']['source'] = getenv('VERSION') ?: 'php-sdk';
         }
-
         // Create a Monolog logger instance.
         $monolog = new Logger('convert');
         // Configure Monolog to log to STDOUT at DEBUG level.
         $monolog->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
 
         // Initialize LogManager with the Monolog logger and provided log level.
-        $this->loggerManager = new LogManager($monolog, $configuration['logger']['logLevel']);
+        $this->loggerManager = new LogManager($monolog, 3);
 
         // Iterate over custom loggers (if any) and add them to LogManager.
         if (isset($configuration['logger']['customLoggers']) && is_array($configuration['logger']['customLoggers'])) {
@@ -62,40 +62,39 @@ class ConvertSDK extends Core {
                 }
             }
         }
-
+        $configuration['data'] = new ConfigResponseData($configuration['data']);
         // Initialize EventManager
-        $this->eventManager = new EventManager($configuration, ['loggerManager' => $this->loggerManager]);
+        $this->eventManager = new EventManager(new OpenApiConfig($configuration), ['loggerManager' => $this->loggerManager]);
 
         // Initialize ApiManager
-        $this->apiManager = new ApiManager($configuration, $this->eventManager, $this->loggerManager);
-
+        $this->apiManager = new ApiManager(new OpenApiConfig($configuration), $this->eventManager, $this->loggerManager);
         // Initialize BucketingManager
-        $this->bucketingManager = new BucketingManager($configuration, [
+        $this->bucketingManager = new BucketingManager(new OpenApiConfig($configuration), [
             'loggerManager' => $this->loggerManager
         ]);
 
-        $this->ruleManager = new RuleManager($configuration, [
+        $this->ruleManager = new RuleManager(new OpenApiConfig($configuration), [
             'loggerManager' => $this->loggerManager
         ]);
-
         // Initialize DataManager
-        $this->dataManager = new DataManager($configuration,
+        $this->dataManager = new DataManager(new OpenApiConfig($configuration),
             $this->bucketingManager,
             $this->ruleManager,
             $this->eventManager,
             $this->apiManager,
             $this->loggerManager
-    );;
+        );
+
         // Initialize ExperienceManager
-        $this->experienceManager = new ExperienceManager($configuration, [
+        $this->experienceManager = new ExperienceManager(new OpenApiConfig($configuration), [
             'dataManager' => $this->dataManager,
             'loggerManager' => $this->loggerManager
         ]);
-        $this->featureManager = new FeatureManager($configuration, $this->dataManager, $this->loggerManager);
-        $this->segmentsManager = new SegmentsManager($configuration, $this->dataManager, $this->ruleManager, $this->loggerManager);
+        $this->featureManager = new FeatureManager(new OpenApiConfig($configuration), $this->dataManager, $this->loggerManager);
+        $this->segmentsManager = new SegmentsManager(new OpenApiConfig($configuration), $this->dataManager, $this->ruleManager, $this->loggerManager);
 
         // Call parent constructor
-        parent::__construct($configuration, [
+        parent::__construct(new OpenApiConfig($configuration), [
             'dataManager'       => $this->dataManager,
             'eventManager'      => $this->eventManager,
             'apiManager'        => $this->apiManager,
