@@ -251,7 +251,6 @@ class DataStore
 Register the DataStore service in `AppServiceProvider.php`:
 
 ```bash
-<?php
 $this->app->singleton(DataStore::class, function ($app) {
     return new DataStore([
         'driver' => 'cookie',
