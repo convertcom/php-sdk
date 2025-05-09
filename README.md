@@ -33,7 +33,7 @@ Since the Convert PHP SDK is not published and is available as a local folder, y
 ```
 Then, require the SDK:
 ```bash
-composer require convertcom/php-sdk:@dev
+composer require convertcom/php-sdk:@dev --with-all-dependencies
 ```
 
 ### 3. Install Dependencies
