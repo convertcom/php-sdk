@@ -263,6 +263,7 @@ $this->app->singleton(DataStore::class, function ($app) {
 ### Using the Convert PHP SDK in Controllers
 You can access the SDK context in your controllers via the request attributes. For example:
 create `HomeController` in controllers/
+make sure that you provide your experience and feature keys correctly. also location properties correctly for example 'locationProperties' => ['screen' => 'home']
 ### HomeController
 ```bash
 <?php
@@ -278,8 +279,8 @@ class HomeController extends Controller
     {
         $context = $request->attributes->get('sdkContext');
 
-        $experienceKey = 'test-exp';
-        $featureKey = 'test-feature';
+        $experienceKey = 'your-exp-key';
+        $featureKey = 'your-feature-key';
         $attributes = new BucketingAttributes(['locationProperties' => ['screen' => 'home']]);
         $variation = $context->runExperience($experienceKey, $attributes);
         $feature = $context->runFeature($featureKey, $attributes);
