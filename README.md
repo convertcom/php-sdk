@@ -25,7 +25,7 @@ cd convert-sdk-demo
 ```
 
 ### 2. Add the Convert PHP SDK
-Since the Convert PHP SDK is not published and is available as a local folder, you need to add it to your composer.json file. Update the repositories section to include the local packages folder:
+Since the Convert PHP SDK is not published and is available as a local folder, you need to add it to your composer.json file. Update the repositories section (if there is no repositories section then just copy and paste the provided one) to include the local packages folder:
 ```bash
 "repositories": [
     { "type": "path", "url": "../php-sdk/packages/*" }
