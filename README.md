@@ -40,7 +40,6 @@ composer require convertcom/php-sdk:@dev
 Install the required dependencies:
 ```bash
 composer install
-npm install
 ```
 
 ### 4. Configure Environment Variables
@@ -295,7 +294,7 @@ class HomeController extends Controller
 }
 ```
 
-Also add its view file `views/home.blad.php`:
+Also add its view file `views/home.blade.php`:
 ```bash
 <!DOCTYPE html>
 <html lang="en">
