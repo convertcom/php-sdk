@@ -176,7 +176,7 @@ protected $middleware = [
 ```
 
 ### Adding a Custom Data Store
-If you need to use a custom data store for the SDK, create a service class like `app/Services/DataStore.php`:
+If you need to use a custom data store for the SDK, create a service (if there is no Services folder then create one) class like `app/Services/DataStore.php`:
 
 ```bash
 <?php
