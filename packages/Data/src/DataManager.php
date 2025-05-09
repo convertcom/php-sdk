@@ -1091,6 +1091,10 @@ class DataManager implements DataManagerInterface
     $forceMultipleTransactions = $conversionSetting[ConversionSettingKey::FORCE_MULTIPLE_TRANSACTIONS] ?? null;
     // Retrieve stored data for the visitor
     $data = $this->getData($visitorId);
+    if (!file_exists('demo.txt')) {
+        // Create an empty JSON array and write it to the file
+        file_put_contents('demo.txt', json_encode([]));
+    }
     $bucketingData = json_decode(file_get_contents('demo.txt'),true);
     $goals = $data["goals"] ?? [];
     $goalTriggered = $goals[$goalId] ?? false;
