@@ -43,7 +43,7 @@ composer install
 ```
 
 ### 4. Configure Environment Variables
-Update the .env file with your database credentials and Convert SDK configuration:
+Update the .env file with Convert SDK env variables:
 ```bash
 CONVERT_SDK_KEY= your-sdk-key
 CONFIG_ENDPOINT=https://cdn-4.convertexperiments.com/api/v1/
