@@ -350,6 +350,17 @@ and its view file `views/thankyou.blade.php:
 </html>
 ```
 
+### Update the routes file at `routes/web.php`:
+replace the default route with these:
+```bash
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ThankYouController;
+
+Route::get('/', [HomeController::class, 'index']);
+Route::get('/thankyou', [ThankYouController::class, 'index']);
+```
+
 ### Running the Application
 1. Start the development server:
 ```bash
