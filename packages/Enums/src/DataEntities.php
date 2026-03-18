@@ -1,7 +1,10 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class DataEntities {
+final class DataEntities {
     const DATA_ENTITIES = [
         'events',
         'goals',

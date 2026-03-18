@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -43,5 +45,5 @@ interface EventManagerInterface
      * @param string $event The event name.
      * @return void
      */
-    public function removeListeners(string $event): void;
+    public function removeListeners($event): void;
 }

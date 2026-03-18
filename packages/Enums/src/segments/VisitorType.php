@@ -1,7 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class VisitorType {
-    const NEW = 'new';
-    const RETURNING = 'returning';
+enum VisitorType: string
+{
+    case New = 'new';
+    case Returning = 'returning';
 }

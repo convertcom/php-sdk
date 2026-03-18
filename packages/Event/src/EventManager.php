@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -65,20 +67,21 @@ class EventManager implements EventManagerInterface
      */
     public function on($event, callable $fn): void
     {
-        if (!isset($this->_listeners[$event])) {
-            $this->_listeners[$event] = [];
+        $key = $event instanceof \BackedEnum ? $event->value : $event;
+        if (!isset($this->_listeners[$key])) {
+            $this->_listeners[$key] = [];
         }
-        $this->_listeners[$event][] = $fn;
-        
+        $this->_listeners[$key][] = $fn;
+
         // Log the registration if a logger is available.
         if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'trace')) {
-            $this->_loggerManager->trace('EventManager.on()', ['event' => $event]);
+            $this->_loggerManager->trace('EventManager.on()', ['event' => $key]);
         }
-        
+
         // If there is a deferred event for this event, fire it now.
-        if (array_key_exists($event, $this->_deferred)) {
-            $deferredData = $this->_deferred[$event];
-            $this->fire($event, $deferredData['args'], $deferredData['err']);
+        if (array_key_exists($key, $this->_deferred)) {
+            $deferredData = $this->_deferred[$key];
+            $this->fire($key, $deferredData['args'], $deferredData['err']);
         }
     }
 
@@ -93,18 +96,19 @@ class EventManager implements EventManagerInterface
      */
     public function fire($event, $args = null, $err = null, bool $deferred = false): void
     {
+        $key = $event instanceof \BackedEnum ? $event->value : $event;
         if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'debug')) {
             $mapped = call_user_func($this->_mapper, [
-                'event' => $event,
+                'event' => $key,
                 'args' => $args,
                 'err' => $err,
                 'deferred' => $deferred
             ]);
             $this->_loggerManager->debug('EventManager.fire()', $mapped);
         }
-        
+
         // Iterate through registered listeners for the event.
-        $listeners = $this->_listeners[$event] ?? [];
+        $listeners = $this->_listeners[$key] ?? [];
         foreach ($listeners as $fn) {
             if (is_callable($fn)) {
                 try {
@@ -116,10 +120,10 @@ class EventManager implements EventManagerInterface
                 }
             }
         }
-        
+
         // If deferred is true and no deferred record exists yet, store it.
-        if ($deferred && !array_key_exists($event, $this->_deferred)) {
-            $this->_deferred[$event] = ['args' => $args, 'err' => $err];
+        if ($deferred && !array_key_exists($key, $this->_deferred)) {
+            $this->_deferred[$key] = ['args' => $args, 'err' => $err];
         }
     }
 
@@ -129,13 +133,14 @@ class EventManager implements EventManagerInterface
      * @param string $event The event name.
      * @return void
      */
-    public function removeListeners(string $event): void
+    public function removeListeners($event): void
     {
-        if (array_key_exists($event, $this->_listeners)) {
-            unset($this->_listeners[$event]);
+        $key = $event instanceof \BackedEnum ? $event->value : $event;
+        if (array_key_exists($key, $this->_listeners)) {
+            unset($this->_listeners[$key]);
         }
-        if (array_key_exists($event, $this->_deferred)) {
-            unset($this->_deferred[$event]);
+        if (array_key_exists($key, $this->_deferred)) {
+            unset($this->_deferred[$key]);
         }
     }
 }

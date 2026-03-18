@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk;
 
 use OpenAPI\Client\Config;
@@ -110,7 +112,7 @@ class SegmentsManager implements SegmentsManagerInterface
                     new RuleObject($segment['rules'] ?? []),
                     "ConfigSegment #{$segment['id']}"
                 );
-                if (in_array($segmentsMatched, RuleError::getConstants(), true)) {
+                if ($segmentsMatched instanceof RuleError) {
                     return $segmentsMatched;
                 }
             }
@@ -133,7 +135,7 @@ class SegmentsManager implements SegmentsManagerInterface
         if (!empty($segmentIds)) {
             $segmentsData = array_merge(
                 json_decode(json_encode($visitorSegments), true),
-                [SegmentsKeys::CUSTOM_SEGMENTS => array_merge($customSegments, $segmentIds)]
+                [SegmentsKeys::CustomSegments->value => array_merge($customSegments, $segmentIds)]
             );
             $this->putSegments($visitorId, $segmentsData);
             return new VisitorSegments($segmentsData);

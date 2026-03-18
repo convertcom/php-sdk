@@ -1,13 +1,17 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class DeviceType {
-    const ALLPH  = 'ALLPH';
-    const IPH    = 'IPH';
-    const OTHPH  = 'OTHPH';
-    const ALLTAB = 'ALLTAB';
-    const IPAD   = 'IPAD';
-    const OTHTAB = 'OTHTAB';
-    const DESK   = 'DESK';
-    const OTHDEV = 'OTHDEV';
+enum DeviceType: string
+{
+    case Allph = 'ALLPH';
+    case Iph = 'IPH';
+    case Othph = 'OTHPH';
+    case Alltab = 'ALLTAB';
+    case Ipad = 'IPAD';
+    case Othtab = 'OTHTAB';
+    case Desk = 'DESK';
+    case Othdev = 'OTHDEV';
 }

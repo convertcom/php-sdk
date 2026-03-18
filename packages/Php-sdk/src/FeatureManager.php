@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk;
 
 use ConvertSdk\Interfaces\DataManagerInterface;
@@ -201,13 +203,13 @@ class FeatureManager implements FeatureManagerInterface
                 'id' => $declaredFeature['id'],
                 'name' => $declaredFeature['name'],
                 'key' => $featureKey,
-                'status' => FeatureStatus::DISABLED
+                'status' => FeatureStatus::Disabled->value
             ];
         } else {
             // Feature is not declared
             return [
                 'key' => $featureKey,
-                'status' => FeatureStatus::DISABLED
+                'status' => FeatureStatus::Disabled->value
             ];
         }
     }
@@ -275,7 +277,7 @@ class FeatureManager implements FeatureManagerInterface
                 } else {
                     // Check for rule errors
                     $matchedErrors = array_filter($features, function ($match) {
-                        return in_array($match, RuleError::getConstants(), true);
+                        return $match instanceof RuleError;
                     });
                     if (!empty($matchedErrors)) {
                         return $matchedErrors;
@@ -290,13 +292,13 @@ class FeatureManager implements FeatureManagerInterface
                 'id' => $featureId,
                 'name' => $declaredFeature['name'],
                 'key' => $declaredFeature['key'],
-                'status' => FeatureStatus::DISABLED
+                'status' => FeatureStatus::Disabled->value
             ];
         } else {
             // Feature is not declared
             return [
                 'id' => $featureId,
-                'status' => FeatureStatus::DISABLED
+                'status' => FeatureStatus::Disabled->value
             ];
         }
     }
@@ -330,7 +332,7 @@ class FeatureManager implements FeatureManagerInterface
                 $experience['key'] ?? null,
                 $attributes
             );
-            if (in_array($variation, RuleError::getConstants(), true)) {
+            if ($variation instanceof RuleError) {
                 return $variation;
             }
             return $variation;
@@ -338,7 +340,7 @@ class FeatureManager implements FeatureManagerInterface
 
         // Return rule errors if present
         $matchedErrors = array_filter($bucketedVariations, function ($match) {
-            return in_array($match, RuleError::getConstants(), true);
+            return $match instanceof RuleError;
         });
         if (!empty($matchedErrors)) {
             return $matchedErrors;
@@ -351,7 +353,7 @@ class FeatureManager implements FeatureManagerInterface
                 $changes = end($bucketedVariation)["changes"];
             }
             foreach ($changes as $change) {
-                if (($change['type'] ?? null) !== VariationChangeType::FULLSTACK_FEATURE) {
+                if (($change['type'] ?? null) !== VariationChangeType::FullstackFeature->value) {
                     $this->_loggerManager?->warn(
                         'FeatureManager.runFeatures()',
                         Messages::VARIATION_CHANGE_NOT_SUPPORTED
@@ -413,7 +415,7 @@ class FeatureManager implements FeatureManagerInterface
                             'key' => $declaredFeatures[$featureId]['key'] ?? null,
                             'name' => $declaredFeatures[$featureId]['name'] ?? null,
                             'id' => $featureId,
-                            'status' => FeatureStatus::ENABLED,
+                            'status' => FeatureStatus::Enabled->value,
                             'variables' => $variables
                         ]
                     );
@@ -431,7 +433,7 @@ class FeatureManager implements FeatureManagerInterface
                         'id' => $declaredFeature['id'],
                         'name' => $declaredFeature['name'] ?? null,
                         'key' => $declaredFeature['key'] ?? null,
-                        'status' => FeatureStatus::DISABLED
+                        'status' => FeatureStatus::Disabled->value
                     ];
                 }
             }

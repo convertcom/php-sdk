@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * Logger Module Unit Tests
@@ -46,7 +48,7 @@ class CustomLogMethodMap implements LogMethodMapInterface {
     }
     public function __construct() {
         // For custom mapping, map the TRACE log method to the 'send' method.
-        $this->map[LogMethod::TRACE] = 'send';
+        $this->map[LogMethod::Trace->value] = 'send';
     }
 }
 
@@ -75,7 +77,7 @@ class LogManagerTest extends TestCase
         $this->monolog->pushHandler($this->testHandler);
 
         // Initialize LogManager with the Monolog instance.
-        $this->logger = new LogManager($this->monolog, LogLevel::TRACE);
+        $this->logger = new LogManager($this->monolog, LogLevel::Trace);
     }
 
     protected function tearDown(): void
@@ -92,7 +94,7 @@ class LogManagerTest extends TestCase
 
     public function testImportedEntityShouldBeConstructorOfLogManagerInstance()
     {
-        $logger = new LogManager($this->monolog, LogLevel::TRACE);
+        $logger = new LogManager($this->monolog, LogLevel::Trace);
         $this->assertInstanceOf(LogManager::class, $logger);
         $this->assertEquals('ConvertSdk\\LogManager', get_class($logger));
     }
@@ -100,7 +102,7 @@ class LogManagerTest extends TestCase
     public function testShouldLogToConsoleByDefault()
     {
         $output = 'testing trace message';
-        $this->logger->log(LogLevel::TRACE, $output);
+        $this->logger->log(LogLevel::Trace, $output);
         // Monolog mapping for LOG is set in LogManager as 'info'
         $this->assertTrue($this->testHandler->hasRecord($output, MonologLoggerLevel::Info));
     }
@@ -109,7 +111,7 @@ class LogManagerTest extends TestCase
     {
         $output = 'testing log method';
         $argument = 'with multiple arguments';
-        $this->logger->log(LogLevel::TRACE, $output, $argument);
+        $this->logger->log(LogLevel::Trace, $output, $argument);
         $expectedMessage = $output . " " . $argument;
         $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Info));
     }
@@ -163,17 +165,16 @@ class LogManagerTest extends TestCase
     public function testShouldNotLogAnythingWhenUsingSilentLogLevel()
     {
         $output = 'testing silent log level';
-        $this->logger->log(LogLevel::SILENT, $output);
+        $this->logger->log(LogLevel::Silent, $output);
         $records = $this->testHandler->getRecords();
         $this->assertEmpty($records);
     }
 
-    public function testShouldReturnErrorWhenUsingInvalidLogLevel()
+    public function testShouldRejectInvalidLogLevelViaNativeEnum()
     {
-        // Invalid log level should not add any log record via the monolog client.
-        $this->logger->log(6, 'testing invalid log level');
-        $records = $this->testHandler->getRecords();
-        $this->assertEmpty($records);
+        // With native enums, invalid log levels are rejected by the type system.
+        // LogLevel::tryFrom(6) returns null since 6 is not a valid backing value.
+        $this->assertNull(LogLevel::tryFrom(6));
     }
 
     public function testShouldReturnErrorWhenAddingNewClientWithInvalidSDK()
@@ -185,12 +186,11 @@ class LogManagerTest extends TestCase
         $this->assertCount(count($initialClients), $afterClients);
     }
 
-    public function testShouldReturnErrorWhenAddingNewClientWithInvalidLogLevel()
+    public function testShouldRejectInvalidLogLevelForClientViaNativeEnum()
     {
-        $initialClients = $this->getPrivateProperty($this->logger, '_clients');
-        $this->logger->addClient($this->monolog, 6);
-        $afterClients = $this->getPrivateProperty($this->logger, '_clients');
-        $this->assertCount(count($initialClients), $afterClients);
+        // With native enums, invalid log levels are rejected by the type system.
+        // LogLevel::tryFrom(6) returns null since 6 is not a valid backing value.
+        $this->assertNull(LogLevel::tryFrom(6));
     }
 
     public function testShouldLogToConsoleAndToThirdPartyWhenAddingNewClient()
@@ -211,7 +211,7 @@ class LogManagerTest extends TestCase
         // Clear default clients so only the custom mapping client is used.
         $this->logger->clearClients();
         // Add a client with custom mapping (using CustomMappingClient and mapping TRACE to 'send').
-        $this->logger->addClient(new CustomMappingClient(), LogLevel::TRACE, new CustomLogMethodMap());
+        $this->logger->addClient(new CustomMappingClient(), LogLevel::Trace, new CustomLogMethodMap());
         $output = 'testing third-party method mapping';
         $this->logger->trace($output);
         // Since CustomMappingClient is not PSR-3, its output is not captured by the TestHandler.
@@ -224,7 +224,7 @@ class LogManagerTest extends TestCase
         // Clear default clients so only the missing method client is used.
         $this->logger->clearClients();
         // Add a client that only implements "log" to force fallback.
-        $this->logger->addClient(new MissingMethodClient(), LogLevel::INFO);
+        $this->logger->addClient(new MissingMethodClient(), LogLevel::Info);
         $output = 'testing third-party missing info method';
         $this->logger->info($output);
         // Since MissingMethodClient does not have an "info" method, fallback will trigger.
@@ -239,7 +239,7 @@ class LogManagerTest extends TestCase
         $testHandler2 = new TestHandler();
         $monolog2 = new MonologLogger('test2');
         $monolog2->pushHandler($testHandler2);
-        $this->logger->addClient($monolog2, LogLevel::ERROR);
+        $this->logger->addClient($monolog2, LogLevel::Error);
         $output = 'testing third-party matching log level';
         $this->logger->warn($output);
         $this->assertTrue($this->testHandler->hasRecord($output, MonologLoggerLevel::Warning));
@@ -248,7 +248,7 @@ class LogManagerTest extends TestCase
 
     public function testShouldLogEmptyMessage()
     {
-        $this->logger->log(LogLevel::INFO, '');
+        $this->logger->log(LogLevel::Info, '');
         $records = $this->testHandler->getRecords();
         $foundEmpty = false;
         foreach ($records as $record) {
@@ -264,7 +264,7 @@ class LogManagerTest extends TestCase
     {
         $output = 'testing with many arguments';
         $args = array_fill(0, 1000, 'arg');
-        $this->logger->log(LogLevel::INFO, $output, ...$args);
+        $this->logger->log(LogLevel::Info, $output, ...$args);
         $records = $this->testHandler->getRecords();
         $this->assertStringContainsString($output, $records[0]['message']);
     }

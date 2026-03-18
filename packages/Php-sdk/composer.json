@@ -61,7 +61,7 @@
         }
       },
     "require": {
-      "php": ">=7.4",
+      "php": "^8.2",
       "convertcom/php-sdk-api": ">=1.0.0",
       "convertcom/php-sdk-data": ">=1.0.0",
       "convertcom/php-sdk-enums": ">=1.0.0",
@@ -72,11 +72,10 @@
       "convertcom/php-sdk-rules": ">=1.0.0",
       "convertcom/php-sdk-experience": ">=1.0.0",
       "convertcom/php-sdk-types": ">=1.0.0",
-      "convertcom/php-sdk-segments": ">=1.0.0",
-      "ext-swoole": "*"
+      "convertcom/php-sdk-segments": ">=1.0.0"
     },
     "require-dev": {
-      "phpunit/phpunit": "^9.0",
+      "phpunit/phpunit": "^11.0",
       "squizlabs/php_codesniffer": "^3.6"
     },
     "scripts": {

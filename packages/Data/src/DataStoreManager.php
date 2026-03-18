@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk;
 
 use ConvertSdk\Interfaces\DataStoreManagerInterface;
@@ -139,7 +141,7 @@ class DataStoreManager implements DataStoreManagerInterface
             $this->set($key, $value);
         }
         if ($this->eventManager !== null && method_exists($this->eventManager, 'fire')) {
-            $this->eventManager->fire(SystemEvents::DATA_STORE_QUEUE_RELEASED, ['reason' => $reason]);
+            $this->eventManager->fire(SystemEvents::DataStoreQueueReleased, ['reason' => $reason]);
         }
         // Clear the queue after releasing.
         $this->requestsQueue = [];

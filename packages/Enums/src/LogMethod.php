@@ -1,11 +1,15 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class LogMethod {
-    const LOG = 'log';
-    const TRACE = 'trace';
-    const DEBUG = 'debug';
-    const INFO = 'info';
-    const WARN = 'warn';
-    const ERROR = 'error';
+enum LogMethod: string
+{
+    case Log = 'log';
+    case Trace = 'trace';
+    case Debug = 'debug';
+    case Info = 'info';
+    case Warn = 'warn';
+    case Error = 'error';
 }

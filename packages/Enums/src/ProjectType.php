@@ -1,7 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class ProjectType {
-    const WEB = 'web';
-    const FULLSTACK = 'fullstack';
+enum ProjectType: string
+{
+    case Web = 'web';
+    case Fullstack = 'fullstack';
 }

@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert JS SDK
  * Version 1.0.0
@@ -357,7 +359,7 @@ class DataManager implements DataManagerInterface
                         'locationProperties' => $locationProperties,
                         'identityField' => $identityField
                     ]));
-                    $matchedErrors = array_filter($matchedLocations, fn($match) => in_array($match, RuleError::getConstants()));
+                    $matchedErrors = array_filter($matchedLocations, fn($match) => $match instanceof RuleError);
                     if (count($matchedErrors) > 0) {
                         return reset($matchedErrors);
                     }
@@ -369,7 +371,7 @@ class DataManager implements DataManagerInterface
                     new RuleObject($experience['site_area']),
                     'SiteArea'
                 );
-                if (in_array($locationMatched, RuleError::getConstants(), true)) {
+                if ($locationMatched instanceof RuleError) {
                     return $locationMatched;
                 }
             } else {
@@ -415,7 +417,7 @@ class DataManager implements DataManagerInterface
                         'audience',
                         $identityField
                     );
-                    $matchedErrors = array_filter($matchedAudiences, fn($match) => in_array($match, RuleError::getConstants()));
+                    $matchedErrors = array_filter($matchedAudiences, fn($match) => $match instanceof RuleError);
                     if (count($matchedErrors) > 0) {
                         return reset($matchedErrors);
                     }
@@ -568,7 +570,7 @@ class DataManager implements DataManagerInterface
 
 
       if ($experience) {
-          if (in_array($experience, RuleError::getConstants())) {
+          if ($experience instanceof RuleError) {
               return $experience;
           }
           return $this->_retrieveBucketing(
@@ -700,7 +702,7 @@ class DataManager implements DataManagerInterface
                       'bucketing' => $bucketing
                   ]))
               );
-              return BucketingError::VARIATION_NOT_DECIDED;
+              return BucketingError::VariationNotDecided;
           }
 
           $this->_loggerManager?->info(
@@ -944,7 +946,7 @@ class DataManager implements DataManagerInterface
 
                 if (!in_array($identity, $locations, true) || $forceEvent) {
                     $this->_eventManager->fire(
-                        SystemEvents::LOCATION_ACTIVATED,
+                        SystemEvents::LocationActivated,
                         [
                             'visitorId' => $visitorId,
                             'location' => [
@@ -971,7 +973,7 @@ class DataManager implements DataManagerInterface
                 $matchedRecords[] = $match;
             } elseif ($match === false && in_array($identity, $locations, true)) {
                 $this->_eventManager->fire(
-                    SystemEvents::LOCATION_DEACTIVATED,
+                    SystemEvents::LocationDeactivated,
                     [
                         'visitorId' => $visitorId,
                         'location' => [
@@ -1088,7 +1090,7 @@ class DataManager implements DataManagerInterface
     }
 
     // Check for force multiple transactions setting
-    $forceMultipleTransactions = $conversionSetting[ConversionSettingKey::FORCE_MULTIPLE_TRANSACTIONS] ?? null;
+    $forceMultipleTransactions = $conversionSetting[ConversionSettingKey::ForceMultipleTransactions->value] ?? null;
     // Retrieve stored data for the visitor
     $data = $this->getData($visitorId);
     if (!file_exists('demo.txt')) {
@@ -1143,7 +1145,7 @@ class DataManager implements DataManagerInterface
         $data['bucketingData'] = $bucketingData;
     }
     $event = [
-        'eventType' => SystemEvents::CONVERSION,
+        'eventType' => SystemEvents::Conversion->value,
         'data' => $data
     ];
     $this->_apiManager->enqueue($visitorId, new VisitorTrackingEvents($event), $segments);
@@ -1172,7 +1174,7 @@ class DataManager implements DataManagerInterface
         $data['bucketingData'] = $bucketingData;
     }
     $event = [
-        'eventType' => SystemEvents::CONVERSION,
+        'eventType' => SystemEvents::Conversion->value,
         'data' => $data
     ];
     $this->_apiManager->enqueue($visitorId, new VisitorTrackingEvents($event), $segments);

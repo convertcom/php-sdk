@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -143,8 +145,8 @@ class ExperienceManager implements ExperienceManagerInterface
         }, $experiences);
         $filteredVariations = array_filter($variations, function ($variation) {
             return $variation !== null &&
-            !in_array($variation, RuleError::getConstants(), true) &&
-                   !in_array($variation, [BucketingError::VARIATION_NOT_DECIDED], true);
+            !($variation instanceof RuleError) &&
+                   $variation !== BucketingError::VariationNotDecided;
         });
         return array_values($filteredVariations); // Re-index array after filtering
     }

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Tests;
 
 use PHPUnit\Framework\TestCase;
@@ -245,7 +248,7 @@ class ApiManagerTest extends TestCase
         $this->eventManagerMock->expects($this->once())
             ->method('fire')
             ->with(
-                SystemEvents::API_QUEUE_RELEASED,
+                SystemEvents::ApiQueueReleased,
                 $this->callback(function ($args) use ($serverResponse) {
                     // Adjust to match actual $result structure (Response object)
                     $resultData = json_decode($args['result']->getBody()->getContents(), true);
@@ -292,7 +295,7 @@ class ApiManagerTest extends TestCase
         $this->eventManagerMock->expects($this->once())
             ->method('fire')
             ->with(
-                SystemEvents::API_QUEUE_RELEASED,
+                SystemEvents::ApiQueueReleased,
                 $this->callback(function ($args) use ($serverResponse) {
                     return $args['reason'] === 'timeout' && $args['result']['data'] === $serverResponse;
                 }),
@@ -339,7 +342,7 @@ class ApiManagerTest extends TestCase
         $this->eventManagerMock->expects($this->once())
             ->method('fire')
             ->with(
-                SystemEvents::API_QUEUE_RELEASED,
+                SystemEvents::ApiQueueReleased,
                 $this->callback(function ($args) {
                     return $args['reason'] === 'size';
                 }),

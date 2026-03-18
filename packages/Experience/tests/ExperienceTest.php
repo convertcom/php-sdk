@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk\Tests;
 
 use OpenAPI\Client\Config;

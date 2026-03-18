@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -110,14 +112,14 @@ class Core implements CoreInterface
 
             $this->fetchConfig()->then(
                 function () {
-                    $this->_eventManager->fire(SystemEvents::READY, null, null, true);
+                    $this->_eventManager->fire(SystemEvents::Ready, null, null, true);
                     $this->_loggerManager?->trace('Core.initialize()', Messages::CORE_INITIALIZED);
                     $this->_initialized = true;
                 },
                 function ($e) {
                     $this->_loggerManager?->error('Core.initialize()', ['error' => $e->getMessage()]);
                     $this->_eventManager->fire(
-                        SystemEvents::READY,
+                        SystemEvents::Ready,
                         [],
                         $e,
                         true
@@ -130,20 +132,20 @@ class Core implements CoreInterface
             if (!$configData->getAccountId() || !$configData->getProject()) {
                 $this->_loggerManager?->error('Core.initialize()', ['error' => 'Invalid configuration data: missing account_id or project']);
                 $this->_eventManager->fire(
-                    SystemEvents::READY,
+                    SystemEvents::Ready,
                     [],
                     new \Exception('Invalid configuration data: missing account_id or project'),
                     true
                 );
             } else {
-                $this->_eventManager->fire(SystemEvents::READY, null, null, true);
+                $this->_eventManager->fire(SystemEvents::Ready, null, null, true);
                 $this->_loggerManager?->trace('Core.initialize()', Messages::CORE_INITIALIZED);
                 $this->_initialized = true;
             }
         } else {
             $this->_loggerManager?->error('Core.initialize()', ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED);
             $this->_eventManager->fire(
-                SystemEvents::READY,
+                SystemEvents::Ready,
                 [],
                 new \Exception(ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED),
                 true
@@ -233,7 +235,7 @@ class Core implements CoreInterface
                 }
 
                 $this->_loggerManager?->trace('Core.fetchConfig()', ['data' => $data]);
-                $event = ($configData->getAccountId() && $configData->getProject()) ? SystemEvents::CONFIG_UPDATED : SystemEvents::READY;
+                $event = ($configData->getAccountId() && $configData->getProject()) ? SystemEvents::ConfigUpdated : SystemEvents::Ready;
                 $this->_eventManager->fire($event, null, null, true);
                 $this->_apiManager->setData($data);
 

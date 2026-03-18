@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk;
 
 use GuzzleHttp\Promise\PromiseInterface;
@@ -12,6 +14,7 @@ use ConvertSdk\Config\Config;
 use OpenAPI\Client\Config as OpenApiConfig;
 use OpenAPI\Client\Model\ConfigResponseData;
 use ConvertSdk\Enums\ErrorMessages;
+use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
@@ -43,21 +46,23 @@ class ConvertSDK extends Core {
         $monolog->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
 
         // Initialize LogManager with the Monolog logger and provided log level.
-        $this->loggerManager = new LogManager($monolog, 3);
+        $this->loggerManager = new LogManager($monolog, LogLevel::Warn);
 
         // Iterate over custom loggers (if any) and add them to LogManager.
         if (isset($configuration['logger']['customLoggers']) && is_array($configuration['logger']['customLoggers'])) {
             foreach ($configuration['logger']['customLoggers'] as $customLogger) {
                 if (isset($customLogger['logger']) && isset($customLogger['logLevel'])) {
+                    $level = $customLogger['logLevel'];
                     $this->loggerManager->addClient(
                         $customLogger['logger'],
-                        $customLogger['logLevel'],
+                        $level instanceof LogLevel ? $level : LogLevel::from((int)$level),
                         $customLogger['methodsMap'] ?? []
                     );
                 } else {
+                    $configLevel = $configuration['logger']['logLevel'];
                     $this->loggerManager->addClient(
                         $customLogger,
-                        $configuration['logger']['logLevel']
+                        $configLevel instanceof LogLevel ? $configLevel : LogLevel::from((int)$configLevel)
                     );
                 }
             }

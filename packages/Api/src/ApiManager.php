@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -287,7 +289,7 @@ class ApiManager implements ApiManagerInterface
             function ($result) use ($reason, $payload) {
                 $this->requestsQueue->reset();
                 if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
-                    $this->eventManager->fire(SystemEvents::API_QUEUE_RELEASED, [
+                    $this->eventManager->fire(SystemEvents::ApiQueueReleased, [
                         'reason' => $reason,
                         'result' => $result,
                         'visitors' => $payload['visitors']
@@ -305,7 +307,7 @@ class ApiManager implements ApiManagerInterface
                 $this->startQueue();
                 if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
                     $this->eventManager->fire(
-                        SystemEvents::API_QUEUE_RELEASED,
+                        SystemEvents::ApiQueueReleased,
                         ['reason' => $reason],
                         $error
                     );

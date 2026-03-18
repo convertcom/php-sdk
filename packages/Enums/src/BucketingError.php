@@ -1,6 +1,10 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class BucketingError {
-    const VARIATION_NOT_DECIDED = 'convert.com_variation_not_decided';
+enum BucketingError: string
+{
+    case VariationNotDecided = 'convert.com_variation_not_decided';
 }

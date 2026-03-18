@@ -1,8 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 // File: src/Enums/Messages.php
 namespace ConvertSdk\Enums;
 
-class Messages {
+final class Messages {
     public const CONFIG_DATA_UPDATED = 'Config Data updated';
     public const CORE_CONSTRUCTOR = 'Core Manager constructor has been called';
     public const CORE_INITIALIZED = 'Core Manager has been initialized';

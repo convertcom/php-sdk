@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use ConvertSdk\Utils\StringUtils;
 use PHPUnit\Framework\TestCase;
 

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 use PHPUnit\Framework\TestCase;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
@@ -130,7 +133,7 @@ class CoreTest extends TestCase
     public function shouldSuccessfullyTriggerReadyEvent()
     {
         $triggered = false;
-        $this->eventManager->on(SystemEvents::READY, function ($args, $err) use (&$triggered) {
+        $this->eventManager->on(SystemEvents::Ready, function ($args, $err) use (&$triggered) {
             $this->assertNull($err);
             $triggered = true;
         });

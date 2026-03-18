@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -146,7 +148,7 @@ class RuleManager implements RuleManagerInterface
             foreach ($ruleSet['OR'] as $i => $rule) {
 
                 $match = $this->_processAND($data, new RuleAnd($rule));
-                if (in_array($match, RuleError::getConstants(), true)) {
+                if ($match instanceof RuleError) {
                     if ($this->_loggerManager) {
                         $this->_loggerManager->info('RuleManager.isRuleMatched()', $logEntry ?? '', ErrorMessages::RULE_ERROR);
                     }
@@ -284,8 +286,9 @@ class RuleManager implements RuleManagerInterface
                                     $rule_method = StringUtils::camelCase('get ' . str_replace('_', ' ', $rule['rule_type']));
                                     if ($method === $rule_method || ($data['mapper'] ?? null) === $rule_method) {
                                         $dataValue = $data[$method]($rule);
-                                        if (in_array($dataValue, RuleError::getConstants(), true)) {
-                                            return $dataValue;
+                                        $ruleErrorEnum = RuleError::tryFrom($dataValue);
+                                        if ($ruleErrorEnum !== null) {
+                                            return $ruleErrorEnum;
                                         }
                                         if ($rule['rule_type'] === 'js_condition') return $dataValue;
                                         // Handle both string (class name) and array cases

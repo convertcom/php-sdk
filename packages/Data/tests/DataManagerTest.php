@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk\Tests;
 
 use ConvertSdk\DataManager;
@@ -194,7 +196,7 @@ class DataManagerTest extends TestCase
             $this->assertArrayHasKey('experienceKey', $variation);
             $this->assertEquals($experienceKey, $variation['experienceKey']);
         } else {
-            $this->assertEquals(BucketingError::VARIATION_NOT_DECIDED, $variation); // Handle error case
+            $this->assertEquals(BucketingError::VariationNotDecided, $variation); // Handle error case
         }
     }
 
@@ -216,7 +218,7 @@ class DataManagerTest extends TestCase
             $this->assertArrayHasKey('experienceId', $variation);
             $this->assertEquals($experienceId, $variation['experienceId']);
         } else {
-            $this->assertEquals(BucketingError::VARIATION_NOT_DECIDED, $variation);
+            $this->assertEquals(BucketingError::VariationNotDecided, $variation);
         }
     }
 
@@ -294,7 +296,7 @@ class DataManagerTest extends TestCase
                 'locationProperties' => ['url' => 'https://convert.com/']
             ])
         );
-        $this->assertEquals(BucketingError::VARIATION_NOT_DECIDED, $variation);
+        $this->assertEquals(BucketingError::VariationNotDecided, $variation);
     }
 
     public function testLocalStoreSizeLimit(): void

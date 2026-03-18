@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -112,19 +114,19 @@ class Context implements ContextInterface
 
 
         // Check if the result is a RuleError
-        if (in_array($bucketedVariation, RuleError::getConstants(), true)) {
+        if ($bucketedVariation instanceof RuleError) {
             return $bucketedVariation;
         }
 
         // Check if the result is a BucketingError
-        if (in_array($bucketedVariation, [BucketingError::VARIATION_NOT_DECIDED], true)) {
+        if (in_array($bucketedVariation, [BucketingError::VariationNotDecided], true)) {
             return $bucketedVariation;
         }
 
         // If a valid variation is returned, fire a bucketing event
         if ($bucketedVariation) {
             $this->_eventManager->fire(
-                SystemEvents::BUCKETING,
+                SystemEvents::Bucketing,
                 [
                     'visitorId' => $this->_visitorId,
                     'experienceKey' => $experienceKey,
@@ -171,7 +173,7 @@ class Context implements ContextInterface
 
         // Filter for rule errors
         $matchedRuleErrors = array_filter($bucketedVariations, function ($match) {
-            return in_array($match, RuleError::getConstants(), true);
+            return $match instanceof RuleError;
         });
         if (!empty($matchedRuleErrors)) {
             return array_values($matchedRuleErrors); // Return rule errors if present
@@ -179,7 +181,7 @@ class Context implements ContextInterface
 
         // Filter for bucketing errors
         $matchedBucketingErrors = array_filter($bucketedVariations, function ($match) {
-            return in_array($match, [BucketingError::VARIATION_NOT_DECIDED], true);
+            return in_array($match, [BucketingError::VariationNotDecided], true);
         });
         if (!empty($matchedBucketingErrors)) {
             return array_values($matchedBucketingErrors); // Return bucketing errors if present
@@ -188,7 +190,7 @@ class Context implements ContextInterface
         // Fire events for each bucketed variation
         foreach ($bucketedVariations as $variation) {
             $this->_eventManager->fire(
-                SystemEvents::BUCKETING,
+                SystemEvents::Bucketing,
                 [
                     'visitorId' => $this->_visitorId,
                     'experienceKey' => $variation['experienceKey'] ?? null, // Safely access experience key
@@ -242,7 +244,7 @@ class Context implements ContextInterface
         if (is_array($bucketedFeature)) {
             // Filter for rule errors
             $matchedErrors = array_filter($bucketedFeature, function ($match) {
-                return in_array($match, RuleError::getConstants(), true);
+                return $match instanceof RuleError;
             });
             if (!empty($matchedErrors)) {
                 return array_values($matchedErrors); // Return errors if present
@@ -251,7 +253,7 @@ class Context implements ContextInterface
             // Fire events for each bucketed feature
             foreach ($bucketedFeature as $feature) {
                 $this->_eventManager->fire(
-                    SystemEvents::BUCKETING,
+                    SystemEvents::Bucketing,
                     [
                         'visitorId' => $this->_visitorId,
                         'experienceKey' => $feature['experienceKey'] ?? null,
@@ -264,13 +266,13 @@ class Context implements ContextInterface
             }
         } else {
             // Handle single RuleError or BucketedFeature
-            if (in_array($bucketedFeature, RuleError::getConstants(), true)) {
+            if ($bucketedFeature instanceof RuleError) {
                 return $bucketedFeature; // Return RuleError
             }
 
             if ($bucketedFeature) {
                 $this->_eventManager->fire(
-                    SystemEvents::BUCKETING,
+                    SystemEvents::Bucketing,
                     [
                         'visitorId' => $this->_visitorId,
                         'experienceKey' => $bucketedFeature['experienceKey'] ?? null,
@@ -318,7 +320,7 @@ class Context implements ContextInterface
 
         // Filter for rule errors
         $matchedErrors = array_filter($bucketedFeatures, function ($match) {
-            return in_array($match, RuleError::getConstants(), true);
+            return $match instanceof RuleError;
         });
         if (!empty($matchedErrors)) {
             return array_values($matchedErrors); // Return errors if present
@@ -327,7 +329,7 @@ class Context implements ContextInterface
         // Fire events for each bucketed feature
         foreach ($bucketedFeatures as $feature) {
             $this->_eventManager->fire(
-                SystemEvents::BUCKETING,
+                SystemEvents::Bucketing,
                 [
                     'visitorId' => $this->_visitorId,
                     'experienceKey' => $feature['experienceKey'] ?? null,
@@ -377,12 +379,12 @@ class Context implements ContextInterface
             $attributes['conversionData'] ?? []
         );
 
-        if (in_array($triggered, RuleError::getConstants(), true)) {
+        if ($triggered instanceof RuleError) {
             return $triggered;
         }
         if ($triggered) {
             $this->_eventManager->fire(
-                SystemEvents::CONVERSION,
+                SystemEvents::Conversion,
                 [
                     'visitorId' => $this->_visitorId,
                     'goalKey' => $goalKey
@@ -457,8 +459,8 @@ class Context implements ContextInterface
      */
     public function getConfigEntity(string $key, string $entityType): array
     {
-        if ($entityType === EntityType::VARIATION) {
-            $experiences = $this->_dataManager->getEntitiesList(EntityType::EXPERIENCE);
+        if ($entityType === EntityType::Variation->value) {
+            $experiences = $this->_dataManager->getEntitiesList(EntityType::Experience->value);
             foreach ($experiences as $experience) {
                 $variation = $this->_dataManager->getSubItem(
                     'experiences',
@@ -484,8 +486,8 @@ class Context implements ContextInterface
      */
     public function getConfigEntityById(string $id, string $entityType): array
     {
-        if ($entityType === EntityType::VARIATION) {
-            $experiences = $this->_dataManager->getEntitiesList(EntityType::EXPERIENCE);
+        if ($entityType === EntityType::Variation->value) {
+            $experiences = $this->_dataManager->getEntitiesList(EntityType::Experience->value);
             foreach ($experiences as $experience) {
                 $variation = $this->_dataManager->getSubItem(
                     'experiences',

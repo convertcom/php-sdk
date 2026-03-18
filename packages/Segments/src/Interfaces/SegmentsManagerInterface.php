@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk\Interfaces;
 
 use OpenAPI\Client\Model\VisitorSegments;

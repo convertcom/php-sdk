@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert Php SDK
  * Version 1.0.0
@@ -19,7 +21,7 @@ interface LogManagerInterface {
      * @param mixed ...$args
      * @return void
      */
-    public function log(int $level, ...$args): void;
+    public function log(LogLevel $level, ...$args): void;
 
     /**
      * Log a trace message.
@@ -69,7 +71,7 @@ interface LogManagerInterface {
      * @param LogMethodMapInterface|null $methodMap
      * @return void
      */
-    public function addClient($client = null, ?int $level = null, ?LogMethodMapInterface $methodMap = null): void;
+    public function addClient($client = null, ?LogLevel $level = null, ?LogMethodMapInterface $methodMap = null): void;
 
     /**
      * Set the log level for a given client.
@@ -78,5 +80,5 @@ interface LogManagerInterface {
      * @param mixed|null $client
      * @return void
      */
-    public function setClientLevel(int $level, $client = null): void;
+    public function setClientLevel(LogLevel $level, $client = null): void;
 }
