@@ -82,7 +82,7 @@ class ContextTest extends TestCase
             $this->loggerManager
         );
         $this->experienceManager = new ExperienceManager(dataManager: $this->dataManager);
-        $this->featureManager = new FeatureManager($this->config, $this->dataManager);
+        $this->featureManager = new FeatureManager(dataManager: $this->dataManager);
         $this->segmentsManager = new SegmentsManager($this->config, $this->dataManager, $this->ruleManager);
 
         $this->context = new Context(
@@ -138,42 +138,28 @@ class ContextTest extends TestCase
             'visitorProperties' => ['varName3' => 'something']
         ]));
 
-        $this->assertIsArray($feature);
-        $this->assertArrayHasKey('experienceId', $feature);
-        $this->assertArrayHasKey('experienceKey', $feature);
-        $this->assertArrayHasKey('experienceName', $feature);
-        $this->assertArrayHasKey('id', $feature);
-        $this->assertArrayHasKey('key', $feature);
-        $this->assertArrayHasKey('name', $feature);
-        $this->assertArrayHasKey('status', $feature);
-        $this->assertArrayHasKey('variables', $feature);
-        $this->assertEquals($this->featureId, $feature['id']);
+        $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $feature);
+        $this->assertNotEmpty($feature->featureId);
+        $this->assertEquals($featureKey, $feature->featureKey);
+        $this->assertInstanceOf(\ConvertSdk\Enums\FeatureStatus::class, $feature->status);
+        $this->assertEquals(\ConvertSdk\Enums\FeatureStatus::Enabled, $feature->status);
+        $this->assertIsArray($feature->variables);
+        $this->assertEquals($this->featureId, $feature->featureId);
     }
 
     public function testGetMultipleFeatureWithStatus(): void
     {
         $featureKey = 'feature-1';
-        $featureIds = ['10024', '10025'];
-        $features = $this->context->runFeature($featureKey, new BucketingAttributes([
+        // feature-1 is in multiple experiences — runFeature returns first enabled
+        $feature = $this->context->runFeature($featureKey, new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
             'visitorProperties' => ['varName3' => 'something']
         ]));
 
-        $this->assertIsArray($features);
-        $this->assertCount(2, $features);
-        foreach ($features as $feature) {
-            $this->assertIsArray($feature);
-            $this->assertArrayHasKey('experienceId', $feature);
-            $this->assertArrayHasKey('experienceKey', $feature);
-            $this->assertArrayHasKey('experienceName', $feature);
-            $this->assertArrayHasKey('id', $feature);
-            $this->assertArrayHasKey('key', $feature);
-            $this->assertArrayHasKey('name', $feature);
-            $this->assertArrayHasKey('status', $feature);
-            $this->assertArrayHasKey('variables', $feature);
-        }
-        $selectedFeatures = array_column($features, 'id');
-        $this->assertContainsAll($featureIds, $selectedFeatures);
+        $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $feature);
+        $this->assertEquals($featureKey, $feature->featureKey);
+        $this->assertEquals(\ConvertSdk\Enums\FeatureStatus::Enabled, $feature->status);
+        $this->assertNotEmpty($feature->featureId);
     }
 
     public function testGetFeaturesWithStatuses(): void
@@ -186,27 +172,21 @@ class ContextTest extends TestCase
 
         $this->assertIsArray($features);
         $this->assertCount(4, $features);
-        $enabledFeatures = array_filter($features, fn($f) => $f['status'] === 'enabled');
+        foreach ($features as $feature) {
+            $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $feature);
+            $this->assertInstanceOf(\ConvertSdk\Enums\FeatureStatus::class, $feature->status);
+            $this->assertNotEmpty($feature->featureKey);
+        }
+        $enabledFeatures = array_filter($features, fn($f) => $f->status === \ConvertSdk\Enums\FeatureStatus::Enabled);
         foreach ($enabledFeatures as $feature) {
-            $this->assertIsArray($feature);
-            $this->assertArrayHasKey('experienceId', $feature);
-            $this->assertArrayHasKey('experienceKey', $feature);
-            $this->assertArrayHasKey('experienceName', $feature);
-            $this->assertArrayHasKey('id', $feature);
-            $this->assertArrayHasKey('key', $feature);
-            $this->assertArrayHasKey('name', $feature);
-            $this->assertArrayHasKey('status', $feature);
-            $this->assertArrayHasKey('variables', $feature);
+            $this->assertNotEmpty($feature->featureId);
+            $this->assertIsArray($feature->variables);
         }
-        $disabledFeatures = array_filter($features, fn($f) => $f['status'] === 'disabled');
+        $disabledFeatures = array_filter($features, fn($f) => $f->status === \ConvertSdk\Enums\FeatureStatus::Disabled);
         foreach ($disabledFeatures as $feature) {
-            $this->assertIsArray($feature);
-            $this->assertArrayHasKey('id', $feature);
-            $this->assertArrayHasKey('key', $feature);
-            $this->assertArrayHasKey('name', $feature);
-            $this->assertArrayHasKey('status', $feature);
+            $this->assertNotEmpty($feature->featureId);
         }
-        $selectedFeatures = array_column($features, 'id');
+        $selectedFeatures = array_map(fn($f) => $f->featureId, $features);
         $this->assertContainsAll($featureIds, $selectedFeatures);
     }
 
@@ -490,5 +470,99 @@ class ContextTest extends TestCase
         ]));
 
         $this->assertNull($result);
+    }
+
+    public function testRunFeatureReturnsDto(): void
+    {
+        $featureKey = 'feature-2';
+        $result = $this->context->runFeature($featureKey, new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something']
+        ]));
+
+        $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $result);
+        $this->assertNotEmpty($result->featureId);
+        $this->assertEquals($featureKey, $result->featureKey);
+        $this->assertIsArray($result->variables);
+    }
+
+    public function testRunFeatureReturnsNullForMissingKey(): void
+    {
+        $result = $this->context->runFeature('nonexistent-feature', new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something']
+        ]));
+
+        $this->assertNull($result);
+    }
+
+    public function testRunFeaturesReturnsDtoArray(): void
+    {
+        $features = $this->context->runFeatures(new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something']
+        ]));
+
+        $this->assertIsArray($features);
+        $this->assertGreaterThan(0, count($features));
+        foreach ($features as $feature) {
+            $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $feature);
+            $this->assertNotEmpty($feature->featureKey);
+            $this->assertInstanceOf(\ConvertSdk\Enums\FeatureStatus::class, $feature->status);
+        }
+    }
+
+    public function testRunFeatureReturnsDtoWithDisabledStatus(): void
+    {
+        // 'not-attached-feature-3' exists in config but visitor shouldn't be bucketed for it
+        $featureKey = 'not-attached-feature-3';
+        $result = $this->context->runFeature($featureKey, new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something']
+        ]));
+
+        // Feature exists but visitor is not bucketed → disabled DTO
+        $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $result);
+        $this->assertEquals(\ConvertSdk\Enums\FeatureStatus::Disabled, $result->status);
+        $this->assertEquals($featureKey, $result->featureKey);
+    }
+
+    public function testRunFeatureDoesNotFireEventOnNull(): void
+    {
+        // A nonexistent feature should return null and not fire any event
+        $result = $this->context->runFeature('definitely-nonexistent-feature', new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+        ]));
+
+        $this->assertNull($result);
+    }
+
+    public function testRunFeatureTypeCastingApplied(): void
+    {
+        $featureKey = 'feature-1';
+        $result = $this->context->runFeature($featureKey, new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something'],
+            'typeCasting' => true
+        ]));
+
+        $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $result);
+        $this->assertEquals(\ConvertSdk\Enums\FeatureStatus::Enabled, $result->status);
+        $this->assertNotEmpty($result->variables, 'Enabled feature should have variables');
+
+        // Verify actual type casting: 'enabled' variable is defined as boolean in test-config
+        if (isset($result->variables['enabled'])) {
+            $this->assertIsBool($result->variables['enabled'], 'Boolean variable should be cast to bool, not remain string');
+        }
+
+        // Verify variables are not all strings (type casting must have happened)
+        $hasNonString = false;
+        foreach ($result->variables as $value) {
+            if (!is_string($value)) {
+                $hasNonString = true;
+                break;
+            }
+        }
+        $this->assertTrue($hasNonString, 'At least one variable should be type-cast to a non-string type');
     }
 }

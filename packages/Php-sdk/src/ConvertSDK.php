@@ -139,7 +139,7 @@ final class ConvertSDK
             logManager: $logManager,
         );
 
-        $featureManager = new FeatureManager($openApiConfig, $dataManager, $logManager);
+        $featureManager = new FeatureManager(dataManager: $dataManager, logManager: $logManager);
         $segmentsManager = new SegmentsManager($openApiConfig, $dataManager, $ruleManager, $logManager);
 
         // 8. Construct and return Core

@@ -12,9 +12,7 @@ namespace ConvertSdk\Interfaces;
  */
 
 use OpenAPI\Client\Model\ConfigFeature;
-use OpenAPI\Client\IdentityField;
 use OpenAPI\Client\BucketingAttributes;
-use ConvertSdk\Enums\RuleError;
 
 /**
  * Interface FeatureManagerInterface
@@ -59,7 +57,7 @@ interface FeatureManagerInterface
     /**
      * Get all features as an object indexed by a specified field.
      *
-     * @param IdentityField $field Field to index by (e.g., 'id', 'key')
+     * @param string $field Field to index by (e.g., 'id', 'key')
      * @return array<string, ConfigFeature> Associative array of features
      */
     public function getListAsObject(string $field): array;
@@ -91,20 +89,20 @@ interface FeatureManagerInterface
     public function getFeatureVariableTypeById(string $id, string $variableName): ?string;
 
     /**
-     * Run a feature for a visitor, returning its bucketed state or an error.
+     * Run a feature for a visitor, returning its bucketed state.
      *
      * @param string $visitorId Visitor ID
      * @param string $featureKey Feature key
      * @param BucketingAttributes $attributes Bucketing attributes
      * @param string[]|null $experienceKeys Optional array of experience keys
-     * @return BucketedFeature|RuleError|array<BucketedFeature|RuleError> Bucketed feature, error, or array of results
+     * @return array<string, mixed> Bucketed feature array or array of feature arrays
      */
     public function runFeature(
         string $visitorId,
         string $featureKey,
         BucketingAttributes $attributes,
         ?array $experienceKeys = null
-    );
+    ): array;
 
     /**
      * Check if a feature is enabled for a visitor.
@@ -123,20 +121,20 @@ interface FeatureManagerInterface
     ): bool;
 
     /**
-     * Run a feature by its ID for a visitor, returning its bucketed state or an error.
+     * Run a feature by its ID for a visitor, returning its bucketed state.
      *
      * @param string $visitorId Visitor ID
      * @param string $featureId Feature ID
      * @param BucketingAttributes $attributes Bucketing attributes
      * @param string[]|null $experienceIds Optional array of experience IDs
-     * @return BucketedFeature|RuleError|array<BucketedFeature|RuleError> Bucketed feature, error, or array of results
+     * @return array<string, mixed> Bucketed feature array or array of feature arrays
      */
     public function runFeatureById(
         string $visitorId,
         string $featureId,
         BucketingAttributes $attributes,
         ?array $experienceIds = null
-    );
+    ): array;
 
     /**
      * Run multiple features for a visitor with optional filtering.
@@ -144,7 +142,7 @@ interface FeatureManagerInterface
      * @param string $visitorId Visitor ID
      * @param BucketingAttributes $attributes Bucketing attributes
      * @param array<string, string[]>|null $filter Optional filter (e.g., ['experienceKeys' => ['exp1']])
-     * @return array<BucketedFeature|RuleError> Array of bucketed features or errors
+     * @return array<int, array<string, mixed>> Array of bucketed feature arrays
      */
     public function runFeatures(
         string $visitorId,

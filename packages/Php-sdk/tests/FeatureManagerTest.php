@@ -13,9 +13,7 @@ use ConvertSdk\DataManager;
 use ConvertSdk\FeatureManager;
 use ConvertSdk\LogManager;
 use OpenAPI\Client\Model\ConfigFeature;
-use OpenAPI\Client\Model\ConfigExperience;
 use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\BucketedVariation;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Config\DefaultConfig;
 use OpenAPI\Client\Config;
@@ -80,7 +78,7 @@ class FeatureManagerTest extends TestCase
             $this->apiManager,
             $loggerManager
         );
-        $this->featureManager = new FeatureManager($this->config, $this->dataManager);
+        $this->featureManager = new FeatureManager(dataManager: $this->dataManager);
 
         $this->accountId = $this->config->getData() ? $this->config->getData()->getAccountId() : '';
         $project = $this->config->getData() ? $this->config->getData()->getProject() : null;
