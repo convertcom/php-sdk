@@ -150,6 +150,11 @@ final class FeatureManager implements FeatureManagerInterface
         BucketingAttributes $attributes,
         ?array $experienceKeys = null
     ): array {
+        $this->logManager?->debug('FeatureManager.runFeature()', [
+            'visitorId' => $visitorId,
+            'featureKey' => $featureKey,
+        ]);
+
         $declaredFeature = $this->dataManager->getEntity($featureKey, 'features');
         if ($declaredFeature) {
             $features = $this->runFeatures($visitorId, $attributes, [
@@ -161,12 +166,22 @@ final class FeatureManager implements FeatureManagerInterface
             $validFeatures = array_filter($features, fn($f) => is_array($f));
 
             if (!empty($validFeatures)) {
-                if (count($validFeatures) === 1) {
-                    return reset($validFeatures);
-                } else {
-                    return array_values($validFeatures);
-                }
+                $result = count($validFeatures) === 1
+                    ? reset($validFeatures)
+                    : array_values($validFeatures);
+
+                $this->logManager?->debug('FeatureManager.runFeature()', [
+                    'featureKey' => $featureKey,
+                    'status' => FeatureStatus::Enabled->value,
+                ]);
+
+                return $result;
             }
+
+            $this->logManager?->debug('FeatureManager.runFeature()', [
+                'featureKey' => $featureKey,
+                'status' => FeatureStatus::Disabled->value,
+            ]);
 
             return [
                 'id' => $declaredFeature['id'],
@@ -175,6 +190,18 @@ final class FeatureManager implements FeatureManagerInterface
                 'status' => FeatureStatus::Disabled->value
             ];
         } else {
+            if ($this->logManager) {
+                $availableKeys = array_map(
+                    fn($f) => $f['key'] ?? 'unknown',
+                    $this->dataManager->getEntitiesList('features')
+                );
+                $this->logManager->debug('FeatureManager.runFeature()', [
+                    'featureKey' => $featureKey,
+                    'reason' => Messages::NULL_RETURN_FEATURE_NOT_FOUND,
+                    'availableKeys' => $availableKeys,
+                ]);
+            }
+
             return [
                 'key' => $featureKey,
                 'status' => FeatureStatus::Disabled->value
@@ -197,6 +224,11 @@ final class FeatureManager implements FeatureManagerInterface
         BucketingAttributes $attributes,
         ?array $experienceKeys = null
     ): bool {
+        $this->logManager?->debug('FeatureManager.isFeatureEnabled()', [
+            'visitorId' => $visitorId,
+            'featureKey' => $featureKey,
+        ]);
+
         $declaredFeature = $this->dataManager->getEntity($featureKey, 'features');
 
         if ($declaredFeature) {
@@ -205,7 +237,27 @@ final class FeatureManager implements FeatureManagerInterface
                 'experiences' => $experienceKeys
             ]);
             $validFeatures = array_filter($features, fn($f) => is_array($f));
-            return !empty($validFeatures);
+            $enabled = !empty($validFeatures);
+
+            $this->logManager?->debug('FeatureManager.isFeatureEnabled()', [
+                'featureKey' => $featureKey,
+                'enabled' => $enabled,
+            ]);
+
+            return $enabled;
+        }
+
+        if ($this->logManager) {
+            $availableKeys = array_map(
+                fn($f) => $f['key'] ?? 'unknown',
+                $this->dataManager->getEntitiesList('features')
+            );
+            $this->logManager->debug('FeatureManager.isFeatureEnabled()', [
+                'featureKey' => $featureKey,
+                'enabled' => false,
+                'reason' => Messages::NULL_RETURN_FEATURE_NOT_FOUND,
+                'availableKeys' => $availableKeys,
+            ]);
         }
 
         return false;
@@ -226,6 +278,11 @@ final class FeatureManager implements FeatureManagerInterface
         BucketingAttributes $attributes,
         ?array $experienceIds = null
     ): array {
+        $this->logManager?->debug('FeatureManager.runFeatureById()', [
+            'visitorId' => $visitorId,
+            'featureId' => $featureId,
+        ]);
+
         $declaredFeature = $this->dataManager->getEntityById($featureId, 'features');
 
         if ($declaredFeature) {
@@ -242,12 +299,22 @@ final class FeatureManager implements FeatureManagerInterface
             $validFeatures = array_filter($features, fn($f) => is_array($f));
 
             if (!empty($validFeatures)) {
+                $this->logManager?->debug('FeatureManager.runFeatureById()', [
+                    'featureId' => $featureId,
+                    'status' => FeatureStatus::Enabled->value,
+                ]);
+
                 if (count($validFeatures) === 1) {
                     return reset($validFeatures);
                 } else {
                     return array_values($validFeatures);
                 }
             }
+
+            $this->logManager?->debug('FeatureManager.runFeatureById()', [
+                'featureId' => $featureId,
+                'status' => FeatureStatus::Disabled->value,
+            ]);
 
             return [
                 'id' => $featureId,
@@ -256,6 +323,18 @@ final class FeatureManager implements FeatureManagerInterface
                 'status' => FeatureStatus::Disabled->value
             ];
         } else {
+            if ($this->logManager) {
+                $availableIds = array_map(
+                    fn($f) => $f['id'] ?? 'unknown',
+                    $this->dataManager->getEntitiesList('features')
+                );
+                $this->logManager->debug('FeatureManager.runFeatureById()', [
+                    'featureId' => $featureId,
+                    'reason' => Messages::NULL_RETURN_FEATURE_NOT_FOUND,
+                    'availableIds' => $availableIds,
+                ]);
+            }
+
             return [
                 'id' => $featureId,
                 'status' => FeatureStatus::Disabled->value
@@ -273,6 +352,13 @@ final class FeatureManager implements FeatureManagerInterface
      */
     public function runFeatures(string $visitorId, BucketingAttributes $attributes, ?array $filter = null): array
     {
+        if ($this->logManager) {
+            $this->logManager->debug('FeatureManager.runFeatures()', [
+                'visitorId' => $visitorId,
+                'filter' => $filter,
+            ]);
+        }
+
         $typeCasting = $attributes->getTypeCasting() ?? true;
 
         $declaredFeatures = $this->getListAsObject('id');
@@ -387,6 +473,17 @@ final class FeatureManager implements FeatureManagerInterface
                     ];
                 }
             }
+        }
+
+        if ($this->logManager) {
+            $enabledCount = count(array_filter($bucketedFeatures, fn($f) => ($f['status'] ?? '') === FeatureStatus::Enabled->value));
+            $disabledCount = count($bucketedFeatures) - $enabledCount;
+            $this->logManager->debug('FeatureManager.runFeatures()', [
+                'visitorId' => $visitorId,
+                'totalFeatures' => count($bucketedFeatures),
+                'enabled' => $enabledCount,
+                'disabled' => $disabledCount,
+            ]);
         }
 
         return $bucketedFeatures;

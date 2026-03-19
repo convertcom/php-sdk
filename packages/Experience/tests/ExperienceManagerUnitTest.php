@@ -263,4 +263,51 @@ class ExperienceManagerUnitTest extends TestCase
         $em = new ExperienceManager(dataManager: $this->dataManager);
         $this->assertInstanceOf(ExperienceManager::class, $em);
     }
+
+    public function testSelectVariationLogsDebugEntryAndResult(): void
+    {
+        $this->dataManager
+            ->method('getBucketing')
+            ->willReturn(['id' => '200', 'key' => 'var-1', 'experienceKey' => 'exp-1', 'changes' => []]);
+
+        $this->logManager->expects($this->atLeast(2))
+            ->method('debug')
+            ->with(
+                $this->equalTo('ExperienceManager.selectVariation()'),
+                $this->isType('array')
+            );
+
+        $this->experienceManager->selectVariation('visitor-1', 'exp-1', new BucketingAttributes([]));
+    }
+
+    public function testSelectVariationsLogsDebugWithCounts(): void
+    {
+        $this->dataManager
+            ->method('getEntitiesList')
+            ->with('experiences')
+            ->willReturn([['key' => 'exp-1']]);
+
+        $this->dataManager
+            ->method('getBucketing')
+            ->willReturn(['id' => '200', 'key' => 'var-1', 'experienceKey' => 'exp-1', 'changes' => []]);
+
+        $this->logManager->expects($this->atLeastOnce())
+            ->method('debug');
+
+        $results = $this->experienceManager->selectVariations('visitor-1', new BucketingAttributes([]));
+
+        $this->assertCount(1, $results);
+    }
+
+    public function testSelectVariationWithNullLogManagerNoException(): void
+    {
+        $em = new ExperienceManager(dataManager: $this->dataManager);
+
+        $this->dataManager
+            ->method('getBucketing')
+            ->willReturn(null);
+
+        $result = $em->selectVariation('visitor-1', 'exp-1', new BucketingAttributes([]));
+        $this->assertNull($result);
+    }
 }

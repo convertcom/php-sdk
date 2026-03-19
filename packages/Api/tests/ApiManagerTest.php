@@ -342,4 +342,92 @@ class ApiManagerTest extends TestCase
         $this->assertEquals(200, $result['status']);
         $this->assertEquals(['key' => 'value'], $result['data']);
     }
+
+    /**
+     * Test that getConfig() calls debug() on logger after successful fetch (AC #2).
+     */
+    public function testGetConfigLogsDebugOnSuccess(): void
+    {
+        $configPayload = [
+            'data' => [
+                'account_id' => '999',
+                'project' => ['id' => '888', 'key' => 'test-project'],
+                'experiences' => [],
+                'features' => [],
+                'segments' => [],
+                'audiences' => [],
+                'goals' => [],
+                'locations' => [],
+            ]
+        ];
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], json_encode($configPayload))
+        );
+
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('debug')
+            ->with(
+                $this->equalTo('ApiManager.getConfig()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['endpoint']) &&
+                           $data['status'] === 'success' &&
+                           array_key_exists('accountId', $data) &&
+                           array_key_exists('projectId', $data);
+                })
+            );
+
+        $this->apiManager->getConfig();
+    }
+
+    /**
+     * Test that getConfig() calls error() on logger when fetch fails (AC #6).
+     */
+    public function testGetConfigLogsErrorOnFailure(): void
+    {
+        $this->mockHttpClient->addException(
+            new \Http\Client\Exception\NetworkException(
+                'Connection refused',
+                $this->psr17Factory->createRequest('GET', 'http://localhost')
+            )
+        );
+
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('error')
+            ->with(
+                $this->equalTo('ApiManager.getConfig()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['endpoint']) &&
+                           $data['status'] === 'error' &&
+                           isset($data['error']);
+                })
+            );
+
+        $this->expectException(\RuntimeException::class);
+        $this->apiManager->getConfig();
+    }
+
+    /**
+     * Test that getConfig() logs error on non-2xx HTTP status (AC #6).
+     */
+    public function testGetConfigLogsErrorOnBadStatus(): void
+    {
+        $this->mockHttpClient->addResponse(
+            new Response(500, ['Content-Type' => 'application/json'], '{"error": "internal"}')
+        );
+
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('error')
+            ->with(
+                $this->equalTo('ApiManager.getConfig()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['endpoint']) &&
+                           $data['status'] === 'error' &&
+                           $data['httpStatus'] === 500;
+                })
+            );
+
+        $this->expectException(\RuntimeException::class);
+        $this->apiManager->getConfig();
+    }
 }

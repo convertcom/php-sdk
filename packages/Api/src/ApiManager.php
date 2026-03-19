@@ -450,6 +450,14 @@ class ApiManager implements ApiManagerInterface
             $statusCode = $response['status'] ?? 0;
             if ($statusCode < 200 || $statusCode >= 300) {
                 $url = $this->configEndpoint . "/config/{$this->sdkKey}";
+                if ($this->loggerManager) {
+                    $this->loggerManager->error('ApiManager.getConfig()', [
+                        'endpoint' => $url . $query,
+                        'status' => 'error',
+                        'httpStatus' => $statusCode,
+                        'error' => "HTTP {$statusCode}",
+                    ]);
+                }
                 throw new \RuntimeException(
                     "Config fetch failed: HTTP {$statusCode} from {$url}",
                     $statusCode
@@ -457,8 +465,31 @@ class ApiManager implements ApiManagerInterface
             }
 
             $data = $response['data'] ?? [];
-            return new ConfigResponseData($data);
+            $configData = new ConfigResponseData($data);
+
+            if ($this->loggerManager) {
+                $project = $configData->getProject();
+                $this->loggerManager->debug('ApiManager.getConfig()', [
+                    'endpoint' => $this->configEndpoint . "/config/{$this->sdkKey}" . $query,
+                    'status' => 'success',
+                    'httpStatus' => $statusCode,
+                    'accountId' => $configData->getAccountId() ?? 'unknown',
+                    'projectId' => $project ? (is_array($project) ? ($project['id'] ?? '') : $project->getId()) : 'unknown',
+                    'fetchedAt' => date('c'),
+                ]);
+            }
+
+            return $configData;
         } catch (ClientExceptionInterface $e) {
+            if ($this->loggerManager) {
+                $this->loggerManager->error('ApiManager.getConfig()', [
+                    'endpoint' => $this->configEndpoint . "/config/{$this->sdkKey}" . $query,
+                    'status' => 'error',
+                    'error' => $e->getMessage(),
+                    'code' => method_exists($e, 'getCode') ? $e->getCode() : null,
+                ]);
+            }
+
             throw new \RuntimeException(
                 "Failed to fetch config from {$this->configEndpoint}/config/{$this->sdkKey}: HTTP error - {$e->getMessage()}",
                 (int)$e->getCode(),

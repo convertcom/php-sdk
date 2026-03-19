@@ -103,7 +103,51 @@ final class ExperienceManager implements ExperienceManagerInterface
      */
     public function selectVariation(string $visitorId, string $experienceKey, BucketingAttributes $attributes): array|RuleError|BucketingError|null
     {
-        return $this->dataManager->getBucketing($visitorId, $experienceKey, $attributes);
+        $this->logManager?->debug('ExperienceManager.selectVariation()', [
+            'visitorId' => $visitorId,
+            'experienceKey' => $experienceKey,
+        ]);
+
+        $result = $this->dataManager->getBucketing($visitorId, $experienceKey, $attributes);
+
+        if ($this->logManager) {
+            $logData = [
+                'visitorId' => $visitorId,
+                'experienceKey' => $experienceKey,
+            ];
+
+            if (is_array($result)) {
+                $logData['resultType'] = 'bucketed';
+                $logData['variationId'] = $result['id'] ?? $result['key'] ?? 'unknown';
+            } elseif ($result instanceof RuleError) {
+                $logData['resultType'] = 'RuleError';
+                $logData['ruleError'] = $result->value;
+            } elseif ($result instanceof BucketingError) {
+                $logData['resultType'] = 'BucketingError';
+                $logData['bucketingError'] = $result->value;
+                $logData['reason'] = Messages::NULL_RETURN_TRAFFIC_ALLOCATION;
+            } elseif ($result === null) {
+                // Determine specific null-return reason for consumer-facing log
+                $logData['resultType'] = 'null';
+                $experience = $this->dataManager->getEntity($experienceKey, 'experiences');
+                if ($experience === null) {
+                    $logData['reason'] = Messages::NULL_RETURN_EXPERIENCE_NOT_FOUND;
+                    $logData['availableKeys'] = array_map(
+                        fn($e) => $e['key'] ?? 'unknown',
+                        $this->dataManager->getEntitiesList('experiences')
+                    );
+                } else {
+                    // Experience exists but visitor not qualified — DataManager already
+                    // logged the specific reason (audience mismatch, location mismatch,
+                    // experience archived, environment mismatch)
+                    $logData['reason'] = Messages::NULL_RETURN_VISITOR_NOT_QUALIFIED;
+                }
+            }
+
+            $this->logManager->debug('ExperienceManager.selectVariation()', $logData);
+        }
+
+        return $result;
     }
 
     /**
@@ -116,7 +160,47 @@ final class ExperienceManager implements ExperienceManagerInterface
      */
     public function selectVariationById(string $visitorId, string $experienceId, BucketingAttributes $attributes): array|RuleError|BucketingError|null
     {
-        return $this->dataManager->getBucketingById($visitorId, $experienceId, $attributes);
+        $this->logManager?->debug('ExperienceManager.selectVariationById()', [
+            'visitorId' => $visitorId,
+            'experienceId' => $experienceId,
+        ]);
+
+        $result = $this->dataManager->getBucketingById($visitorId, $experienceId, $attributes);
+
+        if ($this->logManager) {
+            $logData = [
+                'visitorId' => $visitorId,
+                'experienceId' => $experienceId,
+            ];
+
+            if (is_array($result)) {
+                $logData['resultType'] = 'bucketed';
+                $logData['variationId'] = $result['id'] ?? $result['key'] ?? 'unknown';
+            } elseif ($result instanceof RuleError) {
+                $logData['resultType'] = 'RuleError';
+                $logData['ruleError'] = $result->value;
+            } elseif ($result instanceof BucketingError) {
+                $logData['resultType'] = 'BucketingError';
+                $logData['bucketingError'] = $result->value;
+                $logData['reason'] = Messages::NULL_RETURN_TRAFFIC_ALLOCATION;
+            } elseif ($result === null) {
+                $logData['resultType'] = 'null';
+                $experience = $this->dataManager->getEntityById($experienceId, 'experiences');
+                if ($experience === null) {
+                    $logData['reason'] = Messages::NULL_RETURN_EXPERIENCE_NOT_FOUND;
+                    $logData['availableIds'] = array_map(
+                        fn($e) => $e['id'] ?? 'unknown',
+                        $this->dataManager->getEntitiesList('experiences')
+                    );
+                } else {
+                    $logData['reason'] = Messages::NULL_RETURN_VISITOR_NOT_QUALIFIED;
+                }
+            }
+
+            $this->logManager->debug('ExperienceManager.selectVariationById()', $logData);
+        }
+
+        return $result;
     }
 
     /**
@@ -132,6 +216,14 @@ final class ExperienceManager implements ExperienceManagerInterface
     public function selectVariations(string $visitorId, BucketingAttributes $attributes): array
     {
         $experiences = $this->getList();
+
+        $experienceCount = count($experiences);
+
+        $this->logManager?->debug('ExperienceManager.selectVariations()', [
+            'visitorId' => $visitorId,
+            'experienceCount' => $experienceCount,
+        ]);
+
         $variations = array_map(function ($experience) use ($visitorId, $attributes) {
             return $this->selectVariation($visitorId, $experience["key"], $attributes);
         }, $experiences);
@@ -140,7 +232,15 @@ final class ExperienceManager implements ExperienceManagerInterface
             !($variation instanceof RuleError) &&
                    $variation !== BucketingError::VariationNotDecided;
         });
-        return array_values($filteredVariations); // Re-index array after filtering
+        $result = array_values($filteredVariations); // Re-index array after filtering
+
+        $this->logManager?->debug('ExperienceManager.selectVariations()', [
+            'visitorId' => $visitorId,
+            'experienceCount' => $experienceCount,
+            'bucketedVariations' => count($result),
+        ]);
+
+        return $result;
     }
 
     /**
