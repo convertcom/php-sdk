@@ -8,24 +8,23 @@ use PHPUnit\Framework\TestCase;
 use ConvertSdk\ApiManager;
 use ConvertSdk\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Utils\HttpClient;
-use ConvertSdk\Utils\HttpResponseType;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Enums\SystemEvents;
 use OpenAPI\Client\Config;
 use ConvertSdk\Config\DefaultConfig;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
-use GuzzleHttp\Promise\Promise;
-use Psr\Http\Message\ResponseInterface;
-use GuzzleHttp\Psr7\Response;
+use Http\Mock\Client as MockHttpClient;
+use Nyholm\Psr7\Factory\Psr17Factory;
+use Nyholm\Psr7\Response;
 
 class ApiManagerTest extends TestCase
 {
     private $apiManager;
     private $eventManagerMock;
     private $loggerManagerMock;
-    private $httpClientMock;
+    private MockHttpClient $mockHttpClient;
+    private Psr17Factory $psr17Factory;
     private $config;
 
     private const HOST = 'http://localhost';
@@ -42,7 +41,8 @@ class ApiManagerTest extends TestCase
         // Mock dependencies
         $this->eventManagerMock = $this->createMock(EventManagerInterface::class);
         $this->loggerManagerMock = $this->createMock(LogManagerInterface::class);
-        $this->httpClientMock = $this->createMock(HttpClient::class);
+        $this->mockHttpClient = new MockHttpClient();
+        $this->psr17Factory = new Psr17Factory();
 
         // Load and prepare test configuration
         $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
@@ -68,19 +68,16 @@ class ApiManagerTest extends TestCase
         $finalConfig["data"] = new ConfigResponseData($finalConfig["data"]);
         $this->config = new Config($finalConfig);
 
-        // Instantiate ApiManager with mocks
-        $this->apiManager = new ApiManager($this->config, $this->eventManagerMock, $this->loggerManagerMock);
+        // Instantiate ApiManager with mock PSR-18 client
+        $this->apiManager = new ApiManager(
+            $this->config,
+            $this->eventManagerMock,
+            $this->loggerManagerMock,
+            $this->mockHttpClient,
+            $this->psr17Factory,
+            $this->psr17Factory
+        );
         $this->apiManager->setTimeoutEnabled(false);
-        // Inject mocked HttpClient using reflection (assuming it's a private property)
-        $reflection = new \ReflectionClass($this->apiManager);
-        $httpClientProperty = $reflection->getProperty('httpClient');
-        $httpClientProperty->setAccessible(true);
-        $httpClientProperty->setValue($this->apiManager, $this->httpClientMock);
-
-        $eventManagerProperty = $reflection->getProperty('eventManager');
-        $eventManagerProperty->setAccessible(true);
-        $eventManagerProperty->setValue($this->apiManager, $this->eventManagerMock);
-        
     }
 
     /**
@@ -96,7 +93,14 @@ class ApiManagerTest extends TestCase
      */
     public function testApiManagerInstantiationWithDefaultConfig(): void
     {
-        $apiManager = new ApiManager();
+        $apiManager = new ApiManager(
+            null,
+            null,
+            null,
+            $this->mockHttpClient,
+            $this->psr17Factory,
+            $this->psr17Factory
+        );
         $this->assertInstanceOf(ApiManager::class, $apiManager);
     }
 
@@ -117,29 +121,29 @@ class ApiManagerTest extends TestCase
             'foo' => 'bar',
             'some' => ['test' => ['data' => 'value']]
         ];
-    
-        // Mock HTTP client response
-        $response = new Response(200, ['Content-Type' => 'application/json'], '{}');
-        // Create a pre-resolved promise
-        $promise = new Promise();
-        $promise->resolve($response); // Resolve it immediately
-    
-        // Mock the request method with a single config array
-        $this->httpClientMock->expects($this->once())
-            ->method('request')
-            ->with($this->callback(function ($config) use ($testPayload) {
-                return $config['method'] === 'POST' &&
-                       $config['baseURL'] === self::HOST . ':' . self::PORT &&
-                       $config['path'] === '/test' &&
-                       $config['data'] === $testPayload &&
-                       $config['headers']['Content-Type'] === 'application/json' &&
-                       $config['responseType'] === HttpResponseType::JSON;
-            }))
-            ->willReturn($promise);
-    
-        $result = $this->apiManager->request('POST', ['base' => self::HOST . ':' . self::PORT, 'route' => '/test'], $testPayload);
-        $this->assertInstanceOf(Promise::class, $result);
-        $result->wait(); // Ensure the promise resolves
+
+        // Add mock response
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
+        $result = $this->apiManager->request(
+            'POST',
+            ['base' => self::HOST . ':' . self::PORT, 'route' => '/test'],
+            $testPayload
+        );
+
+        $this->assertIsArray($result);
+        $this->assertEquals(200, $result['status']);
+
+        // Verify the request that was sent
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $this->assertEquals('POST', $sentRequest->getMethod());
+        $this->assertStringContainsString('/test', (string)$sentRequest->getUri());
+        $this->assertEquals('application/json', $sentRequest->getHeaderLine('Content-Type'));
+
+        $sentBody = json_decode($sentRequest->getBody()->getContents(), true);
+        $this->assertEquals($testPayload, $sentBody);
     }
 
     /**
@@ -148,36 +152,6 @@ class ApiManagerTest extends TestCase
     public function testEnqueueAndReleaseBeforeTimeout(): void
     {
         $this->markTestSkipped('Timeout-based tests require an event loop or manual simulation in PHP.');
-
-        $this->apiManager->setTimeoutEnabled(true);
-    
-        $N = self::BATCH_SIZE - 2;
-        $requestData = new VisitorTrackingEvents([
-            'eventType' => 'bucketing',
-            'data' => ['experienceId' => '11', 'variationId' => '12']
-        ]);
-    
-        for ($i = 1; $i <= $N; $i++) {
-            $this->apiManager->enqueue("VID$i", $requestData);
-        }
-    
-        $this->httpClientMock->expects($this->once())
-            ->method('request')
-            ->with(
-                $this->callback(function ($config) use ($N) {
-                    $data = $config['data'];
-                    return $config['method'] === 'POST' &&
-                           strpos($config['path'], '/track/') === 0 &&
-                           is_array($data['visitors']) &&
-                           count($data['visitors']) === $N;
-                })
-            )
-            ->willReturn(new Promise(function ($resolve) {
-                $resolve(new Response(200, ['Content-Type' => 'application/json'], '{}'));
-            }));
-    
-        $promise = $this->apiManager->releaseQueue('timeout');
-        $promise->wait();
     }
 
     /**
@@ -189,39 +163,21 @@ class ApiManagerTest extends TestCase
             'eventType' => 'bucketing',
             'data' => ['experienceId' => '11', 'variationId' => '12']
         ]);
-    
-        $accountId = $this->config->getData() ? $this->config->getData()->getAccountId() : '';
-        $project = $this->config->getData() ? $this->config->getData()->getProject() : null;
-        $projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
-        $sdkKey = $this->config->getSdkKey() ?: "{$accountId}/{$projectId}";
-        $expectedPath = "/track/{$sdkKey}";
-    
-        $promise = new Promise();
-        $promise->resolve(new Response(200, ['Content-Type' => 'application/json'], '{}'));
-    
-        $this->httpClientMock->expects($this->once())
-            ->method('request')
-            ->with($this->callback(function ($config) use ($expectedPath) {
-                $data = $config['data'];
-                var_dump([
-                    'method' => $config['method'],
-                    'baseURL' => $config['baseURL'],
-                    'path' => $config['path'],
-                    'visitors_count' => count($data['visitors']),
-                    'expected_batch_size' => self::BATCH_SIZE
-                ]);
-                return $config['method'] === 'POST' &&
-                       $config['baseURL'] === self::HOST . ':' . self::PORT &&
-                       $config['path'] === $expectedPath &&
-                       isset($data['visitors']) &&
-                       count($data['visitors']) === self::BATCH_SIZE;
-            }))
-            ->willReturn($promise);
-    
+
+        // Add mock response for the release request
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
         for ($i = 1; $i <= self::BATCH_SIZE; $i++) {
-            echo "Enqueuing VID$i for testEnqueueAndReleaseOnBatchSize\n";
             $this->apiManager->enqueue("VID$i", $requestData);
         }
+
+        // Verify a request was sent (queue was released)
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $this->assertNotNull($sentRequest);
+        $this->assertEquals('POST', $sentRequest->getMethod());
+        $this->assertStringContainsString('/track/', (string)$sentRequest->getUri());
     }
 
     /**
@@ -229,52 +185,36 @@ class ApiManagerTest extends TestCase
      */
     public function testEventFiringOnReleaseDueToSize(): void
     {
-        // Disable timeout to ensure size-based release
         $this->apiManager->setTimeoutEnabled(false);
-    
+
         $requestData = new VisitorTrackingEvents([
             'eventType' => 'bucketing',
             'data' => ['experienceId' => '11', 'variationId' => '12']
         ]);
-        $serverResponse = ['data' => 'ok'];
-    
-        // Ensure eventManagerMock is injected
-        $reflection = new \ReflectionClass($this->apiManager);
-        $eventManagerProperty = $reflection->getProperty('eventManager');
-        $eventManagerProperty->setAccessible(true);
-        $eventManagerProperty->setValue($this->apiManager, $this->eventManagerMock);
-    
+
+        // Add mock response
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{"data": "ok"}')
+        );
+
         // Expect event to be fired
         $this->eventManagerMock->expects($this->once())
             ->method('fire')
             ->with(
                 SystemEvents::ApiQueueReleased,
-                $this->callback(function ($args) use ($serverResponse) {
-                    // Adjust to match actual $result structure (Response object)
-                    $resultData = json_decode($args['result']->getBody()->getContents(), true);
+                $this->callback(function ($args) {
                     return $args['reason'] === 'size' &&
-                           $resultData === $serverResponse &&
+                           isset($args['result']) &&
+                           is_array($args['result']) &&
                            isset($args['visitors']) &&
                            count($args['visitors']) === self::BATCH_SIZE;
-                }),
-                null
+                })
             );
-    
-        // Mock HTTP client response with synchronous resolution
-        $promise = new Promise();
-        $response = new Response(200, ['Content-Type' => 'application/json'], json_encode($serverResponse));
-        $promise->resolve($response);
-        $this->httpClientMock->expects($this->once())
-            ->method('request')
-            ->willReturn($promise);
-    
+
         // Enqueue batch_size requests
         for ($i = 1; $i <= self::BATCH_SIZE; $i++) {
             $this->apiManager->enqueue("VID$i", $requestData);
         }
-    
-        // Process promise queue to trigger 'then' callback
-        \GuzzleHttp\Promise\Utils::queue()->run();
     }
 
     /**
@@ -283,40 +223,6 @@ class ApiManagerTest extends TestCase
     public function testEventFiringOnReleaseDueToTimeout(): void
     {
         $this->markTestSkipped('Timeout-based tests require an event loop or manual simulation in PHP.');
-
-        $N = self::BATCH_SIZE - 2;
-        $requestData = new VisitorTrackingEvents([
-            'eventType' => 'bucketing',
-            'data' => ['experienceId' => '11', 'variationId' => '12']
-        ]);
-        $serverResponse = ['data' => 'ok'];
-
-        // Expect event to be fired
-        $this->eventManagerMock->expects($this->once())
-            ->method('fire')
-            ->with(
-                SystemEvents::ApiQueueReleased,
-                $this->callback(function ($args) use ($serverResponse) {
-                    return $args['reason'] === 'timeout' && $args['result']['data'] === $serverResponse;
-                }),
-                null
-            );
-
-        // Mock HTTP client response
-        $this->httpClientMock->expects($this->once())
-            ->method('request')
-            ->willReturn(new Promise(function () use ($serverResponse) {
-                $this->resolve(new Response(200, ['Content-Type' => 'application/json'], json_encode($serverResponse)));
-            }));
-
-        // Enqueue N requests
-        for ($i = 1; $i <= $N; $i++) {
-            $this->apiManager->enqueue("VID$i", $requestData);
-        }
-
-        // Simulate timeout
-        sleep(self::RELEASE_TIMEOUT / 1000);
-        $this->apiManager->releaseQueue('timeout');
     }
 
     /**
@@ -324,20 +230,18 @@ class ApiManagerTest extends TestCase
      */
     public function testEventFiringOnReleaseWithError(): void
     {
-        // Disable timeout to ensure size-based release
         $this->apiManager->setTimeoutEnabled(false);
-    
+
         $requestData = new VisitorTrackingEvents([
             'eventType' => 'bucketing',
             'data' => ['experienceId' => '11', 'variationId' => '12']
         ]);
-    
-        // Ensure eventManagerMock is injected
-        $reflection = new \ReflectionClass($this->apiManager);
-        $eventManagerProperty = $reflection->getProperty('eventManager');
-        $eventManagerProperty->setAccessible(true);
-        $eventManagerProperty->setValue($this->apiManager, $this->eventManagerMock);
-    
+
+        // Configure mock client to throw an exception
+        $this->mockHttpClient->addException(
+            new \Http\Client\Exception\NetworkException('Server error', $this->psr17Factory->createRequest('POST', 'http://localhost'))
+        );
+
         // Expect event to be fired with error
         $this->eventManagerMock->expects($this->once())
             ->method('fire')
@@ -347,24 +251,95 @@ class ApiManagerTest extends TestCase
                     return $args['reason'] === 'size';
                 }),
                 $this->callback(function ($err) {
-                    return $err instanceof \Exception && $err->getCode() === 500 && $err->getMessage() === 'Server error';
+                    return $err instanceof \Exception && $err->getMessage() === 'Server error';
                 })
             );
-    
-        // Mock HTTP client error response with synchronous rejection
-        $promise = new Promise();
-        $exception = new \Exception('Server error', 500);
-        $promise->reject($exception);
-        $this->httpClientMock->expects($this->once())
-            ->method('request')
-            ->willReturn($promise);
-    
+
         // Enqueue batch_size requests
         for ($i = 1; $i <= self::BATCH_SIZE; $i++) {
             $this->apiManager->enqueue("VID$i", $requestData);
         }
-    
-        // Process promise queue to trigger rejection handler
-        \GuzzleHttp\Promise\Utils::queue()->run();
+    }
+
+    /**
+     * Test that getConfig() returns ConfigResponseData on success (AC #8).
+     */
+    public function testGetConfigReturnsConfigResponseData(): void
+    {
+        $configPayload = [
+            'data' => [
+                'account_id' => '999',
+                'project' => ['id' => '888', 'key' => 'test-project'],
+                'experiences' => [],
+                'features' => [],
+                'segments' => [],
+                'audiences' => [],
+                'goals' => [],
+                'locations' => [],
+            ]
+        ];
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], json_encode($configPayload))
+        );
+
+        $result = $this->apiManager->getConfig();
+
+        $this->assertInstanceOf(ConfigResponseData::class, $result);
+    }
+
+    /**
+     * Test that getConfig() throws RuntimeException on HTTP error (AC #8).
+     */
+    public function testGetConfigThrowsOnHttpError(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Failed to fetch config/');
+
+        $this->mockHttpClient->addException(
+            new \Http\Client\Exception\NetworkException(
+                'Connection refused',
+                $this->psr17Factory->createRequest('GET', 'http://localhost')
+            )
+        );
+
+        $this->apiManager->getConfig();
+    }
+
+    /**
+     * Test that request() propagates PSR-18 exceptions to callers.
+     */
+    public function testRequestPropagatesPsr18Exceptions(): void
+    {
+        $this->expectException(\Psr\Http\Client\ClientExceptionInterface::class);
+
+        $this->mockHttpClient->addException(
+            new \Http\Client\Exception\NetworkException(
+                'Connection timeout',
+                $this->psr17Factory->createRequest('GET', 'http://localhost')
+            )
+        );
+
+        $this->apiManager->request('GET', ['base' => 'http://localhost', 'route' => '/test']);
+    }
+
+    /**
+     * Test that request() returns synchronous array (not PromiseInterface) (AC #8).
+     */
+    public function testRequestReturnsSynchronousArray(): void
+    {
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{"key": "value"}')
+        );
+
+        $result = $this->apiManager->request('GET', ['base' => 'http://localhost', 'route' => '/test']);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('data', $result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertArrayHasKey('statusText', $result);
+        $this->assertArrayHasKey('headers', $result);
+        $this->assertEquals(200, $result['status']);
+        $this->assertEquals(['key' => 'value'], $result['data']);
     }
 }

@@ -269,6 +269,74 @@ class LogManagerTest extends TestCase
         $this->assertStringContainsString($output, $records[0]['message']);
     }
 
+    public function testNullLoggerDefault()
+    {
+        // Create LogManager with no client — should default to NullLogger
+        $logger = new LogManager();
+        $this->assertInstanceOf(LogManager::class, $logger);
+
+        $clients = $this->getPrivateProperty($logger, '_clients');
+        $this->assertCount(1, $clients);
+        $this->assertInstanceOf(\Psr\Log\NullLogger::class, $clients[0]['sdk']);
+
+        // Verify logging does not error
+        $logger->info('test message with NullLogger');
+        $logger->debug('another test');
+        $logger->error('error test');
+        // NullLogger produces no output — just verify no exceptions
+        $this->assertTrue(true);
+    }
+
+    public function testPsr3LoggerIntegration()
+    {
+        $mockLogger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        // Expect info to be called (LogManager maps 'log' → 'info' for PSR-3)
+        $mockLogger->expects($this->once())
+            ->method('info')
+            ->with('test PSR-3 message', []);
+
+        $logger = new LogManager($mockLogger, LogLevel::Trace);
+        $logger->log(LogLevel::Info, 'test PSR-3 message');
+    }
+
+    public function testPsr3LoggerDebugMethod()
+    {
+        $mockLogger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $mockLogger->expects($this->once())
+            ->method('debug')
+            ->with('debug via PSR-3', []);
+
+        $logger = new LogManager($mockLogger, LogLevel::Trace);
+        $logger->debug('debug via PSR-3');
+    }
+
+    public function testPsr3LoggerWarningMethod()
+    {
+        $mockLogger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        // LogManager maps 'warn' → 'warning' for PSR-3
+        $mockLogger->expects($this->once())
+            ->method('warning')
+            ->with('warning via PSR-3', []);
+
+        $logger = new LogManager($mockLogger, LogLevel::Trace);
+        $logger->warn('warning via PSR-3');
+    }
+
+    public function testPsr3LoggerErrorMethod()
+    {
+        $mockLogger = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $mockLogger->expects($this->once())
+            ->method('error')
+            ->with('error via PSR-3', []);
+
+        $logger = new LogManager($mockLogger, LogLevel::Trace);
+        $logger->error('error via PSR-3');
+    }
+
     /**
      * Helper method to access protected properties for testing.
      */

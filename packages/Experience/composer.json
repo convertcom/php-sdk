@@ -56,7 +56,6 @@
   },
   "require": {
     "php": "^8.2",
-    "guzzlehttp/guzzle": "^7.0",
     "convertcom/php-sdk-api": ">=1.0.0",
     "convertcom/php-sdk-enums": ">=1.0.0",
     "convertcom/php-sdk-event": ">=1.0.0",

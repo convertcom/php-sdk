@@ -4,118 +4,142 @@ declare(strict_types=1);
 
 namespace ConvertSdk;
 
-use GuzzleHttp\Promise\PromiseInterface;
-use ConvertSdk\ApiManager;
-use ConvertSdk\DataManager;
-use ConvertSdk\BucketingManager;
-use ConvertSdk\EventManager;
-use ConvertSdk\LogManager;
 use ConvertSdk\Config\Config;
+use ConvertSdk\Cache\ArrayCache;
+use ConvertSdk\Enums\LogLevel;
+use ConvertSdk\Exception\InvalidArgumentException;
 use OpenAPI\Client\Config as OpenApiConfig;
 use OpenAPI\Client\Model\ConfigResponseData;
-use ConvertSdk\Enums\ErrorMessages;
-use ConvertSdk\Enums\LogLevel;
-use ConvertSdk\Enums\Messages;
-use ConvertSdk\ExperienceManager;
-use ConvertSdk\FeatureManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\SegmentsManager;
-use Monolog\Logger;
-use Monolog\Handler\StreamHandler;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Psr\SimpleCache\CacheInterface;
 
-class ConvertSDK extends Core {
-    public $dataManager;
-    public $apiManager;
-    public $loggerManager;
-    public $experienceManager;
-    public $featureManager;
-    public $segmentsManager;
+/**
+ * SDK entry point and factory.
+ *
+ * ConvertSDK is a static factory class that creates and returns a fully
+ * initialized {@see Core} instance. It is not directly instantiable.
+ *
+ * Usage:
+ *   $sdk = ConvertSDK::create(['sdkKey' => 'your-sdk-key']);
+ *   $context = $sdk->createContext('visitor-123', ['country' => 'US']);
+ */
+final class ConvertSDK
+{
+    /**
+     * Prevent direct instantiation — use {@see create()} instead.
+     */
+    private function __construct() {}
 
-    public function __construct(array $config = []) {
+    /**
+     * Create and initialize the SDK.
+     *
+     * Resolves all dependencies, creates managers in the correct order,
+     * and returns a fully initialized Core instance.
+     *
+     * @param array{
+     *     sdkKey?: string,
+     *     data?: array<string, mixed>|ConfigResponseData,
+     *     logger?: LoggerInterface,
+     *     cache?: CacheInterface,
+     *     dataRefreshInterval?: int,
+     *     environment?: string,
+     *     network?: array<string, mixed>,
+     *     api?: array<string, mixed>,
+     * } $config SDK configuration options
+     *
+     * @return Core A fully initialized Core instance
+     *
+     * @throws InvalidArgumentException If both sdkKey and data are missing
+     */
+    public static function create(array $config = []): Core
+    {
+        // 1. Validate: at least one of sdkKey or data must be provided
         if (empty($config['sdkKey']) && empty($config['data'])) {
-            error_log(ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED);
+            throw new InvalidArgumentException('Either sdkKey or data must be provided');
         }
-        // Load configuration
+
+        // 2. Merge defaults
         $configuration = Config::create($config);
         if (!isset($configuration['network']['source'])) {
             $configuration['network']['source'] = getenv('VERSION') ?: 'php-sdk';
         }
-        // Create a Monolog logger instance.
-        $monolog = new Logger('convert');
-        // Configure Monolog to log to STDOUT at DEBUG level.
-        $monolog->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
 
-        // Initialize LogManager with the Monolog logger and provided log level.
-        $this->loggerManager = new LogManager($monolog, LogLevel::Warn);
-
-        // Iterate over custom loggers (if any) and add them to LogManager.
-        if (isset($configuration['logger']['customLoggers']) && is_array($configuration['logger']['customLoggers'])) {
-            foreach ($configuration['logger']['customLoggers'] as $customLogger) {
-                if (isset($customLogger['logger']) && isset($customLogger['logLevel'])) {
-                    $level = $customLogger['logLevel'];
-                    $this->loggerManager->addClient(
-                        $customLogger['logger'],
-                        $level instanceof LogLevel ? $level : LogLevel::from((int)$level),
-                        $customLogger['methodsMap'] ?? []
-                    );
-                } else {
-                    $configLevel = $configuration['logger']['logLevel'];
-                    $this->loggerManager->addClient(
-                        $customLogger,
-                        $configLevel instanceof LogLevel ? $configLevel : LogLevel::from((int)$configLevel)
-                    );
-                }
-            }
+        // Remove empty sdkKey so OpenAPI\Client\Config processes 'data' correctly
+        // (its constructor uses isset() and elseif, so an empty sdkKey blocks data)
+        if (isset($configuration['sdkKey']) && $configuration['sdkKey'] === '') {
+            unset($configuration['sdkKey']);
         }
-        $configuration['data'] = new ConfigResponseData($configuration['data']);
-        // Initialize EventManager
-        $this->eventManager = new EventManager(new OpenApiConfig($configuration), ['loggerManager' => $this->loggerManager]);
 
-        // Initialize ApiManager
-        $this->apiManager = new ApiManager(new OpenApiConfig($configuration), $this->eventManager, $this->loggerManager);
-        // Initialize BucketingManager
-        $this->bucketingManager = new BucketingManager(new OpenApiConfig($configuration), [
-            'loggerManager' => $this->loggerManager
-        ]);
+        // 3. Resolve PSR-3 logger (accepts a single PSR-3 LoggerInterface instance)
+        $logger = (isset($config['logger']) && $config['logger'] instanceof LoggerInterface)
+            ? $config['logger']
+            : new NullLogger();
 
-        $this->ruleManager = new RuleManager(new OpenApiConfig($configuration), [
-            'loggerManager' => $this->loggerManager
-        ]);
-        // Initialize DataManager
-        $this->dataManager = new DataManager(new OpenApiConfig($configuration),
-            $this->bucketingManager,
-            $this->ruleManager,
-            $this->eventManager,
-            $this->apiManager,
-            $this->loggerManager
+        $logManager = new LogManager($logger, LogLevel::Warn);
+
+        // 4. Resolve PSR-16 cache
+        $cache = (isset($configuration['cache']) && $configuration['cache'] instanceof CacheInterface)
+            ? $configuration['cache']
+            : new ArrayCache();
+
+        // Resolve dataRefreshInterval: DefaultConfig stores milliseconds, PSR-16 cache uses seconds
+        $dataRefreshIntervalMs = (int) ($configuration['dataRefreshInterval'] ?? 300000);
+        $dataRefreshInterval = max(1, (int) ($dataRefreshIntervalMs / 1000));
+
+        // 5. Wrap data in ConfigResponseData if raw array provided
+        if (!empty($configuration['data']) && is_array($configuration['data'])) {
+            $configuration['data'] = new ConfigResponseData($configuration['data']);
+        }
+
+        // 6. Create OpenApiConfig wrapper
+        $openApiConfig = new OpenApiConfig($configuration);
+
+        // 7. Instantiate managers in dependency order
+        $eventManager = new EventManager($openApiConfig, ['loggerManager' => $logManager]);
+
+        try {
+            $apiManager = new ApiManager($openApiConfig, $eventManager, $logManager);
+        } catch (\Http\Discovery\Exception\NotFoundException $e) {
+            throw new \RuntimeException(
+                'No PSR-18 HTTP client found. Install one (e.g., guzzlehttp/guzzle ^7) or pass an explicit httpClient.',
+                0,
+                $e
+            );
+        }
+
+        $bucketingManager = new BucketingManager($openApiConfig, ['loggerManager' => $logManager]);
+        $ruleManager = new RuleManager($openApiConfig, ['loggerManager' => $logManager]);
+
+        $dataManager = new DataManager(
+            $openApiConfig,
+            $bucketingManager,
+            $ruleManager,
+            $eventManager,
+            $apiManager,
+            $logManager
         );
 
-        // Initialize ExperienceManager
-        $this->experienceManager = new ExperienceManager(new OpenApiConfig($configuration), [
-            'dataManager' => $this->dataManager,
-            'loggerManager' => $this->loggerManager
+        $experienceManager = new ExperienceManager($openApiConfig, [
+            'dataManager' => $dataManager,
+            'loggerManager' => $logManager,
         ]);
-        $this->featureManager = new FeatureManager(new OpenApiConfig($configuration), $this->dataManager, $this->loggerManager);
-        $this->segmentsManager = new SegmentsManager(new OpenApiConfig($configuration), $this->dataManager, $this->ruleManager, $this->loggerManager);
 
-        // Call parent constructor
-        parent::__construct(new OpenApiConfig($configuration), [
-            'dataManager'       => $this->dataManager,
-            'eventManager'      => $this->eventManager,
-            'apiManager'        => $this->apiManager,
-            'loggerManager'     => $this->loggerManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager'    => $this->featureManager,
-            'segmentsManager'   => $this->segmentsManager,
-        ]);
-    }
+        $featureManager = new FeatureManager($openApiConfig, $dataManager, $logManager);
+        $segmentsManager = new SegmentsManager($openApiConfig, $dataManager, $ruleManager, $logManager);
 
-    /**
-     * Promisified ready event using Guzzle promises.
-     *
-     * @return PromiseInterface
-     */
-    public function onReady(): PromiseInterface {
-        return parent::onReady();
+        // 8. Construct and return Core
+        return new Core(
+            $openApiConfig,
+            $dataManager,
+            $eventManager,
+            $experienceManager,
+            $featureManager,
+            $segmentsManager,
+            $apiManager,
+            $cache,
+            $dataRefreshInterval,
+            $logManager
+        );
     }
 }

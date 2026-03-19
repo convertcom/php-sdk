@@ -10,7 +10,6 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Interfaces;
 
-use GuzzleHttp\Promise\PromiseInterface;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
 use OpenAPI\Client\Model\VisitorSegments;
@@ -27,14 +26,14 @@ interface ApiManagerInterface
      * @param array $path Path with 'base' and 'route' keys
      * @param array $data Request data
      * @param array $headers Request headers
-     * @return PromiseInterface Resolves to an HTTP response
+     * @return array Response array with 'data', 'status', 'statusText', 'headers' keys
      */
     public function request(
         string $method,
         array $path,
         array $data = [],
         array $headers = []
-    ): PromiseInterface;
+    ): array;
 
     /**
      * Add request to queue
@@ -53,9 +52,9 @@ interface ApiManagerInterface
      * Release queue to server
      *
      * @param string|null $reason Optional reason for releasing the queue
-     * @return PromiseInterface Resolves to an HTTP response
+     * @return void
      */
-    public function releaseQueue(?string $reason = null): PromiseInterface;
+    public function releaseQueue(?string $reason = null): void;
 
     /**
      * Stop queue timer
@@ -87,7 +86,7 @@ interface ApiManagerInterface
     /**
      * Get configuration data
      *
-     * @return PromiseInterface Resolves to ConfigResponseData
+     * @return ConfigResponseData
      */
-    public function getConfig(): PromiseInterface;
+    public function getConfig(): ConfigResponseData;
 }

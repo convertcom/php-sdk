@@ -6,7 +6,7 @@ namespace ConvertSdk\Config;
 
 use ConvertSdk\Enums\LogLevel;
 
-class DefaultConfig
+final class DefaultConfig
 {
     /**
      * Get the default configuration array.

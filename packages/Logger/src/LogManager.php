@@ -12,10 +12,10 @@ namespace ConvertSdk;
 
 use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Enums\LogMethod;
-use ConvertSdk\Interfaces\LogClientInterface;
 use ConvertSdk\Interfaces\LogMethodMapInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 class LogManager implements LogManagerInterface
 {
@@ -64,8 +64,7 @@ class LogManager implements LogManagerInterface
     {
         $this->_clients = [];
         if ($client === null) {
-            error_log('Invalid Client SDK' . "\n");
-            return;
+            $client = new NullLogger();
         }
         $this->addClient($client, $level, $mapper);
     }

@@ -7,7 +7,7 @@ namespace ConvertSdk\Config;
 use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Utils\ObjectUtils;
 
-class Config
+final class Config
 {
     /**
      * Create and merge configuration settings.

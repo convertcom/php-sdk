@@ -19,11 +19,9 @@ use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
 use OpenAPI\Client\Model\VisitorSegments;
 use ConvertSdk\Config\DefaultConfig;
-use GuzzleHttp\Client;
-use ConvertSdk\Utils\HttpClient;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Psr7\Response;
+use Http\Mock\Client as MockHttpClient;
+use Nyholm\Psr7\Factory\Psr17Factory;
+use Nyholm\Psr7\Response;
 use PHPUnit\Framework\TestCase;
 
 class DataStoreMock
@@ -73,7 +71,8 @@ class DataManagerTest extends TestCase
     private $accountId;
     private $projectId;
     private $storeKey;
-    private $mockHandler;
+    private MockHttpClient $mockHttpClient;
+    private Psr17Factory $psr17Factory;
 
     private $visitorId = 'test-visitor-123';
     private $bucketing = ['exp1' => 'var1', 'exp2' => 'var2'];
@@ -110,31 +109,31 @@ class DataManagerTest extends TestCase
           unset($mergedConfig['sdkKey']);
         }
         $this->config = new Config($mergedConfig);
-    
-        // Set up Guzzle mock handler
-        $this->mockHandler = new MockHandler();
-        $handlerStack = HandlerStack::create($this->mockHandler);
-        $httpClient = new Client(['handler' => $handlerStack]);
-    
+
+        // Set up PSR-18 mock HTTP client
+        $this->mockHttpClient = new MockHttpClient();
+        $this->psr17Factory = new Psr17Factory();
+
         $this->bucketingManager = new BucketingManager($this->config);
         $this->ruleManager = new RuleManager($this->config);
         $this->eventManager = new EventManager($this->config);
-        $this->apiManager = new ApiManager($this->config, $this->eventManager);
-        
-        // Inject the mocked HTTP client into ApiManager
-        $reflection = new \ReflectionClass($this->apiManager);
-        $property = $reflection->getProperty('httpClient');
-        $property->setAccessible(true);
-        $property->setValue($this->apiManager, new HttpClient($httpClient));
-    
+        $this->apiManager = new ApiManager(
+            $this->config,
+            $this->eventManager,
+            null,
+            $this->mockHttpClient,
+            $this->psr17Factory,
+            $this->psr17Factory
+        );
+
         $this->loggerManager = new LogManager($this->config);
         $this->dataStoreMock = new DataStoreMock();
-    
+
         $this->accountId = $this->config->getData()->getAccountId();
         $project = $this->config->getData() ? $this->config->getData()->getProject() : null;
         $this->projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
         $this->storeKey = "{$this->accountId}-{$this->projectId}-{$this->visitorId}";
-    
+
         $this->dataManager = new DataManager(
             $this->config,
             $this->bucketingManager,
@@ -180,7 +179,8 @@ class DataManagerTest extends TestCase
     public function testRetrieveVariationByKey(): void
     {
         $experienceKey = 'test-experience-ab-fullstack-2';
-        $this->mockHandler->append(new Response(200, [], json_encode(['data' => []]))); // Mock API response if needed
+        // Add mock response for any potential API calls
+        $this->mockHttpClient->addResponse(new Response(200, [], json_encode(['data' => []])));
 
         $variation = $this->dataManager->getBucketing(
             $this->visitorId,
@@ -203,7 +203,7 @@ class DataManagerTest extends TestCase
     public function testRetrieveVariationById(): void
     {
         $experienceId = '100218245';
-        $this->mockHandler->append(new Response(200, [], json_encode(['data' => []]))); // Mock API response if needed
+        $this->mockHttpClient->addResponse(new Response(200, [], json_encode(['data' => []])));
         $variation = $this->dataManager->getBucketingById(
             $this->visitorId,
             $experienceId,
@@ -227,10 +227,10 @@ class DataManagerTest extends TestCase
         $audiences = $this->dataManager->getEntitiesListObject('audiences');
         $configData = $this->config->getData();
         $audienceList = $configData->getAudiences();
-    
+
         $this->assertNotEmpty($audienceList, 'Audiences should not be empty');
         $expectedId = $audienceList[0]['id'];
-    
+
         $this->assertIsArray($audiences);
         $this->assertArrayHasKey($expectedId, $audiences);
         $this->assertEquals($audienceList[0], $audiences[$expectedId]);
@@ -255,9 +255,11 @@ class DataManagerTest extends TestCase
     public function testProcessConversionEvent(): void
     {
         $goalKey = 'increase-engagement';
-        $this->mockHandler->append(
-            new Response(200, [], json_encode(['data' => []])), // Conversion
-            new Response(200, [], json_encode(['data' => []]))  // Transaction
+        $this->mockHttpClient->addResponse(
+            new Response(200, [], json_encode(['data' => []]))
+        );
+        $this->mockHttpClient->addResponse(
+            new Response(200, [], json_encode(['data' => []]))
         );
         $result = $this->dataManager->convert(
             $this->visitorId,
@@ -451,5 +453,88 @@ class DataManagerTest extends TestCase
         $this->assertIsArray($check);
         $this->assertEquals($this->bucketing, $check['bucketing']);
         $this->assertEquals($this->goals, $check['goals']);
+    }
+
+    public function testDataManagerIsFinal(): void
+    {
+        $reflection = new \ReflectionClass(DataManager::class);
+        $this->assertTrue($reflection->isFinal());
+    }
+
+    public function testGetEntityReturnsNullForNonexistentKey(): void
+    {
+        $result = $this->dataManager->getEntity('nonexistent-key', 'experience');
+        $this->assertNull($result);
+    }
+
+    public function testGetEntityByIdReturnsNullForNonexistentId(): void
+    {
+        $result = $this->dataManager->getEntityById('999999999', 'experience');
+        $this->assertNull($result);
+    }
+
+    public function testGetEntityReturnsEntityForValidKey(): void
+    {
+        $result = $this->dataManager->getEntity('adv-audience', 'audience');
+        $this->assertNotNull($result);
+        $this->assertIsArray($result);
+        $this->assertEquals('adv-audience', $result['key']);
+    }
+
+    public function testSetConfigDataBuildsEntityIndices(): void
+    {
+        $configData = $this->config->getData();
+        $this->dataManager->setConfigData($configData);
+
+        // Verify entities are accessible after setConfigData
+        $audiences = $this->dataManager->getEntitiesList('audiences');
+        $this->assertIsArray($audiences);
+
+        $experiences = $this->dataManager->getEntitiesList('experiences');
+        $this->assertIsArray($experiences);
+
+        $features = $this->dataManager->getEntitiesList('features');
+        $this->assertIsArray($features);
+
+        $goals = $this->dataManager->getEntitiesList('goals');
+        $this->assertIsArray($goals);
+
+        $locations = $this->dataManager->getEntitiesList('locations');
+        $this->assertIsArray($locations);
+
+        $segments = $this->dataManager->getEntitiesList('segments');
+        $this->assertIsArray($segments);
+    }
+
+    public function testIsValidConfigDataWithInvalidData(): void
+    {
+        $emptyData = new ConfigResponseData([]);
+        $this->assertFalse($this->dataManager->isValidConfigData($emptyData));
+    }
+
+    public function testIsValidConfigDataWithValidData(): void
+    {
+        $configData = $this->config->getData();
+        $this->assertTrue($this->dataManager->isValidConfigData($configData));
+    }
+
+    public function testGetEntitiesListReturnsEmptyArrayForUnknownType(): void
+    {
+        $result = $this->dataManager->getEntitiesList('nonexistent_type');
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
+    public function testGetSubItemReturnsNullForMissingEntity(): void
+    {
+        $result = $this->dataManager->getSubItem(
+            'experiences',
+            'nonexistent-id',
+            'variations',
+            'nonexistent-var',
+            'id',
+            'id'
+        );
+        $this->assertNull($result);
     }
 }

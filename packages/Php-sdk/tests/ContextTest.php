@@ -15,6 +15,7 @@ use ConvertSdk\FeatureManager;
 use ConvertSdk\SegmentsManager;
 use ConvertSdk\LogManager;
 use ConvertSdk\Context;
+use ConvertSdk\Exception\InvalidArgumentException;
 use OpenAPI\Client\Config;
 use ConvertSdk\Enums\EntityType;
 use OpenAPI\Client\BucketingAttributes;
@@ -43,9 +44,8 @@ class ContextTest extends TestCase
 
     protected function setUp(): void
     {
-        // Load and merge configuration
         $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
-        $defaultConfig = DefaultConfig::getDefault(); // Assume DefaultConfig exists
+        $defaultConfig = DefaultConfig::getDefault();
         $configuration = ObjectUtils::objectDeepMerge($testConfig, $defaultConfig, [
             'api' => [
                 'endpoint' => [
@@ -63,13 +63,12 @@ class ContextTest extends TestCase
             unset($configuration['sdkKey']);
         }
 
-        // Create Config object
         $this->config = new Config($configuration);
-        $this->loggerManager = new LogManager($this->config);
+        $this->loggerManager = new LogManager();
         $this->bucketingManager = new BucketingManager($this->config);
         $this->ruleManager = new RuleManager($this->config);
         $this->eventManager = new EventManager($this->config);
-        $this->apiManager = new ApiManager($this->config, $this->eventManager);
+        $this->apiManager = new ApiManager($this->config, $this->eventManager, $this->loggerManager);
         $this->dataManager = new DataManager(
             $this->config,
             $this->bucketingManager,
@@ -85,14 +84,12 @@ class ContextTest extends TestCase
         $this->context = new Context(
             $this->config,
             $this->visitorId,
-            [
-                'eventManager' => $this->eventManager,
-                'experienceManager' => $this->experienceManager,
-                'featureManager' => $this->featureManager,
-                'segmentsManager' => $this->segmentsManager,
-                'dataManager' => $this->dataManager,
-                'apiManager' => $this->apiManager
-            ]
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->dataManager,
+            $this->segmentsManager,
+            $this->apiManager,
         );
 
         $this->accountId = $this->config->getData() ? $this->config->getData()->getAccountId() : '';
@@ -104,8 +101,6 @@ class ContextTest extends TestCase
     {
         $this->dataManager->reset();
     }
-
-    ### Helper Functions from shared.js (Converted to Test Methods)
 
     public function testGetVariationsAcrossAllExperiences(): void
     {
@@ -214,15 +209,12 @@ class ContextTest extends TestCase
         $this->assertContainsAll($featureIds, $selectedFeatures);
     }
 
-    // Custom assertion for deep membership
     private function assertContainsAll(array $haystack, array $needles): void
     {
         foreach ($needles as $needle) {
             $this->assertContains($needle, $haystack);
         }
     }
-
-    ### Basic Tests
 
     public function testContextClassIsDefined(): void
     {
@@ -234,7 +226,11 @@ class ContextTest extends TestCase
         $this->assertInstanceOf(Context::class, $this->context);
     }
 
-    ### Main Context Tests
+    public function testContextIsFinalClass(): void
+    {
+        $reflection = new \ReflectionClass(Context::class);
+        $this->assertTrue($reflection->isFinal());
+    }
 
     public function testRunExperience(): void
     {
@@ -281,34 +277,6 @@ class ContextTest extends TestCase
     public function testTrackConversion(): void
     {
         $goalKey = 'increase-engagement';
-        $requestData = [
-            'source' => 'js-sdk',
-            'enrichData' => true,
-            'accountId' => $this->accountId,
-            'projectId' => $this->projectId,
-            'visitors' => [
-                [
-                    'visitorId' => $this->visitorId,
-                    'events' => [
-                        [
-                            'eventType' => 'conversion',
-                            'data' => ['goalId' => '100215960']
-                        ],
-                        [
-                            'eventType' => 'conversion',
-                            'data' => [
-                                'goalId' => '100215960',
-                                'goalData' => [
-                                    ['key' => 'amount', 'value' => 10.3],
-                                    ['key' => 'productsCount', 'value' => 2]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ];
-
         $this->context->trackConversion($goalKey, [
             'ruleData' => ['action' => 'buy'],
             'conversionData' => [
@@ -316,11 +284,7 @@ class ContextTest extends TestCase
                 ['key' => 'productsCount', 'value' => 2]
             ]
         ]);
-
-        // Since we're not using a server, we can't directly assert the request body.
-        // Instead, we could mock the ApiManager or check internal state if applicable.
-        // For now, we'll assume the method runs without throwing an exception.
-        $this->assertTrue(true); // Placeholder assertion
+        $this->assertTrue(true);
     }
 
     public function testTrackConversionInvalidGoalData(): void
@@ -361,91 +325,20 @@ class ContextTest extends TestCase
         $this->assertEquals($properties, $localSegments['segments']);
     }
 
-
-
-    ### Invalid Visitor Tests
-
-    public function testRunExperienceInvalidVisitor(): void
+    public function testEmptyVisitorIdThrowsException(): void
     {
-        $invalidContext = new Context($this->config, null, [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => $this->apiManager
-        ]);
-        $variation = $invalidContext->runExperience('test-experience-ab-fullstack-2');
-        $this->assertNull($variation);
-    }
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Visitor ID must not be empty');
 
-    public function testRunExperiencesInvalidVisitor(): void
-    {
-        $invalidContext = new Context($this->config, null, [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => $this->apiManager
-        ]);
-        $variations = $invalidContext->runExperiences();
-        $this->assertEmpty($variations);
-    }
-
-    public function testRunFeatureInvalidVisitor(): void
-    {
-        $invalidContext = new Context($this->config, null, [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => $this->apiManager
-        ]);
-        $features = $invalidContext->runFeature('feature-1');
-        $this->assertNull($features);
-    }
-
-    public function testRunFeaturesInvalidVisitor(): void
-    {
-        $invalidContext = new Context($this->config, null, [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => $this->apiManager
-        ]);
-        $features = $invalidContext->runFeatures();
-        $this->assertEmpty($features);
-    }
-
-    public function testTrackConversionInvalidVisitor(): void
-    {
-        $invalidContext = new Context($this->config, null, [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => $this->apiManager
-        ]);
-        $output = $invalidContext->trackConversion('increase-engagement', []);
-        $this->assertNull($output);
-    }
-
-    public function testSetCustomSegmentsInvalidVisitor(): void
-    {
-        $invalidContext = new Context($this->config, null, [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => $this->apiManager
-        ]);
-        $output = $invalidContext->setCustomSegments(['test-segments-1']);
-        $this->assertNull($output);
+        new Context(
+            $this->config,
+            '',
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->dataManager,
+            $this->segmentsManager,
+            $this->apiManager,
+        );
     }
 }

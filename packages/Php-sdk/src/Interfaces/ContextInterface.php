@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Convert JS SDK
+ * Convert PHP SDK
  * Version 1.0.0
  * Copyright(c) 2020 Convert Insights, Inc
  * License Apache-2.0
@@ -13,113 +13,114 @@ namespace ConvertSdk\Interfaces;
 
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\BucketedVariation;
-use OpenAPI\Client\Entity;
 use ConvertSdk\Enums\EntityType;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
-use OpenAPI\Client\Model\VisitorSegments;
-use OpenAPI\Client\StoreData;
-use GuzzleHttp\Promise\PromiseInterface;
-use GuzzleHttp\Promise\Promise;
 
+/**
+ * Visitor context interface for running experiences, features, and tracking conversions.
+ */
 interface ContextInterface
 {
     /**
-     * Runs a single experience for a given key with optional bucketing attributes.
+     * Run a single experience for a given key with optional bucketing attributes.
      *
      * @param string $experienceKey The key identifying the experience
      * @param BucketingAttributes|null $attributes Optional attributes for bucketing
-     * @return mixed The result of running the experience (BucketedVariation, RuleError, or BucketingError)
+     * @return BucketedVariation|RuleError|BucketingError|null The bucketing result
      */
     public function runExperience(string $experienceKey, ?BucketingAttributes $attributes = null);
 
     /**
-     * Runs multiple experiences with optional bucketing attributes.
+     * Run multiple experiences with optional bucketing attributes.
      *
      * @param BucketingAttributes|null $attributes Optional attributes for bucketing
-     * @return array An array of results from running experiences (each can be BucketedVariation, RuleError, or BucketingError)
+     * @return array<int, BucketedVariation|RuleError|BucketingError> Array of bucketing results
      */
     public function runExperiences(?BucketingAttributes $attributes = null): array;
 
     /**
-     * Runs a single feature for a given key with optional bucketing attributes.
+     * Run a single feature for a given key with optional bucketing attributes.
      *
      * @param string $key The key identifying the feature
      * @param BucketingAttributes|null $attributes Optional attributes for bucketing
-     * @return mixed The result of running the feature (, RuleError, or array of |RuleError)
+     * @return mixed The feature result (bucketed feature, RuleError, array, or null)
      */
     public function runFeature(string $key, ?BucketingAttributes $attributes = null);
 
     /**
-     * Runs multiple features with optional bucketing attributes.
+     * Run multiple features with optional bucketing attributes.
      *
      * @param BucketingAttributes|null $attributes Optional attributes for bucketing
-     * @return array An array of results from running features (each can be  or RuleError)
+     * @return array<int, mixed> Array of feature results
      */
     public function runFeatures(?BucketingAttributes $attributes = null): array;
 
     /**
-     * Tracks a conversion for a given goal key with optional conversion attributes.
+     * Track a conversion for a given goal key.
      *
      * @param string $goalKey The key identifying the goal
-     * @param ConversionAttributes|null $attributes Optional attributes for conversion tracking
-     * @return RuleError The error result of tracking the conversion, if any
+     * @param array<string, mixed>|null $attributes Conversion attributes
+     * @return RuleError|null Rule error if tracking fails
      */
     public function trackConversion(string $goalKey, ?array $attributes): ?RuleError;
 
     /**
-     * Sets default segments for the visitor.
+     * Set default segments for the visitor.
      *
-     * @param VisitorSegments $segments The segments to set as default
+     * @param array<string, mixed> $segments The segments to set
+     * @return void
      */
     public function setDefaultSegments(array $segments): void;
 
     /**
-     * Runs custom segments for given segment keys with optional segment attributes.
+     * Run custom segments for given segment keys.
      *
-     * @param string[] $segmentKeys Array of segment keys
-     * @param SegmentsAttributes|null $attributes Optional attributes for segment evaluation
-     * @return RuleError The error result of running custom segments, if any
+     * @param array<int, string> $segmentKeys Array of segment keys
+     * @param array<string, mixed>|null $attributes Optional segment attributes
+     * @return array<int, mixed>|null Custom segments or null
      */
-    public function runCustomSegments(array $segmentKeys, array $attributes = null): ?array;
+    public function runCustomSegments(array $segmentKeys, ?array $attributes = null): ?array;
 
     /**
-     * Updates properties for a specific visitor.
+     * Update properties for a specific visitor.
      *
      * @param string $visitorId The ID of the visitor
      * @param array<string, mixed> $visitorProperties Key-value pairs of visitor properties
+     * @return void
      */
     public function updateVisitorProperties(string $visitorId, array $visitorProperties): void;
 
     /**
-     * Retrieves a configuration entity by key and type.
+     * Retrieve a configuration entity by key and type.
      *
      * @param string $key The key of the entity
-     * @param EntityType $entityType The type of the entity (e.g., feature or experience)
-     * @return Entity The configuration entity
+     * @param string $entityType The type of the entity (EntityType value)
+     * @return array<string, mixed> The entity data
      */
     public function getConfigEntity(string $key, string $entityType): array;
 
     /**
-     * Retrieves a configuration entity by ID and type.
+     * Retrieve a configuration entity by ID and type.
      *
      * @param string $id The ID of the entity
-     * @param EntityType $entityType The type of the entity (e.g., feature or experience)
-     * @return Entity The configuration entity
+     * @param string $entityType The type of the entity (EntityType value)
+     * @return array<string, mixed> The entity data
      */
     public function getConfigEntityById(string $id, string $entityType): array;
 
     /**
-     * Retrieves the visitor's stored data.
+     * Retrieve the visitor's stored data.
      *
-     * @return StoreData The visitor's data
+     * @return array<string, mixed> The visitor's data
      */
     public function getVisitorData(): array;
 
     /**
-     * Releases any queued operations with an optional reason.
+     * Release any queued operations.
      *
      * @param string|null $reason Optional reason for releasing queues
+     * @return void
      */
-    public function releaseQueues(?string $reason = null): PromiseInterface;
+    public function releaseQueues(?string $reason = null): void;
 }
