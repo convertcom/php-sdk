@@ -390,7 +390,7 @@ final class FeatureManager implements FeatureManagerInterface
         foreach ($bucketedVariations as $bucketedVariation) {
             $changes = [];
             if (is_array($bucketedVariation)) {
-                $changes = end($bucketedVariation)["changes"];
+                $changes = $bucketedVariation['changes'] ?? [];
             }
             foreach ($changes as $change) {
                 if (($change['type'] ?? null) !== VariationChangeType::FullstackFeature->value) {

@@ -278,7 +278,7 @@ final class DataManager implements DataManagerInterface
     public function matchRulesByField(
         string $visitorId,
         string $identity,
-        string $identityField = 'key',
+        string $identityField,
         BucketingAttributes $attributes
     ): array|RuleError|null {
         // Extract attributes properties
@@ -515,7 +515,7 @@ final class DataManager implements DataManagerInterface
     private function _getBucketingByField(
       string $visitorId,
       string $identity,
-      string $identityField = IdentityField::KEY,
+      string $identityField,
       BucketingAttributes $attributes
     ): array|RuleError|BucketingError|null {
       // Validate identityField
@@ -736,7 +736,14 @@ final class DataManager implements DataManagerInterface
                   'experienceKey' => $experience->getKey()
               ],
               ['bucketingAllocation' => $bucketingAllocation],
-              (array)$variation
+              [
+                  'id' => $variation->getId(),
+                  'name' => $variation->getName(),
+                  'key' => $variation->getKey(),
+                  'traffic_allocation' => $variation->getTrafficAllocation(),
+                  'status' => $variation->getStatus(),
+                  'changes' => $variation->getChanges(),
+              ]
           );
       }
 
