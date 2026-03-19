@@ -15,6 +15,7 @@ interface CoreInterface
      * @param string $visitorId A unique visitor identifier
      * @param array<string, mixed>|null $visitorAttributes Optional associative array for audience/segments targeting
      * @return ContextInterface|null The visitor context, or null if SDK is not initialized
+     * @throws \ConvertSdk\Exception\InvalidArgumentException If visitorId is empty
      */
     public function createContext(string $visitorId, ?array $visitorAttributes = null): ?ContextInterface;
 

@@ -76,8 +76,12 @@ class SegmentsManagerTest extends TestCase
         $config = new Config(self::$configuration);
 
         // Initialize all manager instances with dependencies
-        $bucketingManager = new BucketingManager($config);
-        $ruleManager = new RuleManager($config);
+        $bucketingConfig = $config->getBucketing();
+        $bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $ruleManager = new RuleManager();
         $eventManager = new EventManager($config);
         $apiManager = new ApiManager($config, $eventManager);
         $loggerManager = new LogManager($config);

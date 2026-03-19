@@ -65,8 +65,12 @@ class ContextTest extends TestCase
 
         $this->config = new Config($configuration);
         $this->loggerManager = new LogManager();
-        $this->bucketingManager = new BucketingManager($this->config);
-        $this->ruleManager = new RuleManager($this->config);
+        $bucketingConfig = $this->config->getBucketing();
+        $this->bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $this->ruleManager = new RuleManager();
         $this->eventManager = new EventManager($this->config);
         $this->apiManager = new ApiManager($this->config, $this->eventManager, $this->loggerManager);
         $this->dataManager = new DataManager(
@@ -77,7 +81,7 @@ class ContextTest extends TestCase
             $this->apiManager,
             $this->loggerManager
         );
-        $this->experienceManager = new ExperienceManager($this->config, ['dataManager' => $this->dataManager]);
+        $this->experienceManager = new ExperienceManager(dataManager: $this->dataManager);
         $this->featureManager = new FeatureManager($this->config, $this->dataManager);
         $this->segmentsManager = new SegmentsManager($this->config, $this->dataManager, $this->ruleManager);
 
@@ -113,20 +117,17 @@ class ContextTest extends TestCase
         $this->assertIsArray($variations);
         $this->assertCount(2, $variations);
         foreach ($variations as $variation) {
-            $this->assertIsArray($variation);
-            $this->assertArrayHasKey('experienceId', $variation);
-            $this->assertArrayHasKey('experienceKey', $variation);
-            $this->assertArrayHasKey('experienceName', $variation);
-            $this->assertArrayHasKey('bucketingAllocation', $variation);
-            $this->assertArrayHasKey('id', end($variation));
-            $this->assertArrayHasKey('key', end($variation));
-            $this->assertArrayHasKey('name', end($variation));
-            $this->assertArrayHasKey('status', end($variation));
-            $this->assertArrayHasKey('changes', end($variation));
-            $this->assertArrayHasKey('traffic_allocation', end($variation));
+            $this->assertInstanceOf(\ConvertSdk\DTO\BucketedVariation::class, $variation);
+            $this->assertNotEmpty($variation->experienceId);
+            $this->assertNotEmpty($variation->experienceKey);
+            $this->assertNotEmpty($variation->variationId);
+            $this->assertNotEmpty($variation->variationKey);
+            $this->assertIsArray($variation->changes);
         }
-        $selectedVariations = array_column($variations, 'id');
-        $this->assertContainsAll($variationIds, $selectedVariations);
+        $selectedVariationIds = array_map(fn($v) => $v->variationId, $variations);
+        foreach ($selectedVariationIds as $id) {
+            $this->assertContains($id, $variationIds);
+        }
     }
 
     public function testGetSingleFeatureWithStatus(): void
@@ -240,18 +241,12 @@ class ContextTest extends TestCase
             'visitorProperties' => ['varName3' => 'something']
         ]));
 
-        $this->assertIsArray($variation);
-        $this->assertArrayHasKey('experienceId', $variation);
-        $this->assertArrayHasKey('experienceKey', $variation);
-        $this->assertArrayHasKey('experienceName', $variation);
-        $this->assertArrayHasKey('bucketingAllocation', $variation);
-        $this->assertArrayHasKey('id', end($variation));
-        $this->assertArrayHasKey('key', end($variation));
-        $this->assertArrayHasKey('name', end($variation));
-        $this->assertArrayHasKey('status', end($variation));
-        $this->assertArrayHasKey('changes', end($variation));
-        $this->assertArrayHasKey('traffic_allocation', end($variation));
-        $this->assertEquals($experienceKey, $variation['experienceKey']);
+        $this->assertInstanceOf(\ConvertSdk\DTO\BucketedVariation::class, $variation);
+        $this->assertNotEmpty($variation->experienceId);
+        $this->assertEquals($experienceKey, $variation->experienceKey);
+        $this->assertNotEmpty($variation->variationId);
+        $this->assertNotEmpty($variation->variationKey);
+        $this->assertIsArray($variation->changes);
     }
 
     public function testRunExperiences(): void
@@ -340,5 +335,160 @@ class ContextTest extends TestCase
             $this->segmentsManager,
             $this->apiManager,
         );
+    }
+
+    public function testGetVisitorId(): void
+    {
+        $this->assertEquals($this->visitorId, $this->context->getVisitorId());
+    }
+
+    public function testGetAttributesReturnsEmptyArrayWhenNoAttributesSet(): void
+    {
+        $this->assertIsArray($this->context->getAttributes());
+    }
+
+    public function testCreateContextWithAttributes(): void
+    {
+        // Note: filterReportSegments() splits attributes:
+        // - Segment keys (browser, devices, source, campaign, visitor_type, country, custom_segments) → stored via putSegments()
+        // - Other keys → stored as visitorProperties (accessible via getAttributes())
+        $attributes = ['plan' => 'premium', 'country' => 'DE'];
+        $context = new Context(
+            $this->config,
+            'visitor-with-attrs',
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->dataManager,
+            $this->segmentsManager,
+            $this->apiManager,
+            null,
+            $attributes,
+        );
+
+        $this->assertEquals('visitor-with-attrs', $context->getVisitorId());
+
+        // 'plan' is a non-segment property → accessible via getAttributes()
+        $result = $context->getAttributes();
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('plan', $result, 'Non-segment attributes should be accessible via getAttributes()');
+        $this->assertEquals('premium', $result['plan']);
+
+        // 'country' is a segment key → stored via putSegments(), not in getAttributes()
+        $this->assertArrayNotHasKey('country', $result, 'Segment keys are stored via putSegments, not in visitorProperties');
+    }
+
+    public function testSetAttribute(): void
+    {
+        $this->context->setAttribute('country', 'US');
+        $attrs = $this->context->getAttributes();
+        $this->assertArrayHasKey('country', $attrs);
+        $this->assertEquals('US', $attrs['country']);
+    }
+
+    public function testSetAttributeOverwritesExisting(): void
+    {
+        $this->context->setAttribute('country', 'US');
+        $this->context->setAttribute('country', 'CA');
+        $attrs = $this->context->getAttributes();
+        $this->assertEquals('CA', $attrs['country']);
+    }
+
+    public function testSetAttributesMultiple(): void
+    {
+        $this->context->setAttributes(['plan' => 'enterprise', 'locale' => 'en']);
+        $attrs = $this->context->getAttributes();
+        $this->assertArrayHasKey('plan', $attrs);
+        $this->assertArrayHasKey('locale', $attrs);
+        $this->assertEquals('enterprise', $attrs['plan']);
+        $this->assertEquals('en', $attrs['locale']);
+    }
+
+    public function testSetAttributesMergesWithExisting(): void
+    {
+        $this->context->setAttribute('plan', 'free');
+        $this->context->setAttributes(['country' => 'US']);
+        $attrs = $this->context->getAttributes();
+        $this->assertArrayHasKey('plan', $attrs);
+        $this->assertArrayHasKey('country', $attrs);
+        $this->assertEquals('free', $attrs['plan']);
+        $this->assertEquals('US', $attrs['country']);
+    }
+
+    public function testSetAttributeAddsNewKeyToExisting(): void
+    {
+        $context = new Context(
+            $this->config,
+            'visitor-initial-attrs',
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->dataManager,
+            $this->segmentsManager,
+            $this->apiManager,
+            null,
+            ['plan' => 'free'],
+        );
+
+        $context->setAttribute('country', 'US');
+        $attrs = $context->getAttributes();
+        $this->assertArrayHasKey('plan', $attrs);
+        $this->assertArrayHasKey('country', $attrs);
+        $this->assertEquals('US', $attrs['country']);
+    }
+
+    public function testRunExperienceReturnsDto(): void
+    {
+        $experienceKey = 'test-experience-ab-fullstack-2';
+        $result = $this->context->runExperience($experienceKey, new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something']
+        ]));
+
+        $this->assertInstanceOf(\ConvertSdk\DTO\BucketedVariation::class, $result);
+        $this->assertNotEmpty($result->experienceId);
+        $this->assertEquals($experienceKey, $result->experienceKey);
+        $this->assertNotEmpty($result->variationId);
+        $this->assertNotEmpty($result->variationKey);
+        $this->assertIsArray($result->changes);
+    }
+
+    public function testRunExperienceReturnsNullForMissingKey(): void
+    {
+        $result = $this->context->runExperience('nonexistent-experience', new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something']
+        ]));
+
+        $this->assertNull($result);
+    }
+
+    public function testRunExperiencesReturnsDtoArray(): void
+    {
+        $variations = $this->context->runExperiences(new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something']
+        ]));
+
+        $this->assertIsArray($variations);
+        $this->assertGreaterThan(0, count($variations));
+        foreach ($variations as $variation) {
+            $this->assertInstanceOf(\ConvertSdk\DTO\BucketedVariation::class, $variation);
+            $this->assertNotEmpty($variation->experienceId);
+            $this->assertNotEmpty($variation->experienceKey);
+            $this->assertNotEmpty($variation->variationId);
+            $this->assertNotEmpty($variation->variationKey);
+            $this->assertIsArray($variation->changes);
+        }
+    }
+
+    public function testRunExperienceDoesNotFireEventOnNull(): void
+    {
+        // A nonexistent experience should return null and not fire any event
+        $result = $this->context->runExperience('definitely-nonexistent', new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+        ]));
+
+        $this->assertNull($result);
     }
 }

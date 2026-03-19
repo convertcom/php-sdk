@@ -6,128 +6,242 @@ namespace ConvertSdk\Utils;
 
 use ConvertSdk\Utils\ObjectUtils;
 
+/**
+ * Comparison processor for rule evaluation.
+ *
+ * Provides static comparison methods used by the RuleManager to evaluate
+ * individual rule conditions. All string comparisons are case-insensitive.
+ */
 class Comparisons
 {
-    public static function equals($value, $testAgainst, bool $negation = false): bool
+    /**
+     * Check equality between value and test target.
+     *
+     * Supports arrays (indexOf), objects (key lookup), and scalar string comparison.
+     * All scalar comparisons are case-insensitive.
+     *
+     * @param mixed $value The actual value to test
+     * @param mixed $testAgainst The expected value to compare against
+     * @param bool $negation Whether to invert the result
+     * @return bool True if values are equal (or not equal when negated)
+     */
+    public static function equals(mixed $value, mixed $testAgainst, bool $negation = false): bool
     {
         if (is_array($value)) {
             $result = in_array($testAgainst, $value, true);
-            return self::_returnNegationCheck($result, $negation);
+            return self::returnNegationCheck($result, $negation);
         }
-        // If $value is an object (or associative array) and not empty,
-        // convert it to an array and check keys.
         if (is_object($value)) {
             $value = get_object_vars($value);
         }
         if (is_array($value) && ObjectUtils::objectNotEmpty($value)) {
             $keys = array_keys($value);
             $result = in_array((string)$testAgainst, $keys, true);
-            return self::_returnNegationCheck($result, $negation);
+            return self::returnNegationCheck($result, $negation);
         }
-        // Otherwise, compare lowercase string representations.
         $valueStr = strtolower((string)$value);
         $testStr = strtolower((string)$testAgainst);
-        return self::_returnNegationCheck($valueStr === $testStr, $negation);
+        return self::returnNegationCheck($valueStr === $testStr, $negation);
     }
 
-    public static function equalsNumber($value, $testAgainst, bool $negation = false): bool
+    /**
+     * Check numeric equality. Delegates to equals().
+     *
+     * @param mixed $value The actual value to test
+     * @param mixed $testAgainst The expected value to compare against
+     * @param bool $negation Whether to invert the result
+     * @return bool True if values are equal
+     */
+    public static function equalsNumber(mixed $value, mixed $testAgainst, bool $negation = false): bool
     {
         return self::equals($value, $testAgainst, $negation);
     }
 
-    public static function matches($value, $testAgainst, bool $negation = false): bool
+    /**
+     * Check matching equality. Delegates to equals().
+     *
+     * @param mixed $value The actual value to test
+     * @param mixed $testAgainst The expected value to compare against
+     * @param bool $negation Whether to invert the result
+     * @return bool True if values match
+     */
+    public static function matches(mixed $value, mixed $testAgainst, bool $negation = false): bool
     {
         return self::equals($value, $testAgainst, $negation);
     }
 
-    public static function less($value, $testAgainst, bool $negation = false): bool
+    /**
+     * Check if value is less than test target.
+     *
+     * Returns false if types don't match (prevents cross-type comparison).
+     *
+     * @param mixed $value The actual value to test
+     * @param mixed $testAgainst The value to compare against
+     * @param bool $negation Whether to invert the result
+     * @return bool True if value < testAgainst (same type only)
+     */
+    public static function less(mixed $value, mixed $testAgainst, bool $negation = false): bool
     {
+        // Normalize numeric types for JS SDK parity (JS typeof returns 'number' for both int and float)
+        if (is_numeric($value) && is_numeric($testAgainst)) {
+            $value = (float) $value;
+            $testAgainst = (float) $testAgainst;
+        }
         if (gettype($value) !== gettype($testAgainst)) {
             return false;
         }
         $result = $value < $testAgainst;
-        return self::_returnNegationCheck($result, $negation);
+        return self::returnNegationCheck($result, $negation);
     }
 
-    public static function lessEqual($value, $testAgainst, bool $negation = false): bool
+    /**
+     * Check if value is less than or equal to test target.
+     *
+     * Returns false if types don't match (prevents cross-type comparison).
+     * Numeric values are normalized to float for JS SDK parity (JS has single 'number' type).
+     *
+     * @param mixed $value The actual value to test
+     * @param mixed $testAgainst The value to compare against
+     * @param bool $negation Whether to invert the result
+     * @return bool True if value <= testAgainst (same type only)
+     */
+    public static function lessEqual(mixed $value, mixed $testAgainst, bool $negation = false): bool
     {
+        // Normalize numeric types for JS SDK parity (JS typeof returns 'number' for both int and float)
+        if (is_numeric($value) && is_numeric($testAgainst)) {
+            $value = (float) $value;
+            $testAgainst = (float) $testAgainst;
+        }
         if (gettype($value) !== gettype($testAgainst)) {
             return false;
         }
         $result = $value <= $testAgainst;
-        return self::_returnNegationCheck($result, $negation);
+        return self::returnNegationCheck($result, $negation);
     }
 
-    public static function contains($value, $testAgainst, bool $negation = false): bool
+    /**
+     * Check if value contains the test string.
+     *
+     * Case-insensitive. Empty/whitespace-only testAgainst always returns true.
+     *
+     * @param mixed $value The value to search within
+     * @param mixed $testAgainst The substring to search for
+     * @param bool $negation Whether to invert the result
+     * @return bool True if value contains testAgainst
+     */
+    public static function contains(mixed $value, mixed $testAgainst, bool $negation = false): bool
     {
         $valueStr = strtolower((string)$value);
         $testStr = strtolower((string)$testAgainst);
         if (trim($testStr) === '') {
-            return self::_returnNegationCheck(true, $negation);
+            return self::returnNegationCheck(true, $negation);
         }
         $found = (strpos($valueStr, $testStr) !== false);
-        return self::_returnNegationCheck($found, $negation);
+        return self::returnNegationCheck($found, $negation);
     }
 
-    public static function isIn($values, $testAgainst, bool $negation = false, string $splitter = '|'): bool
+    /**
+     * Check if value is in a set of pipe-delimited values.
+     *
+     * Both sides are split by the splitter and compared case-insensitively.
+     *
+     * @param mixed $values The value(s) to check (pipe-delimited string)
+     * @param mixed $testAgainst The set to check against (pipe-delimited string or array)
+     * @param bool $negation Whether to invert the result
+     * @param string $splitter Delimiter character (default: '|')
+     * @return bool True if any value is found in testAgainst
+     */
+    public static function isIn(mixed $values, mixed $testAgainst, bool $negation = false, string $splitter = '|'): bool
     {
-        // Convert $values to an array of strings.
         $matchedValuesArray = explode($splitter, (string)$values);
 
         if (is_string($testAgainst)) {
             $testAgainst = explode($splitter, $testAgainst);
         } elseif (is_object($testAgainst)) {
-            // If $testAgainst is an object, we return false (or handle as needed)
-            return self::_returnNegationCheck(false, $negation);
+            return self::returnNegationCheck(false, $negation);
         } elseif (!is_array($testAgainst)) {
             $testAgainst = [$testAgainst];
         }
-        
-        // Convert all items to lowercase strings.
-        $matchedValuesArray = array_map(function ($item) {
+
+        $matchedValuesArray = array_map(function ($item): string {
             return strtolower((string)$item);
         }, $matchedValuesArray);
-        $testAgainst = array_map(function ($item) {
+        $testAgainst = array_map(function ($item): string {
             return strtolower((string)$item);
         }, $testAgainst);
-        
+
         foreach ($matchedValuesArray as $item) {
             if (in_array($item, $testAgainst, true)) {
-                return self::_returnNegationCheck(true, $negation);
+                return self::returnNegationCheck(true, $negation);
             }
         }
-        return self::_returnNegationCheck(false, $negation);
+        return self::returnNegationCheck(false, $negation);
     }
-    
 
-    public static function startsWith($value, $testAgainst, bool $negation = false): bool
+    /**
+     * Check if value starts with the test string.
+     *
+     * Case-insensitive prefix matching.
+     *
+     * @param mixed $value The value to check
+     * @param mixed $testAgainst The expected prefix
+     * @param bool $negation Whether to invert the result
+     * @return bool True if value starts with testAgainst
+     */
+    public static function startsWith(mixed $value, mixed $testAgainst, bool $negation = false): bool
     {
         $valueStr = strtolower((string)$value);
         $testStr = strtolower((string)$testAgainst);
         $found = (strpos($valueStr, $testStr) === 0);
-        return self::_returnNegationCheck($found, $negation);
+        return self::returnNegationCheck($found, $negation);
     }
 
-    public static function endsWith($value, $testAgainst, bool $negation = false): bool
+    /**
+     * Check if value ends with the test string.
+     *
+     * Case-insensitive suffix matching.
+     *
+     * @param mixed $value The value to check
+     * @param mixed $testAgainst The expected suffix
+     * @param bool $negation Whether to invert the result
+     * @return bool True if value ends with testAgainst
+     */
+    public static function endsWith(mixed $value, mixed $testAgainst, bool $negation = false): bool
     {
         $valueStr = strtolower((string)$value);
         $testStr = strtolower((string)$testAgainst);
         $pos = strrpos($valueStr, $testStr);
         $found = ($pos !== false && $pos === (strlen($valueStr) - strlen($testStr)));
-        return self::_returnNegationCheck($found, $negation);
+        return self::returnNegationCheck($found, $negation);
     }
 
-    public static function regexMatches($value, $testAgainst, bool $negation = false): bool
+    /**
+     * Check if value matches a regular expression pattern.
+     *
+     * Case-insensitive regex matching. Forward slashes in the pattern are escaped.
+     *
+     * @param mixed $value The value to test
+     * @param mixed $testAgainst The regex pattern (without delimiters)
+     * @param bool $negation Whether to invert the result
+     * @return bool True if value matches the regex pattern
+     */
+    public static function regexMatches(mixed $value, mixed $testAgainst, bool $negation = false): bool
     {
         $valueStr = strtolower((string)$value);
-        // Escape delimiter '/' if present in the pattern.
-        $escapedPattern = str_replace('/', '\/', $testAgainst);
+        $escapedPattern = str_replace('/', '\/', (string)$testAgainst);
         $pattern = '/' . $escapedPattern . '/i';
         $matched = (preg_match($pattern, $valueStr) === 1);
-        return self::_returnNegationCheck($matched, $negation);
+        return self::returnNegationCheck($matched, $negation);
     }
 
-    private static function _returnNegationCheck(bool $value, bool $negation = false): bool
+    /**
+     * Apply negation check to a boolean result.
+     *
+     * @param bool $value The comparison result
+     * @param bool $negation Whether to invert the result
+     * @return bool The final result (inverted if negation is true)
+     */
+    private static function returnNegationCheck(bool $value, bool $negation = false): bool
     {
         return $negation ? !$value : $value;
     }

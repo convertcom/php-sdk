@@ -12,8 +12,7 @@ declare(strict_types=1);
 namespace ConvertSdk\Interfaces;
 
 use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\BucketedVariation;
-use ConvertSdk\Enums\EntityType;
+use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
 
@@ -27,15 +26,15 @@ interface ContextInterface
      *
      * @param string $experienceKey The key identifying the experience
      * @param BucketingAttributes|null $attributes Optional attributes for bucketing
-     * @return BucketedVariation|RuleError|BucketingError|null The bucketing result
+     * @return BucketedVariation|null The bucketed variation DTO, or null for all non-success paths
      */
-    public function runExperience(string $experienceKey, ?BucketingAttributes $attributes = null);
+    public function runExperience(string $experienceKey, ?BucketingAttributes $attributes = null): ?BucketedVariation;
 
     /**
      * Run multiple experiences with optional bucketing attributes.
      *
      * @param BucketingAttributes|null $attributes Optional attributes for bucketing
-     * @return array<int, BucketedVariation|RuleError|BucketingError> Array of bucketing results
+     * @return BucketedVariation[] Array of bucketed variation DTOs
      */
     public function runExperiences(?BucketingAttributes $attributes = null): array;
 
@@ -46,7 +45,7 @@ interface ContextInterface
      * @param BucketingAttributes|null $attributes Optional attributes for bucketing
      * @return mixed The feature result (bucketed feature, RuleError, array, or null)
      */
-    public function runFeature(string $key, ?BucketingAttributes $attributes = null);
+    public function runFeature(string $key, ?BucketingAttributes $attributes = null): mixed;
 
     /**
      * Run multiple features with optional bucketing attributes.
@@ -81,6 +80,16 @@ interface ContextInterface
      * @return array<int, mixed>|null Custom segments or null
      */
     public function runCustomSegments(array $segmentKeys, ?array $attributes = null): ?array;
+
+    /**
+     * Set custom segments (deprecated alias for runCustomSegments).
+     *
+     * @deprecated Use runCustomSegments() instead
+     * @param array<int, string> $segmentKeys Array of segment keys
+     * @param array<string, mixed>|null $attributes Optional segment attributes
+     * @return array<int, mixed>|null Custom segments or null
+     */
+    public function setCustomSegments(array $segmentKeys, ?array $attributes = null): ?array;
 
     /**
      * Update properties for a specific visitor.
@@ -123,4 +132,35 @@ interface ContextInterface
      * @return void
      */
     public function releaseQueues(?string $reason = null): void;
+
+    /**
+     * Set a single visitor attribute.
+     *
+     * @param string $key The attribute key
+     * @param mixed $value The attribute value
+     * @return void
+     */
+    public function setAttribute(string $key, mixed $value): void;
+
+    /**
+     * Set multiple visitor attributes at once (merges with existing).
+     *
+     * @param array<string, mixed> $attributes Key-value pairs of attributes
+     * @return void
+     */
+    public function setAttributes(array $attributes): void;
+
+    /**
+     * Get all current visitor attributes.
+     *
+     * @return array<string, mixed> The current visitor attributes
+     */
+    public function getAttributes(): array;
+
+    /**
+     * Get the visitor ID for this context.
+     *
+     * @return string The visitor ID
+     */
+    public function getVisitorId(): string;
 }

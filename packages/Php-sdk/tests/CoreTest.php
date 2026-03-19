@@ -63,8 +63,12 @@ class CoreTest extends TestCase
         $this->config = new Config($this->configuration);
 
         $this->loggerManager = new LogManager();
-        $this->bucketingManager = new BucketingManager($this->config);
-        $this->ruleManager = new RuleManager($this->config);
+        $bucketingConfig = $this->config->getBucketing();
+        $this->bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $this->ruleManager = new RuleManager();
         $this->eventManager = new EventManager($this->config);
         $this->apiManager = new ApiManager($this->config, $this->eventManager, $this->loggerManager);
         $this->dataManager = new DataManager(
@@ -75,7 +79,7 @@ class CoreTest extends TestCase
             $this->apiManager,
             $this->loggerManager
         );
-        $this->experienceManager = new ExperienceManager($this->config, ['dataManager' => $this->dataManager]);
+        $this->experienceManager = new ExperienceManager(dataManager: $this->dataManager);
         $this->featureManager = new FeatureManager($this->config, $this->dataManager);
         $this->segmentsManager = new SegmentsManager($this->config, $this->dataManager, $this->ruleManager);
 

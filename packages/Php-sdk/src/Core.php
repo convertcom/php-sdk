@@ -28,6 +28,7 @@ use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Config\ConfigValidator;
 use ConvertSdk\Exception\ConfigFetchException;
 use ConvertSdk\Exception\ConfigValidationException;
+use ConvertSdk\Exception\InvalidArgumentException;
 use Psr\SimpleCache\CacheInterface;
 
 /**
@@ -150,9 +151,13 @@ final class Core implements CoreInterface
      * @param string $visitorId A unique visitor identifier
      * @param array<string, mixed>|null $visitorAttributes Key-value pairs for audience/segments targeting
      * @return ContextInterface|null The visitor context, or null if SDK is not initialized
+     * @throws InvalidArgumentException If visitorId is empty
      */
     public function createContext(string $visitorId, ?array $visitorAttributes = null): ?ContextInterface
     {
+        if ($visitorId === '') {
+            throw new InvalidArgumentException('Visitor ID must not be empty');
+        }
         if (!$this->initialized) {
             return null;
         }

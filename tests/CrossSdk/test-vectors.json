@@ -1,0 +1,452 @@
+[
+  {
+    "category": "ascii",
+    "input": "testString",
+    "seed": 9999,
+    "expected": 2241850228
+  },
+  {
+    "category": "ascii",
+    "input": "testString",
+    "seed": 0,
+    "expected": 2859361711
+  },
+  {
+    "category": "ascii",
+    "input": "testString",
+    "seed": 1,
+    "expected": 3650062624
+  },
+  {
+    "category": "ascii",
+    "input": "testString",
+    "seed": 42,
+    "expected": 1122469937
+  },
+  {
+    "category": "ascii",
+    "input": "testString",
+    "seed": 2147483647,
+    "expected": 2715170286
+  },
+  {
+    "category": "ascii",
+    "input": "hello",
+    "seed": 9999,
+    "expected": 198804431
+  },
+  {
+    "category": "ascii",
+    "input": "hello",
+    "seed": 0,
+    "expected": 613153351
+  },
+  {
+    "category": "ascii",
+    "input": "hello",
+    "seed": 1,
+    "expected": 3142237357
+  },
+  {
+    "category": "ascii",
+    "input": "hello",
+    "seed": 42,
+    "expected": 3806057185
+  },
+  {
+    "category": "ascii",
+    "input": "hello",
+    "seed": 2147483647,
+    "expected": 2932207495
+  },
+  {
+    "category": "ascii",
+    "input": "visitor-123",
+    "seed": 9999,
+    "expected": 1130634450
+  },
+  {
+    "category": "ascii",
+    "input": "visitor-123",
+    "seed": 0,
+    "expected": 2147676167
+  },
+  {
+    "category": "ascii",
+    "input": "visitor-123",
+    "seed": 1,
+    "expected": 2265131852
+  },
+  {
+    "category": "ascii",
+    "input": "visitor-123",
+    "seed": 42,
+    "expected": 3924851732
+  },
+  {
+    "category": "ascii",
+    "input": "visitor-123",
+    "seed": 2147483647,
+    "expected": 1043475628
+  },
+  {
+    "category": "ascii",
+    "input": "01ABCD",
+    "seed": 9999,
+    "expected": 2347149437
+  },
+  {
+    "category": "ascii",
+    "input": "01ABCD",
+    "seed": 0,
+    "expected": 849284242
+  },
+  {
+    "category": "ascii",
+    "input": "01ABCD",
+    "seed": 1,
+    "expected": 1421184423
+  },
+  {
+    "category": "ascii",
+    "input": "01ABCD",
+    "seed": 42,
+    "expected": 1595999719
+  },
+  {
+    "category": "ascii",
+    "input": "01ABCD",
+    "seed": 2147483647,
+    "expected": 3737462854
+  },
+  {
+    "category": "ascii",
+    "input": "exp100234567visitor-456",
+    "seed": 9999,
+    "expected": 389144390
+  },
+  {
+    "category": "ascii",
+    "input": "exp100234567visitor-456",
+    "seed": 0,
+    "expected": 251686026
+  },
+  {
+    "category": "ascii",
+    "input": "exp100234567visitor-456",
+    "seed": 1,
+    "expected": 903160116
+  },
+  {
+    "category": "ascii",
+    "input": "exp100234567visitor-456",
+    "seed": 42,
+    "expected": 728223044
+  },
+  {
+    "category": "ascii",
+    "input": "exp100234567visitor-456",
+    "seed": 2147483647,
+    "expected": 2674321400
+  },
+  {
+    "category": "unicode",
+    "input": "こんにちは",
+    "seed": 9999,
+    "expected": 383202654
+  },
+  {
+    "category": "unicode",
+    "input": "こんにちは",
+    "seed": 0,
+    "expected": 757219804
+  },
+  {
+    "category": "unicode",
+    "input": "こんにちは",
+    "seed": 1,
+    "expected": 3536108979
+  },
+  {
+    "category": "unicode",
+    "input": "こんにちは",
+    "seed": 42,
+    "expected": 1571673518
+  },
+  {
+    "category": "unicode",
+    "input": "こんにちは",
+    "seed": 2147483647,
+    "expected": 2164962015
+  },
+  {
+    "category": "unicode",
+    "input": "über",
+    "seed": 9999,
+    "expected": 3630651915
+  },
+  {
+    "category": "unicode",
+    "input": "über",
+    "seed": 0,
+    "expected": 2684790572
+  },
+  {
+    "category": "unicode",
+    "input": "über",
+    "seed": 1,
+    "expected": 86538514
+  },
+  {
+    "category": "unicode",
+    "input": "über",
+    "seed": 42,
+    "expected": 3585450250
+  },
+  {
+    "category": "unicode",
+    "input": "über",
+    "seed": 2147483647,
+    "expected": 401251216
+  },
+  {
+    "category": "unicode",
+    "input": "café",
+    "seed": 9999,
+    "expected": 3512853862
+  },
+  {
+    "category": "unicode",
+    "input": "café",
+    "seed": 0,
+    "expected": 605818632
+  },
+  {
+    "category": "unicode",
+    "input": "café",
+    "seed": 1,
+    "expected": 3339761266
+  },
+  {
+    "category": "unicode",
+    "input": "café",
+    "seed": 42,
+    "expected": 1312538061
+  },
+  {
+    "category": "unicode",
+    "input": "café",
+    "seed": 2147483647,
+    "expected": 3122006092
+  },
+  {
+    "category": "unicode",
+    "input": "emoji🎉test",
+    "seed": 9999,
+    "expected": 3359303706
+  },
+  {
+    "category": "unicode",
+    "input": "emoji🎉test",
+    "seed": 0,
+    "expected": 1901250822
+  },
+  {
+    "category": "unicode",
+    "input": "emoji🎉test",
+    "seed": 1,
+    "expected": 281452684
+  },
+  {
+    "category": "unicode",
+    "input": "emoji🎉test",
+    "seed": 42,
+    "expected": 1478545735
+  },
+  {
+    "category": "unicode",
+    "input": "emoji🎉test",
+    "seed": 2147483647,
+    "expected": 2585104342
+  },
+  {
+    "category": "empty",
+    "input": "",
+    "seed": 9999,
+    "expected": 3523940263
+  },
+  {
+    "category": "empty",
+    "input": "",
+    "seed": 0,
+    "expected": 0
+  },
+  {
+    "category": "empty",
+    "input": "",
+    "seed": 1,
+    "expected": 1364076727
+  },
+  {
+    "category": "empty",
+    "input": "",
+    "seed": 42,
+    "expected": 142593372
+  },
+  {
+    "category": "empty",
+    "input": "",
+    "seed": 2147483647,
+    "expected": 4190899880
+  },
+  {
+    "category": "numeric",
+    "input": "12345",
+    "seed": 9999,
+    "expected": 495772237
+  },
+  {
+    "category": "numeric",
+    "input": "12345",
+    "seed": 0,
+    "expected": 329585043
+  },
+  {
+    "category": "numeric",
+    "input": "12345",
+    "seed": 1,
+    "expected": 1377935000
+  },
+  {
+    "category": "numeric",
+    "input": "12345",
+    "seed": 42,
+    "expected": 762312584
+  },
+  {
+    "category": "numeric",
+    "input": "12345",
+    "seed": 2147483647,
+    "expected": 2156089812
+  },
+  {
+    "category": "numeric",
+    "input": "0",
+    "seed": 9999,
+    "expected": 935988371
+  },
+  {
+    "category": "numeric",
+    "input": "0",
+    "seed": 0,
+    "expected": 3530670207
+  },
+  {
+    "category": "numeric",
+    "input": "0",
+    "seed": 1,
+    "expected": 2992457707
+  },
+  {
+    "category": "numeric",
+    "input": "0",
+    "seed": 42,
+    "expected": 3495505081
+  },
+  {
+    "category": "numeric",
+    "input": "0",
+    "seed": 2147483647,
+    "expected": 1636712044
+  },
+  {
+    "category": "numeric",
+    "input": "999999999",
+    "seed": 9999,
+    "expected": 776928737
+  },
+  {
+    "category": "numeric",
+    "input": "999999999",
+    "seed": 0,
+    "expected": 1409968506
+  },
+  {
+    "category": "numeric",
+    "input": "999999999",
+    "seed": 1,
+    "expected": 88589017
+  },
+  {
+    "category": "numeric",
+    "input": "999999999",
+    "seed": 42,
+    "expected": 3748054925
+  },
+  {
+    "category": "numeric",
+    "input": "999999999",
+    "seed": 2147483647,
+    "expected": 2028654253
+  },
+  {
+    "category": "long",
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "seed": 9999,
+    "expected": 3355690396
+  },
+  {
+    "category": "long",
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "seed": 0,
+    "expected": 1589327108
+  },
+  {
+    "category": "long",
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "seed": 1,
+    "expected": 2657342247
+  },
+  {
+    "category": "long",
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "seed": 42,
+    "expected": 3438819463
+  },
+  {
+    "category": "long",
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "seed": 2147483647,
+    "expected": 1662756128
+  },
+  {
+    "category": "long",
+    "input": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "seed": 9999,
+    "expected": 3766794393
+  },
+  {
+    "category": "long",
+    "input": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "seed": 0,
+    "expected": 167809087
+  },
+  {
+    "category": "long",
+    "input": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "seed": 1,
+    "expected": 1226858266
+  },
+  {
+    "category": "long",
+    "input": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "seed": 42,
+    "expected": 2011089253
+  },
+  {
+    "category": "long",
+    "input": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "seed": 2147483647,
+    "expected": 403187954
+  }
+]

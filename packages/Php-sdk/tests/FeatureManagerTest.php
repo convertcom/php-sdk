@@ -63,8 +63,12 @@ class FeatureManagerTest extends TestCase
         // Create Config object
         $this->config = new Config($configuration);
 
-        $bucketingManager = new BucketingManager($this->config);
-        $ruleManager = new RuleManager($this->config);
+        $bucketingConfig = $this->config->getBucketing();
+        $bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $ruleManager = new RuleManager();
         $loggerManager = new LogManager($this->config);
         $this->eventManager = new EventManager($this->config);
         $this->apiManager = new ApiManager($this->config, $this->eventManager);

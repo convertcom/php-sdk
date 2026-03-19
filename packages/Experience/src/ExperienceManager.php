@@ -14,43 +14,32 @@ namespace ConvertSdk;
 use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigExperience;
 use OpenAPI\Client\Model\ExperienceVariationConfig;
-use OpenAPI\Client\BucketedVariation;
 use OpenAPI\Client\BucketingAttributes;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
 use ConvertSdk\Enums\Messages;
 
 /**
- * Provides experiences specific logic
- * @category Modules
+ * Provides experiences specific logic.
+ *
+ * ExperienceManager is a thin orchestrator that delegates all bucketing logic
+ * to DataManager. It does NOT contain bucketing, rule evaluation, or hashing logic.
+ *
  * @implements ExperienceManagerInterface
  */
-class ExperienceManager implements ExperienceManagerInterface
+final class ExperienceManager implements ExperienceManagerInterface
 {
-    /** @var DataManagerInterface */
-    private $dataManager;
-
-    /** @var LogManagerInterface|null */
-    private $loggerManager;
-
     /**
-     * Constructor for ExperienceManager.
-     *
-     * @param Config $config Configuration object
-     * @param array $dependencies Dependencies array
-     * @param DataManagerInterface $dependencies['dataManager'] Data manager instance
-     * @param LogManagerInterface|null $dependencies['loggerManager'] Optional logger manager instance
+     * @param DataManagerInterface $dataManager Data manager for bucketing and entity lookups
+     * @param LogManagerInterface|null $logManager Optional logger manager instance
      */
-    public function __construct(Config $config, array $dependencies)
-    {
-        $this->dataManager = $dependencies['dataManager'];
-        $this->loggerManager = $dependencies['loggerManager'] ?? null;
-        if ($this->loggerManager) {
-            $this->loggerManager->trace('ExperienceManager()', Messages::EXPERIENCE_CONSTRUCTOR);
-        }
+    public function __construct(
+        private readonly DataManagerInterface $dataManager,
+        private readonly ?LogManagerInterface $logManager = null,
+    ) {
+        $this->logManager?->trace('ExperienceManager()', Messages::EXPERIENCE_CONSTRUCTOR);
     }
 
     /**
@@ -67,7 +56,7 @@ class ExperienceManager implements ExperienceManagerInterface
      * Get an experience by its key.
      *
      * @param string $key The experience key
-     * @return ConfigExperience The experience configuration
+     * @return ConfigExperience|null The experience configuration, or null if not found
      */
     public function getExperience(string $key): ?ConfigExperience
     {
@@ -82,7 +71,7 @@ class ExperienceManager implements ExperienceManagerInterface
      * Get an experience by its ID.
      *
      * @param string $id The experience ID
-     * @return ConfigExperience The experience configuration
+     * @return ConfigExperience|null The experience configuration, or null if not found
      */
     public function getExperienceById(string $id): ?ConfigExperience
     {
@@ -110,9 +99,9 @@ class ExperienceManager implements ExperienceManagerInterface
      * @param string $visitorId The visitor's ID
      * @param string $experienceKey The experience key
      * @param BucketingAttributes $attributes Bucketing attributes for variation selection
-     * @return BucketedVariation|RuleError|BucketingError The selected variation or an error
+     * @return array|RuleError|BucketingError|null The selected variation array, or an error/null
      */
-    public function selectVariation(string $visitorId, string $experienceKey, BucketingAttributes $attributes)
+    public function selectVariation(string $visitorId, string $experienceKey, BucketingAttributes $attributes): array|RuleError|BucketingError|null
     {
         return $this->dataManager->getBucketing($visitorId, $experienceKey, $attributes);
     }
@@ -123,9 +112,9 @@ class ExperienceManager implements ExperienceManagerInterface
      * @param string $visitorId The visitor's ID
      * @param string $experienceId The experience ID
      * @param BucketingAttributes $attributes Bucketing attributes for variation selection
-     * @return BucketedVariation|RuleError|BucketingError The selected variation or an error
+     * @return array|RuleError|BucketingError|null The selected variation array, or an error/null
      */
-    public function selectVariationById(string $visitorId, string $experienceId, BucketingAttributes $attributes)
+    public function selectVariationById(string $visitorId, string $experienceId, BucketingAttributes $attributes): array|RuleError|BucketingError|null
     {
         return $this->dataManager->getBucketingById($visitorId, $experienceId, $attributes);
     }
@@ -133,9 +122,12 @@ class ExperienceManager implements ExperienceManagerInterface
     /**
      * Select variations for a visitor across all experiences.
      *
+     * Filters out null, RuleError, and BucketingError results — only successful
+     * bucketed variation arrays are returned.
+     *
      * @param string $visitorId The visitor's ID
      * @param BucketingAttributes $attributes Bucketing attributes for variation selection
-     * @return array Array of BucketedVariation|RuleError|BucketingError
+     * @return array<int, array<string, mixed>> Array of successful bucketed variation arrays
      */
     public function selectVariations(string $visitorId, BucketingAttributes $attributes): array
     {
