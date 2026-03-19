@@ -71,22 +71,22 @@ class ApiManager implements ApiManagerInterface
     private bool $timeoutEnabled = true;
 
     /** @var string Configuration endpoint URL */
-    private $configEndpoint;
+    private string $configEndpoint;
 
     /** @var string Tracking endpoint URL */
-    private $trackEndpoint;
+    private string $trackEndpoint;
 
     /** @var array<string, string> Default HTTP headers */
-    private $defaultHeaders = self::DEFAULT_HEADERS;
+    private array $defaultHeaders = self::DEFAULT_HEADERS;
 
     /** @var ?ConfigResponseData Configuration response data */
     private ?ConfigResponseData $data = null;
 
     /** @var bool Whether to enrich data */
-    private $enrichData;
+    private bool $enrichData;
 
     /** @var ?string Environment setting */
-    private $environment = null;
+    private ?string $environment = null;
 
     /** @var ?LogManagerInterface Logger manager instance */
     private ?LogManagerInterface $loggerManager = null;
@@ -95,34 +95,34 @@ class ApiManager implements ApiManagerInterface
     private ?EventManagerInterface $eventManager = null;
 
     /** @var string SDK key */
-    private $sdkKey;
+    private string $sdkKey;
 
     /** @var string Account ID */
-    private $accountId;
+    private string $accountId;
 
     /** @var string Project ID */
-    private $projectId;
+    private string $projectId;
 
-    /** @var array Tracking event data */
-    private $trackingEvent;
+    /** @var array<string, mixed> Tracking event data */
+    private array $trackingEvent;
 
     /** @var bool Whether tracking is enabled */
-    private $trackingEnabled = false;
+    private bool $trackingEnabled = false;
 
     /** @var string Source of tracking */
-    private $trackingSource;
+    private string $trackingSource;
 
     /** @var string Cache level setting */
-    private $cacheLevel;
+    private string $cacheLevel;
 
     /** @var callable Mapper function for data transformation */
-    private $mapper;
+    private mixed $mapper;
 
     /** @var int Batch size for queue processing */
-    private $batchSize;
+    private int $batchSize;
 
     /** @var int Release interval in milliseconds */
-    private $releaseInterval;
+    private int $releaseInterval;
 
     /** @var ClientInterface PSR-18 HTTP client */
     private ClientInterface $httpClient;
@@ -190,13 +190,13 @@ class ApiManager implements ApiManagerInterface
             'visitors' => []
         ];
         $this->trackingEnabled = $config && $config->getNetwork() && isset($config->getNetwork()['tracking'])
-            ? $config->getNetwork()['tracking']
+            ? (bool) $config->getNetwork()['tracking']
             : false;
         $this->trackingSource = $config && $config->getNetwork() && isset($config->getNetwork()['source'])
-            ? $config->getNetwork()['source']
+            ? (string) $config->getNetwork()['source']
             : 'js-sdk';
         $this->cacheLevel = $config && $config->getNetwork() && isset($config->getNetwork()['cacheLevel'])
-            ? $config->getNetwork()['cacheLevel']
+            ? (string) $config->getNetwork()['cacheLevel']
             : '';
 
         $this->httpClient = $httpClient ?? Psr18ClientDiscovery::find();
@@ -265,6 +265,7 @@ class ApiManager implements ApiManagerInterface
                 call_user_func($this->mapper, ['eventRequest' => $eventRequest])
             );
         }
+        // @phpstan-ignore-next-line OpenAPI model objects are cast to arrays via end() for VisitorsQueue compatibility
         $this->requestsQueue->push($visitorId, end($eventRequest), end($segments));
         if ($this->trackingEnabled) {
             $this->releaseQueue('size');
@@ -398,7 +399,8 @@ class ApiManager implements ApiManagerInterface
     {
         $this->data = $data;
         $this->accountId = $data->getAccountId() ?? '';
-        $this->projectId = $data->getProject() ? $data->getProject()["id"] : '';
+        $project = $data->getProject();
+        $this->projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
         $this->trackingEvent['accountId'] = $this->accountId;
         $this->trackingEvent['projectId'] = $this->projectId;
     }

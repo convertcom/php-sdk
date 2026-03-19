@@ -12,7 +12,7 @@ class ArrayUtils
      * @param mixed $value
      * @return bool
      */
-    public static function arrayNotEmpty($value): bool
+    public static function arrayNotEmpty(mixed $value): bool
     {
         return is_array($value) && count($value) > 0;
     }

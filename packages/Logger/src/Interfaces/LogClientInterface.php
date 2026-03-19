@@ -19,7 +19,7 @@ interface LogClientInterface {
      *
      * @return mixed
      */
-    public function getSdk();
+    public function getSdk(): mixed;
 
     /**
      * Set the SDK instance.
@@ -27,7 +27,7 @@ interface LogClientInterface {
      * @param mixed $sdk
      * @return void
      */
-    public function setSdk($sdk);
+    public function setSdk(mixed $sdk): void;
 
     /**
      * Get the current log level.

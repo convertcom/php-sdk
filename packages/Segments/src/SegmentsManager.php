@@ -25,17 +25,17 @@ use ConvertSdk\Utils\ObjectUtils;
  */
 class SegmentsManager implements SegmentsManagerInterface
 {
-    /** @var ConfigResponseData */
-    private $data;
+    /** @var ?ConfigResponseData */
+    private ?ConfigResponseData $data;
 
     /** @var DataManagerInterface */
-    private $dataManager;
+    private DataManagerInterface $dataManager;
 
     /** @var RuleManagerInterface */
-    private $ruleManager;
+    private RuleManagerInterface $ruleManager;
 
     /** @var LogManagerInterface|null */
-    private $loggerManager;
+    private ?LogManagerInterface $loggerManager;
 
     /**
      * SegmentsManager constructor.
@@ -68,7 +68,7 @@ class SegmentsManager implements SegmentsManagerInterface
         $storeData = $this->dataManager->getData($visitorId) ?? [];
         $storeData = (array)$storeData;
         $segments = $this->dataManager->filterReportSegments($storeData['segments'] ?? []);
-        return new VisitorSegments($segments['segments']) ?? new VisitorSegments();
+        return new VisitorSegments($segments['segments'] ?? []);
     }
 
     /**
@@ -98,7 +98,7 @@ class SegmentsManager implements SegmentsManagerInterface
         string $visitorId,
         array $segments,
         ?array $segmentRule = null
-    ) {
+    ): VisitorSegments|RuleError|null {
         $storeData = $this->dataManager->getData($visitorId) ?? [];
         $visitorSegments = $storeData["segments"] ?? [];
         $customSegments = $visitorSegments["custom_segments"] ?? [];
@@ -156,7 +156,7 @@ class SegmentsManager implements SegmentsManagerInterface
         string $visitorId,
         array $segmentKeys,
         ?array $segmentRule = null
-    ) {
+    ): VisitorSegments|RuleError|null {
         $segments = $this->dataManager->getEntities($segmentKeys, 'segments');
         return $this->setCustomSegments($visitorId, $segments, $segmentRule);
     }
@@ -173,7 +173,7 @@ class SegmentsManager implements SegmentsManagerInterface
         string $visitorId,
         array $segmentIds,
         ?array $segmentRule = null
-    ) {
+    ): VisitorSegments|RuleError|null {
         $segments = $this->dataManager->getEntitiesByIds($segmentIds, 'segments');
         return $this->setCustomSegments($visitorId, $segments, $segmentRule);
     }

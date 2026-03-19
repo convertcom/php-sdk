@@ -1,0 +1,19 @@
+parameters:
+    level: 6
+    paths:
+        - packages/Api/src
+        - packages/Bucketing/src
+        - packages/Data/src
+        - packages/Enums/src
+        - packages/Event/src
+        - packages/Experience/src
+        - packages/Logger/src
+        - packages/Php-sdk/src
+        - packages/Rules/src
+        - packages/Segments/src
+        - packages/Utils/src
+    excludePaths:
+        - packages/Types/lib
+    scanDirectories:
+        - packages/Types/lib
+    reportUnmatchedIgnoredErrors: false

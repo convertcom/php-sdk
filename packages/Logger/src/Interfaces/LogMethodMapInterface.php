@@ -29,8 +29,7 @@ interface LogMethodMapInterface extends \ArrayAccess {
      * @param LogMethod|string $offset
      * @return string|null
      */
-    #[\ReturnTypeWillChange]
-    public function offsetGet($offset);
+    public function offsetGet(mixed $offset): mixed;
 
     /**
      * Set the mapped method name for the given log method.
@@ -39,7 +38,7 @@ interface LogMethodMapInterface extends \ArrayAccess {
      * @param string|null $value
      * @return void
      */
-    public function offsetSet($offset, $value): void;
+    public function offsetSet(mixed $offset, mixed $value): void;
 
     /**
      * Check if a mapping exists for the given log method.
@@ -47,7 +46,7 @@ interface LogMethodMapInterface extends \ArrayAccess {
      * @param LogMethod|string $offset
      * @return bool
      */
-    public function offsetExists($offset): bool;
+    public function offsetExists(mixed $offset): bool;
 
     /**
      * Remove the mapping for the given log method.
@@ -55,5 +54,5 @@ interface LogMethodMapInterface extends \ArrayAccess {
      * @param LogMethod|string $offset
      * @return void
      */
-    public function offsetUnset($offset): void;
+    public function offsetUnset(mixed $offset): void;
 }
