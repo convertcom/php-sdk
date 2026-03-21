@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace ConvertSdk;
 
 use ConvertSdk\Interfaces\ContextInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;

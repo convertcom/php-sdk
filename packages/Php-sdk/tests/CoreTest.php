@@ -5,7 +5,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 use ConvertSdk\BucketingManager;
 use ConvertSdk\RuleManager;
-use ConvertSdk\EventManager;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\ApiManager;
 use ConvertSdk\DataManager;
 use ConvertSdk\ExperienceManager;
@@ -69,7 +69,7 @@ class CoreTest extends TestCase
             hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
         );
         $this->ruleManager = new RuleManager();
-        $this->eventManager = new EventManager($this->config);
+        $this->eventManager = new EventManager();
         $this->apiManager = new ApiManager($this->config, $this->eventManager, $this->loggerManager);
         $this->dataManager = new DataManager(
             $this->config,

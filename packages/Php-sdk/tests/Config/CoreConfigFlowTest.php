@@ -12,7 +12,7 @@ use ConvertSdk\Exception\ConfigFetchException;
 use ConvertSdk\Exception\ConfigValidationException;
 use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\DataManagerInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;

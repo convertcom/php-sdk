@@ -9,7 +9,7 @@ use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use OpenAPI\Client\Config;
 
 final class DataStoreManager implements DataStoreManagerInterface

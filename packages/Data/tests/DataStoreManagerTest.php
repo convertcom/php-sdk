@@ -6,7 +6,7 @@ namespace ConvertSdk\Tests;
 
 use PHPUnit\Framework\TestCase;
 use ConvertSdk\DataStoreManager;
-use ConvertSdk\EventManager;
+use ConvertSdk\Event\EventManager;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use ConvertSdk\Config\DefaultConfig;
@@ -125,7 +125,7 @@ class DataStoreManagerTest extends TestCase
 
         // Create dependencies
         $this->dataStore = new TestDataStore();
-        $this->eventManager = new EventManager($config);
+        $this->eventManager = new EventManager();
 
         // Instantiate DataStoreManager
         $this->dataStoreManager = new DataStoreManager($config, [

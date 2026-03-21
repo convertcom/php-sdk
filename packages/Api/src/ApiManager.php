@@ -17,7 +17,7 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Http\Discovery\Psr18ClientDiscovery;
 use Http\Discovery\Psr17FactoryDiscovery;
 use ConvertSdk\Interfaces\ApiManagerInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\VisitorsQueue;

@@ -11,7 +11,7 @@ use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\BucketingManager;
 use ConvertSdk\RuleManager;
-use ConvertSdk\EventManager;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\ApiManager;
 use ConvertSdk\LogManager;
 use ConvertSdk\DataManager;
@@ -91,7 +91,7 @@ class ExperienceManagerTest extends TestCase
             hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
         );
         $ruleManager = new RuleManager();
-        $eventManager = new EventManager($config);
+        $eventManager = new EventManager();
         $apiManager = new ApiManager($config, $eventManager);
         $loggerManager = new LogManager($config);
         $this->dataManager = new DataManager(
