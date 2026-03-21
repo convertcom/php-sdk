@@ -9,7 +9,7 @@ namespace ConvertSdk\Utils;
  */
 class ObjectUtils
 {
-    public static function objectDeepValue(array $object, string $path, $defaultValue = null, bool $truthy = false)
+    public static function objectDeepValue(array $object, string $path, mixed $defaultValue = null, bool $truthy = false): mixed
     {
         try {
             if (!empty($object)) {
@@ -32,9 +32,9 @@ class ObjectUtils
         return $defaultValue ?? null;
     }
 
-    public static function objectDeepMerge(...$objects): array
+    public static function objectDeepMerge(array ...$objects): array
     {
-        $isAssoc = function ($arr) {
+        $isAssoc = function (array $arr): bool {
             return array_keys($arr) !== range(0, count($arr) - 1);
         };
     
@@ -62,7 +62,7 @@ class ObjectUtils
     }
     
 
-    public static function objectNotEmpty($object): bool
+    public static function objectNotEmpty(mixed $object): bool
     {
         if (is_array($object)) {
             return !empty($object);
@@ -72,7 +72,7 @@ class ObjectUtils
         return false;
     }
 
-    public static function objectDeepEqual($a, $b): bool
+    public static function objectDeepEqual(mixed $a, mixed $b): bool
     {
         if ($a === $b) {
             return true;

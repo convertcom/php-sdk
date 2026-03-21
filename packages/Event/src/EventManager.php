@@ -12,30 +12,30 @@ namespace ConvertSdk;
 
 use ConvertSdk\Interfaces\EventManagerInterface;
 use ConvertSdk\Enums\SystemEvents;
-use ConvertSdk\Logger\Interfaces\LogManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
 use OpenAPI\Client\Config;
 
 class EventManager implements EventManagerInterface
 {
     /**
-     * @var array Listeners indexed by event name.
+     * @var array<string, array<int, callable>> Listeners indexed by event name.
      */
-    private $_listeners = [];
+    private array $_listeners = [];
 
     /**
-     * @var array Deferred events indexed by event name.
+     * @var array<string, array{args: mixed, err: mixed}> Deferred events indexed by event name.
      */
-    private $_deferred = [];
+    private array $_deferred = [];
 
     /**
      * @var LogManagerInterface|null Optional logger manager.
      */
-    private $_loggerManager;
+    private ?LogManagerInterface $_loggerManager = null;
 
     /**
      * @var callable Mapper function.
      */
-    private $_mapper;
+    private mixed $_mapper;
 
     /**
      * Constructor.
@@ -65,7 +65,7 @@ class EventManager implements EventManagerInterface
      * @param callable $fn Callback function receiving ($args, $err).
      * @return void
      */
-    public function on($event, callable $fn): void
+    public function on(SystemEvents|string $event, callable $fn): void
     {
         $key = $event instanceof \BackedEnum ? $event->value : $event;
         if (!isset($this->_listeners[$key])) {
@@ -94,7 +94,7 @@ class EventManager implements EventManagerInterface
      * @param bool $deferred Whether to store the event for later listeners.
      * @return void
      */
-    public function fire($event, $args = null, $err = null, bool $deferred = false): void
+    public function fire(SystemEvents|string $event, mixed $args = null, mixed $err = null, bool $deferred = false): void
     {
         $key = $event instanceof \BackedEnum ? $event->value : $event;
         if ($this->_loggerManager !== null && method_exists($this->_loggerManager, 'debug')) {
@@ -133,7 +133,7 @@ class EventManager implements EventManagerInterface
      * @param string $event The event name.
      * @return void
      */
-    public function removeListeners($event): void
+    public function removeListeners(SystemEvents|string $event): void
     {
         $key = $event instanceof \BackedEnum ? $event->value : $event;
         if (array_key_exists($key, $this->_listeners)) {

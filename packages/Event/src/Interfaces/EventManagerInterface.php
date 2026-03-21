@@ -26,7 +26,7 @@ interface EventManagerInterface
      * @param callable $fn A callback function that receives two parameters: $args and $err.
      * @return void
      */
-    public function on($event, callable $fn): void;
+    public function on(SystemEvents|string $event, callable $fn): void;
 
     /**
      * Fires an event, optionally with arguments and an error.
@@ -37,7 +37,7 @@ interface EventManagerInterface
      * @param bool $deferred Optional flag indicating if the event should be deferred.
      * @return void
      */
-    public function fire($event, array $args = [], $err = null, bool $deferred = false): void;
+    public function fire(SystemEvents|string $event, mixed $args = null, mixed $err = null, bool $deferred = false): void;
 
     /**
      * Removes all listeners associated with the given event.
@@ -45,5 +45,5 @@ interface EventManagerInterface
      * @param string $event The event name.
      * @return void
      */
-    public function removeListeners($event): void;
+    public function removeListeners(SystemEvents|string $event): void;
 }

@@ -9,7 +9,7 @@ namespace ConvertSdk\Utils;
  */
 class TypeUtils
 {
-    public static function castType($value, string $type)
+    public static function castType(mixed $value, string $type): mixed
     {
         switch ($type) {
             case 'boolean':

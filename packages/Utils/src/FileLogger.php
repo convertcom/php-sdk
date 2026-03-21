@@ -8,16 +8,16 @@ use DateTime;
 
 class FileLogger
 {
-    private $file;
-    private $fs;
-    private $appendMethod;
+    private string $file;
+    private mixed $fs;
+    private string $appendMethod;
 
     /**
      * @param string $file
      * @param mixed $fs A filesystem handler (or null to use PHP built‑in functions)
      * @param string $appendMethod Defaults to 'append'
      */
-    public function __construct(string $file, $fs, string $appendMethod = 'append')
+    public function __construct(string $file, mixed $fs, string $appendMethod = 'append')
     {
         $this->file = $file;
         $this->fs = $fs;
@@ -31,7 +31,7 @@ class FileLogger
      * @param mixed ...$args
      * @return void
      */
-    private function _write(string $method, ...$args): void
+    private function _write(string $method, mixed ...$args): void
     {
         $prefix = sprintf("%s [%s]", (new DateTime())->format(DateTime::ATOM), strtoupper($method));
         $output = $prefix . ' ' . implode("\n" . $prefix . ' ', array_map('json_encode', $args)) . "\n";
@@ -47,27 +47,27 @@ class FileLogger
         }
     }
 
-    public function log(...$args): void
+    public function log(mixed ...$args): void
     {
         $this->_write('log', ...$args);
     }
 
-    public function info(...$args): void
+    public function info(mixed ...$args): void
     {
         $this->_write('info', ...$args);
     }
 
-    public function debug(...$args): void
+    public function debug(mixed ...$args): void
     {
         $this->_write('debug', ...$args);
     }
 
-    public function warn(...$args): void
+    public function warn(mixed ...$args): void
     {
         $this->_write('warn', ...$args);
     }
 
-    public function error(...$args): void
+    public function error(mixed ...$args): void
     {
         $this->_write('error', ...$args);
     }

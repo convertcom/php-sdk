@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Interfaces;
 
+use ConvertSdk\Enums\RuleError;
 use OpenAPI\Client\Model\VisitorSegments;
 
 /**
@@ -41,7 +42,7 @@ interface SegmentsManagerInterface
         string $visitorId,
         array $segmentKeys,
         ?array $segmentRule = null
-    );
+    ): VisitorSegments|RuleError|null;
 
     /**
      * Update custom segments for specific visitor by segment IDs
@@ -49,11 +50,11 @@ interface SegmentsManagerInterface
      * @param string $visitorId
      * @param array<string> $segmentIds A list of segment IDs
      * @param array|null $segmentRule An object of key-value pairs for segments matching
-     * @return mixed VisitorSegments or RuleError
+     * @return VisitorSegments|RuleError|null
      */
     public function selectCustomSegmentsByIds(
         string $visitorId,
         array $segmentIds,
         ?array $segmentRule = null
-    );
+    ): VisitorSegments|RuleError|null;
 }
