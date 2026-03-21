@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\MockObject\MockObject;
 use ConvertSdk\DataManager;
+use ConvertSdk\Enums\Messages;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\BucketingManagerInterface;
-use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Interfaces\RuleManagerInterface;
-use ConvertSdk\Enums\Messages;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for DataManager entity lookup failure logging (Story 4.2).

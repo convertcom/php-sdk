@@ -10,9 +10,8 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Interfaces;
 
-use ConvertSdk\Interfaces\DataStoreManagerInterface;
-use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\RuleError;
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\LocationAttributes;
 use OpenAPI\Client\Model\ConfigResponseData;

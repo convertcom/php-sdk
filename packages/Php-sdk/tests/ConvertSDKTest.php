@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
+use ConvertSdk\Context;
 use ConvertSdk\ConvertSDK;
 use ConvertSdk\Core;
-use ConvertSdk\Context;
-use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\DTO\BucketedFeature;
+use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\Enums\FeatureStatus;
 use ConvertSdk\Exception\InvalidArgumentException;
+use PHPUnit\Framework\TestCase;
 
 class ConvertSDKTest extends TestCase
 {

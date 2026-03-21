@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use ConvertSdk\DataManager;
 use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\Event\EventManager;
-use ConvertSdk\LogManager;
-use ConvertSdk\Utils\ObjectUtils;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\DataManager;
 use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\Interfaces\ApiManagerInterface;
+use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
-use ConvertSdk\Config\DefaultConfig;
 use PHPUnit\Framework\TestCase;
 
 class ConversionDeduplicationTest extends TestCase
@@ -37,13 +37,13 @@ class ConversionDeduplicationTest extends TestCase
             'api' => [
                 'endpoint' => [
                     'config' => 'http://localhost:8090',
-                    'track' => 'http://localhost:8090'
-                ]
+                    'track' => 'http://localhost:8090',
+                ],
             ],
             'events' => [
                 'batch_size' => 10,
-                'release_interval' => 1000
-            ]
+                'release_interval' => 1000,
+            ],
         ];
         $mergedConfig = ObjectUtils::objectDeepMerge($testConfig, $defaultConfig, $overrides);
         $mergedConfig['data'] = new ConfigResponseData($mergedConfig['data']);

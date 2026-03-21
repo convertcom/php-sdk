@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Utils;
 
-use ConvertSdk\Utils\ObjectUtils;
-
 /**
  * Comparison processor for rule evaluation.
  *

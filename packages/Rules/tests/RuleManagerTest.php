@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
 use ConvertSdk\RuleManager;
-use ConvertSdk\Utils\Comparisons;
-use ConvertSdk\Enums\RuleError;
 use OpenAPI\Client\Model\RuleElement;
 use OpenAPI\Client\Model\RuleObject;
+use PHPUnit\Framework\TestCase;
 
 class RuleManagerTest extends TestCase
 {
@@ -54,7 +52,7 @@ class RuleManagerTest extends TestCase
                     return $actualType !== $testAgainst;
                 }
                 return $actualType === $testAgainst;
-            }
+            },
         ];
 
         $rm = new RuleManager(
@@ -82,7 +80,7 @@ class RuleManagerTest extends TestCase
                     return $actualType !== $testAgainst;
                 }
                 return $actualType === $testAgainst;
-            }
+            },
         ];
 
         $rm = new RuleManager(
@@ -111,7 +109,7 @@ class RuleManagerTest extends TestCase
                     return $actualType !== $testAgainst;
                 }
                 return $actualType === $testAgainst;
-            }
+            },
         ];
 
         $rm = new RuleManager(
@@ -129,15 +127,15 @@ class RuleManagerTest extends TestCase
                                     'key' => 'sum',
                                     'matching' => [
                                         'match_type' => 'isTypeOf',
-                                        'negated' => false
+                                        'negated' => false,
                                     ],
-                                    'value' => 'number'
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                                    'value' => 'number',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
         $testRuleSet2 = [
             'OR' => [
@@ -149,15 +147,15 @@ class RuleManagerTest extends TestCase
                                     'key' => 'sum',
                                     'matching' => [
                                         'match_type' => 'isTypeOf',
-                                        'negated' => true
+                                        'negated' => true,
                                     ],
-                                    'value' => 'number'
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                                    'value' => 'number',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
         $testRuleSet3 = [
             'OR' => [
@@ -169,15 +167,15 @@ class RuleManagerTest extends TestCase
                                     'key' => 'SUM',
                                     'matching' => [
                                         'match_type' => 'isTypeOf',
-                                        'negated' => false
+                                        'negated' => false,
                                     ],
-                                    'value' => 'number'
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                                    'value' => 'number',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
         $data1 = ['sum' => 'not a number'];
         $data2 = ['sum' => 44];
@@ -204,21 +202,21 @@ class RuleManagerTest extends TestCase
             'key' => 'device',
             'matching' => [
                 'match_type' => 'contains',
-                'negated' => false
+                'negated' => false,
             ],
-            'value' => 'phone'
+            'value' => 'phone',
         ];
         $this->assertTrue($this->ruleManager->isValidRule(new RuleElement($validRule)));
 
         $badStructure = [
             'matching' => 'contains',
-            'data' => 'phone'
+            'data' => 'phone',
         ];
         $this->assertFalse($this->ruleManager->isValidRule(new RuleElement($badStructure)));
 
         $missingMatching = [
             'key' => 'device',
-            'value' => 'phone'
+            'value' => 'phone',
         ];
         $this->assertFalse($this->ruleManager->isValidRule(new RuleElement($missingMatching)));
 
@@ -226,8 +224,8 @@ class RuleManagerTest extends TestCase
             'key' => 'device',
             'matching' => [
                 'match_type' => 'contains',
-                'negated' => false
-            ]
+                'negated' => false,
+            ],
         ];
         $this->assertFalse($this->ruleManager->isValidRule(new RuleElement($missingValue)));
     }
@@ -246,23 +244,23 @@ class RuleManagerTest extends TestCase
                                     'key' => 'device',
                                     'matching' => [
                                         'match_type' => 'equals',
-                                        'negated' => false
+                                        'negated' => false,
                                     ],
-                                    'value' => 'pc'
+                                    'value' => 'pc',
                                 ],
                                 [
                                     'key' => 'price',
                                     'matching' => [
                                         'match_type' => 'less',
-                                        'negated' => false
+                                        'negated' => false,
                                     ],
-                                    'value' => 100
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                                    'value' => 100,
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         $testRuleSet2 = [
@@ -275,23 +273,23 @@ class RuleManagerTest extends TestCase
                                     'key' => 'device',
                                     'matching' => [
                                         'match_type' => 'equals',
-                                        'negated' => true
+                                        'negated' => true,
                                     ],
-                                    'value' => 'pc'
+                                    'value' => 'pc',
                                 ],
                                 [
                                     'key' => 'device',
                                     'matching' => [
                                         'match_type' => 'isIn',
-                                        'negated' => false
+                                        'negated' => false,
                                     ],
-                                    'value' => 'phone|tablet'
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                                    'value' => 'phone|tablet',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         $testRuleSet3 = [
@@ -304,13 +302,13 @@ class RuleManagerTest extends TestCase
                                     'key' => 'device',
                                     'matching' => [
                                         'match_type' => 'isIn',
-                                        'negated' => false
+                                        'negated' => false,
                                     ],
-                                    'value' => 'phone|tablet'
-                                ]
-                            ]
-                        ]
-                    ]
+                                    'value' => 'phone|tablet',
+                                ],
+                            ],
+                        ],
+                    ],
                 ],
                 [
                     'AND' => [
@@ -320,15 +318,15 @@ class RuleManagerTest extends TestCase
                                     'key' => 'age',
                                     'matching' => [
                                         'match_type' => 'less',
-                                        'negated' => true
+                                        'negated' => true,
                                     ],
-                                    'value' => 30
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                                    'value' => 30,
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         $data1 = ['device' => 'pc', 'browser' => 'Mozilla', 'price' => 3];
@@ -359,7 +357,7 @@ class RuleManagerTest extends TestCase
                     return gettype($value) !== $testAgainst;
                 }
                 return gettype($value) === $testAgainst;
-            }
+            },
         ];
         $this->ruleManager->setComparisonProcessor($customComparisonProcessor);
         $methods = $this->ruleManager->getComparisonProcessorMethods();
@@ -406,17 +404,17 @@ class RuleManagerTest extends TestCase
                 [
                     'AND' => [
                         [
-                            'OR_WHEN' => [['key' => 'country', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'US']]
+                            'OR_WHEN' => [['key' => 'country', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'US']],
                         ],
                         [
-                            'OR_WHEN' => [['key' => 'browser', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'chrome']]
+                            'OR_WHEN' => [['key' => 'browser', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'chrome']],
                         ],
                         [
-                            'OR_WHEN' => [['key' => 'device', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'desktop']]
-                        ]
-                    ]
-                ]
-            ]
+                            'OR_WHEN' => [['key' => 'device', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'desktop']],
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         // Only 2 of 3 match
@@ -442,7 +440,7 @@ class RuleManagerTest extends TestCase
                 ['AND' => [['OR_WHEN' => [['key' => 'country', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'GB']]]]],
                 ['AND' => [['OR_WHEN' => [['key' => 'country', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'US']]]]],
                 ['AND' => [['OR_WHEN' => [['key' => 'country', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'DE']]]]],
-            ]
+            ],
         ];
 
         // Only second matches
@@ -465,12 +463,12 @@ class RuleManagerTest extends TestCase
                             'OR_WHEN' => [
                                 ['key' => 'device', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'phone'],
                                 ['key' => 'device', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'tablet'],
-                                ['key' => 'device', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'desktop']
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                                ['key' => 'device', 'matching' => ['match_type' => 'equals', 'negated' => false], 'value' => 'desktop'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         // First item matches
@@ -603,15 +601,15 @@ class RuleManagerTest extends TestCase
                                     'key' => $key,
                                     'matching' => [
                                         'match_type' => $matchType,
-                                        'negated' => $negated
+                                        'negated' => $negated,
                                     ],
-                                    'value' => $value
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                                    'value' => $value,
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
     }
 }

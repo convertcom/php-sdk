@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
+use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\DataStoreManager;
 use ConvertSdk\Event\EventManager;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
+use PHPUnit\Framework\TestCase;
 
 /**
  * A simple test implementation of a DataStore with get and set methods.
@@ -70,11 +70,11 @@ class DataStoreManagerTest extends TestCase
     private $storeData = [
         'bucketing' => [
             'exp1' => 'var1',
-            'exp2' => 'var2'
+            'exp2' => 'var2',
         ],
         'goals' => [
             'goal1' => true,
-            'goal2' => true
+            'goal2' => true,
         ],
         'segments' => [
             'browser' => 'CH',
@@ -83,8 +83,8 @@ class DataStoreManagerTest extends TestCase
             'campaign' => 'test',
             'visitorType' => 'new',
             'country' => 'US',
-            'custom_segments' => ['seg1', 'seg2']
-        ]
+            'custom_segments' => ['seg1', 'seg2'],
+        ],
     ];
 
     /**
@@ -110,8 +110,8 @@ class DataStoreManagerTest extends TestCase
             [
                 'events' => [
                     'batch_size' => $batchSize,
-                    'release_interval' => $releaseInterval
-                ]
+                    'release_interval' => $releaseInterval,
+                ],
             ]
         );
 
@@ -130,7 +130,7 @@ class DataStoreManagerTest extends TestCase
         // Instantiate DataStoreManager
         $this->dataStoreManager = new DataStoreManager($config, [
             'dataStore' => $this->dataStore,
-            'eventManager' => $this->eventManager
+            'eventManager' => $this->eventManager,
         ]);
     }
 

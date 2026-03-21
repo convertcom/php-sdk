@@ -4,26 +4,24 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use ConvertSdk\DataManager;
-use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\Event\EventManager;
 use ConvertSdk\ApiManager;
-use ConvertSdk\LogManager;
-use ConvertSdk\Utils\ObjectUtils;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\DataManager;
 use ConvertSdk\Enums\BucketingError;
 use ConvertSdk\Enums\ConversionSettingKey;
-use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\Interfaces\ApiManagerInterface;
-use OpenAPI\Client\Config;
-use OpenAPI\Client\Model\ConfigResponseData;
-use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\Model\VisitorTrackingEvents;
-use OpenAPI\Client\Model\VisitorSegments;
-use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
+use ConvertSdk\Utils\ObjectUtils;
 use Http\Mock\Client as MockHttpClient;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
+use OpenAPI\Client\BucketingAttributes;
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\VisitorTrackingEvents;
 use PHPUnit\Framework\TestCase;
 
 class DataStoreMock
@@ -86,7 +84,7 @@ class DataManagerTest extends TestCase
         'campaign' => 'test',
         'visitor_type' => 'new',
         'country' => 'US',
-        'custom_segments' => ['seg1', 'seg2']
+        'custom_segments' => ['seg1', 'seg2'],
     ];
 
     protected function setUp(): void
@@ -97,18 +95,18 @@ class DataManagerTest extends TestCase
             'api' => [
                 'endpoint' => [
                     'config' => self::HOST . ':' . self::PORT,
-                    'track' => self::HOST . ':' . self::PORT
-                ]
+                    'track' => self::HOST . ':' . self::PORT,
+                ],
             ],
             'events' => [
                 'batch_size' => self::BATCH_SIZE,
-                'release_interval' => self::RELEASE_TIMEOUT
-            ]
+                'release_interval' => self::RELEASE_TIMEOUT,
+            ],
         ];
         $mergedConfig = ObjectUtils::objectDeepMerge($testConfig, $defaultConfig, $overrides);
         $mergedConfig['data'] = new ConfigResponseData($mergedConfig['data']);
         if (isset($mergedConfig['sdkKey'])) {
-          unset($mergedConfig['sdkKey']);
+            unset($mergedConfig['sdkKey']);
         }
         $this->config = new Config($mergedConfig);
 
@@ -193,7 +191,7 @@ class DataManagerTest extends TestCase
             $experienceKey,
             new BucketingAttributes([
                 'visitorProperties' => ['varName3' => 'something'],
-                'locationProperties' => ['url' => 'https://convert.com/']
+                'locationProperties' => ['url' => 'https://convert.com/'],
             ])
         );
 
@@ -215,7 +213,7 @@ class DataManagerTest extends TestCase
             $experienceId,
             new BucketingAttributes([
                 'visitorProperties' => ['varName3' => 'something'],
-                'locationProperties' => ['url' => 'https://convert.com/']
+                'locationProperties' => ['url' => 'https://convert.com/'],
             ])
         );
 
@@ -246,7 +244,7 @@ class DataManagerTest extends TestCase
     {
         $keys = ['feature-1', 'feature-2'];
         $entities = $this->dataManager->getEntities($keys, 'features');
-        $expected = array_filter($this->config->getData()["features"] ?? [], fn($f) => in_array($f['key'], $keys));
+        $expected = array_filter($this->config->getData()['features'] ?? [], fn ($f) => in_array($f['key'], $keys, true));
         $this->assertEquals($expected, $entities);
     }
 
@@ -254,7 +252,7 @@ class DataManagerTest extends TestCase
     {
         $ids = ['10024', '10025'];
         $entities = $this->dataManager->getEntitiesByIds($ids, 'features');
-        $expected = array_filter($this->config->getData()["features"] ?? [], fn($f) => in_array($f['id'], $ids));
+        $expected = array_filter($this->config->getData()['features'] ?? [], fn ($f) => in_array($f['id'], $ids, true));
         $this->assertEquals($expected, $entities);
     }
 
@@ -301,7 +299,7 @@ class DataManagerTest extends TestCase
             'test-experience-ab-fullstack-4',
             new BucketingAttributes([
                 'visitorProperties' => ['varName3' => 'something'],
-                'locationProperties' => ['url' => 'https://convert.com/']
+                'locationProperties' => ['url' => 'https://convert.com/'],
             ])
         );
         $this->assertEquals(BucketingError::VariationNotDecided, $variation);

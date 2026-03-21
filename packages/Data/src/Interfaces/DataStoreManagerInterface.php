@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Interfaces;
 
-
 /**
  * DataStoreManagerInterface defines methods for interacting with a data store.
  *

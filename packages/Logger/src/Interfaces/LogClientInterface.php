@@ -11,9 +11,9 @@ declare(strict_types=1);
 namespace ConvertSdk\Interfaces;
 
 use ConvertSdk\Enums\LogLevel;
-use ConvertSdk\Interfaces\LogMethodMapInterface;
 
-interface LogClientInterface {
+interface LogClientInterface
+{
     /**
      * Get the SDK instance.
      *

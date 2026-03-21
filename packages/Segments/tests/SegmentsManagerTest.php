@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\Event\EventManager;
 use ConvertSdk\ApiManager;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\DataManager;
-use ConvertSdk\SegmentsManager;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
+use ConvertSdk\SegmentsManager;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorSegments;
 use PHPUnit\Framework\TestCase;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
 
 class SegmentsManagerTest extends TestCase
 {
@@ -132,7 +132,7 @@ class SegmentsManagerTest extends TestCase
         $segments = ['country' => 'US'];
         self::$segmentsManager->putSegments($this->visitorId, $segments);
         $localSegments = self::$dataManager->getData($this->visitorId);
-        $this->assertEquals($segments['country'], $localSegments["segments"]["country"] ?? null);
+        $this->assertEquals($segments['country'], $localSegments['segments']['country'] ?? null);
     }
 
     public function testUpdateCustomSegments(): void

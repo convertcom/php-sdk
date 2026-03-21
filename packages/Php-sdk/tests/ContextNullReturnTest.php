@@ -4,23 +4,22 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\MockObject\MockObject;
+use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\Context;
 use ConvertSdk\DTO\BucketedVariation;
+use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Event\Interfaces\EventManagerInterface;
+use ConvertSdk\Interfaces\ApiManagerInterface;
+use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
-use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;
-use ConvertSdk\Interfaces\ApiManagerInterface;
-use ConvertSdk\Enums\RuleError;
-use ConvertSdk\Enums\BucketingError;
-use OpenAPI\Client\Config;
-use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\Model\ConfigResponseData;
-use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\Utils\ObjectUtils;
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for Context null-return contract.

@@ -45,8 +45,8 @@
     },
     "scripts": {
         "analyze": "phpstan analyse",
-        "cs-check": "php-cs-fixer fix --dry-run --diff",
-        "cs-fix": "php-cs-fixer fix",
+        "cs-check": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix --dry-run --diff",
+        "cs-fix": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix",
         "test": "phpunit",
         "test:unit": "phpunit --testsuite unit",
         "test:cross-sdk": "phpunit --testsuite cross-sdk",

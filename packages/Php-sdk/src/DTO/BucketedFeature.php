@@ -24,5 +24,6 @@ readonly class BucketedFeature
         public string $featureKey,
         public FeatureStatus $status,
         public array $variables,
-    ) {}
+    ) {
+    }
 }

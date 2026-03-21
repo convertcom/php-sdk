@@ -11,15 +11,15 @@ declare(strict_types=1);
 
 namespace ConvertSdk;
 
+use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\Messages;
+use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
+use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Model\ConfigExperience;
 use OpenAPI\Client\Model\ExperienceVariationConfig;
-use OpenAPI\Client\BucketingAttributes;
-use ConvertSdk\Enums\RuleError;
-use ConvertSdk\Enums\BucketingError;
-use ConvertSdk\Enums\Messages;
 
 /**
  * Provides experiences specific logic.
@@ -133,7 +133,7 @@ final class ExperienceManager implements ExperienceManagerInterface
                 if ($experience === null) {
                     $logData['reason'] = Messages::NULL_RETURN_EXPERIENCE_NOT_FOUND;
                     $logData['availableKeys'] = array_map(
-                        fn($e) => $e['key'] ?? 'unknown',
+                        fn ($e) => $e['key'] ?? 'unknown',
                         $this->dataManager->getEntitiesList('experiences')
                     );
                 } else {
@@ -189,7 +189,7 @@ final class ExperienceManager implements ExperienceManagerInterface
                 if ($experience === null) {
                     $logData['reason'] = Messages::NULL_RETURN_EXPERIENCE_NOT_FOUND;
                     $logData['availableIds'] = array_map(
-                        fn($e) => $e['id'] ?? 'unknown',
+                        fn ($e) => $e['id'] ?? 'unknown',
                         $this->dataManager->getEntitiesList('experiences')
                     );
                 } else {
@@ -225,7 +225,7 @@ final class ExperienceManager implements ExperienceManagerInterface
         ]);
 
         $variations = array_map(function ($experience) use ($visitorId, $attributes) {
-            return $this->selectVariation($visitorId, $experience["key"], $attributes);
+            return $this->selectVariation($visitorId, $experience['key'], $attributes);
         }, $experiences);
         $filteredVariations = array_filter($variations, function ($variation) {
             return $variation !== null &&

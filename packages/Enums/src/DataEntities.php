@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Enums;
 
-final class DataEntities {
-    const DATA_ENTITIES = [
+final class DataEntities
+{
+    public const DATA_ENTITIES = [
         'events',
         'goals',
         'audiences',
@@ -15,16 +16,16 @@ final class DataEntities {
         'archived_experiences',
         'experiences.variations',
         'features',
-        'features.variables'
+        'features.variables',
     ];
 
-    const DATA_ENTITIES_MAP = [
+    public const DATA_ENTITIES_MAP = [
         'goal' => 'goals',
         'audience' => 'audiences',
         'location' => 'locations',
         'segment' => 'segments',
         'experience' => 'experiences',
         'variation' => 'experiences.variations',
-        'feature' => 'features'
+        'feature' => 'features',
     ];
 }

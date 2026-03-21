@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests\Config;
 
-use PHPUnit\Framework\TestCase;
 use ConvertSdk\Config\ConfigValidator;
 use ConvertSdk\Exception\ConfigValidationException;
 use OpenAPI\Client\Model\ConfigResponseData;
+use PHPUnit\Framework\TestCase;
 
 class ConfigValidatorTest extends TestCase
 {

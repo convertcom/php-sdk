@@ -11,11 +11,11 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Interfaces;
 
-use OpenAPI\Client\Model\ConfigExperience;
-use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\Model\ExperienceVariationConfig;
-use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\RuleError;
+use OpenAPI\Client\BucketingAttributes;
+use OpenAPI\Client\Model\ConfigExperience;
+use OpenAPI\Client\Model\ExperienceVariationConfig;
 
 /**
  * Interface for managing experiences and variations.

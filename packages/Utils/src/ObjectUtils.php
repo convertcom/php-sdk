@@ -37,12 +37,12 @@ class ObjectUtils
         $isAssoc = function (array $arr): bool {
             return array_keys($arr) !== range(0, count($arr) - 1);
         };
-    
+
         $result = array_shift($objects);
         foreach ($objects as $obj) {
             foreach ($obj as $key => $oVal) {
                 $pVal = $result[$key] ?? null;
-    
+
                 if (is_array($pVal) && is_array($oVal)) {
                     // Check if both are associative arrays
                     if ($isAssoc($pVal) && $isAssoc($oVal)) {
@@ -60,7 +60,7 @@ class ObjectUtils
         }
         return $result;
     }
-    
+
 
     public static function objectNotEmpty(mixed $object): bool
     {

@@ -12,8 +12,8 @@ namespace ConvertSdk;
 
 use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Enums\LogMethod;
-use ConvertSdk\Interfaces\LogMethodMapInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Interfaces\LogMethodMapInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -109,7 +109,7 @@ class LogManager implements LogManagerInterface
                     if ($client['sdk'] instanceof \Psr\Log\LoggerInterface) {
                         // Concatenate all arguments into one message
                         $message = implode(' ', array_map(
-                            fn($arg) => is_array($arg) ? (json_encode($arg) ?: '[unserializable]') : (is_object($arg) ? get_class($arg) : strval($arg)),
+                            fn ($arg) => is_array($arg) ? (json_encode($arg) ?: '[unserializable]') : (is_object($arg) ? get_class($arg) : strval($arg)),
                             $args
                         ));
                         // Call the PSR-3 method with an empty context array
@@ -205,7 +205,7 @@ class LogManager implements LogManagerInterface
     protected function classBasename(object|string $objectOrClass): string
     {
         $class = is_object($objectOrClass) ? get_class($objectOrClass) : $objectOrClass;
-        return substr(strrchr($class, "\\"), 1) ?: $class;
+        return substr(strrchr($class, '\\'), 1) ?: $class;
     }
 
     /**

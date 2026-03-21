@@ -4,24 +4,23 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
 use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\Event\EventManager;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\Context;
 use ConvertSdk\DataManager;
+use ConvertSdk\DTO\ConversionAttributes;
+use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
-use ConvertSdk\SegmentsManager;
-use ConvertSdk\LogManager;
-use ConvertSdk\Context;
-use ConvertSdk\DTO\ConversionAttributes;
-use ConvertSdk\Enums\RuleError;
-use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Interfaces\ApiManagerInterface;
+use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
+use ConvertSdk\SegmentsManager;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
+use PHPUnit\Framework\TestCase;
 
 class ContextConversionTest extends TestCase
 {
@@ -42,13 +41,13 @@ class ContextConversionTest extends TestCase
             'api' => [
                 'endpoint' => [
                     'config' => 'http://127.0.0.1:9501',
-                    'track' => 'http://127.0.0.1:9501'
-                ]
+                    'track' => 'http://127.0.0.1:9501',
+                ],
             ],
             'events' => [
                 'batch_size' => 5,
-                'release_interval' => 1000
-            ]
+                'release_interval' => 1000,
+            ],
         ]);
         $configuration['data'] = new ConfigResponseData($configuration['data']);
         if (isset($configuration['sdkKey'])) {
@@ -106,7 +105,7 @@ class ContextConversionTest extends TestCase
             ruleData: ['action' => 'buy'],
             conversionData: [
                 ['key' => 'amount', 'value' => 10.3],
-                ['key' => 'productsCount', 'value' => 2]
+                ['key' => 'productsCount', 'value' => 2],
             ]
         ));
 

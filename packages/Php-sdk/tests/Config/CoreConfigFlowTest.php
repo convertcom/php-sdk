@@ -4,22 +4,20 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests\Config;
 
-use PHPUnit\Framework\TestCase;
-use ConvertSdk\Core;
 use ConvertSdk\Cache\ArrayCache;
-use ConvertSdk\Config\ConfigValidator;
+use ConvertSdk\Core;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Exception\ConfigFetchException;
 use ConvertSdk\Exception\ConfigValidationException;
 use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\DataManagerInterface;
-use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
-use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use Psr\SimpleCache\CacheInterface;
+use PHPUnit\Framework\TestCase;
 
 class CoreConfigFlowTest extends TestCase
 {

@@ -11,12 +11,11 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Interfaces;
 
-use OpenAPI\Client\BucketingAttributes;
 use ConvertSdk\DTO\BucketedFeature;
 use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\DTO\ConversionAttributes;
 use ConvertSdk\Enums\RuleError;
-use ConvertSdk\Enums\BucketingError;
+use OpenAPI\Client\BucketingAttributes;
 
 /**
  * Visitor context interface for running experiences, features, and tracking conversions.

@@ -4,28 +4,27 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
-use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\Event\EventManager;
 use ConvertSdk\ApiManager;
-use ConvertSdk\DataManager;
-use ConvertSdk\ExperienceManager;
-use ConvertSdk\FeatureManager;
-use ConvertSdk\SegmentsManager;
-use ConvertSdk\LogManager;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\Context;
-use ConvertSdk\Exception\InvalidArgumentException;
-use OpenAPI\Client\Config;
-use ConvertSdk\Enums\EntityType;
-use OpenAPI\Client\BucketingAttributes;
+use ConvertSdk\DataManager;
 use ConvertSdk\DTO\ConversionAttributes;
 use ConvertSdk\Enums\ConversionSettingKey;
+use ConvertSdk\Event\EventManager;
+use ConvertSdk\Exception\InvalidArgumentException;
+use ConvertSdk\ExperienceManager;
+use ConvertSdk\FeatureManager;
 use ConvertSdk\Interfaces\ApiManagerInterface;
-use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
+use ConvertSdk\SegmentsManager;
 use ConvertSdk\Utils\ObjectUtils;
+use OpenAPI\Client\BucketingAttributes;
+use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
+use PHPUnit\Framework\TestCase;
 
 class ContextTest extends TestCase
 {
@@ -53,13 +52,13 @@ class ContextTest extends TestCase
             'api' => [
                 'endpoint' => [
                     'config' => 'http://127.0.0.1:9501',
-                    'track' => 'http://127.0.0.1:9501'
-                ]
+                    'track' => 'http://127.0.0.1:9501',
+                ],
             ],
             'events' => [
                 'batch_size' => 5,
-                'release_interval' => 1000
-            ]
+                'release_interval' => 1000,
+            ],
         ]);
         $configuration['data'] = new ConfigResponseData($configuration['data']);
         if (isset($configuration['sdkKey'])) {
@@ -114,7 +113,7 @@ class ContextTest extends TestCase
         $variationIds = ['100299456', '100299457', '100299460', '100299461'];
         $variations = $this->context->runExperiences(new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertIsArray($variations);
@@ -127,7 +126,7 @@ class ContextTest extends TestCase
             $this->assertNotEmpty($variation->variationKey);
             $this->assertIsArray($variation->changes);
         }
-        $selectedVariationIds = array_map(fn($v) => $v->variationId, $variations);
+        $selectedVariationIds = array_map(fn ($v) => $v->variationId, $variations);
         foreach ($selectedVariationIds as $id) {
             $this->assertContains($id, $variationIds);
         }
@@ -138,7 +137,7 @@ class ContextTest extends TestCase
         $featureKey = 'feature-2';
         $feature = $this->context->runFeature($featureKey, new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $feature);
@@ -156,7 +155,7 @@ class ContextTest extends TestCase
         // feature-1 is in multiple experiences — runFeature returns first enabled
         $feature = $this->context->runFeature($featureKey, new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $feature);
@@ -170,7 +169,7 @@ class ContextTest extends TestCase
         $featureIds = ['10024', '10025', '10026'];
         $features = $this->context->runFeatures(new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertIsArray($features);
@@ -180,16 +179,16 @@ class ContextTest extends TestCase
             $this->assertInstanceOf(\ConvertSdk\Enums\FeatureStatus::class, $feature->status);
             $this->assertNotEmpty($feature->featureKey);
         }
-        $enabledFeatures = array_filter($features, fn($f) => $f->status === \ConvertSdk\Enums\FeatureStatus::Enabled);
+        $enabledFeatures = array_filter($features, fn ($f) => $f->status === \ConvertSdk\Enums\FeatureStatus::Enabled);
         foreach ($enabledFeatures as $feature) {
             $this->assertNotEmpty($feature->featureId);
             $this->assertIsArray($feature->variables);
         }
-        $disabledFeatures = array_filter($features, fn($f) => $f->status === \ConvertSdk\Enums\FeatureStatus::Disabled);
+        $disabledFeatures = array_filter($features, fn ($f) => $f->status === \ConvertSdk\Enums\FeatureStatus::Disabled);
         foreach ($disabledFeatures as $feature) {
             $this->assertNotEmpty($feature->featureId);
         }
-        $selectedFeatures = array_map(fn($f) => $f->featureId, $features);
+        $selectedFeatures = array_map(fn ($f) => $f->featureId, $features);
         $this->assertContainsAll($featureIds, $selectedFeatures);
     }
 
@@ -221,7 +220,7 @@ class ContextTest extends TestCase
         $experienceKey = 'test-experience-ab-fullstack-2';
         $variation = $this->context->runExperience($experienceKey, new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertInstanceOf(\ConvertSdk\DTO\BucketedVariation::class, $variation);
@@ -257,7 +256,7 @@ class ContextTest extends TestCase
         $segments = ['country' => 'UK'];
         $this->context->setDefaultSegments($segments);
         $localSegments = $this->dataManager->getData($this->visitorId);
-        $this->assertEquals($segments["country"], $localSegments['segments']['country']);
+        $this->assertEquals($segments['country'], $localSegments['segments']['country']);
     }
 
     public function testRunCustomSegments(): void
@@ -399,7 +398,7 @@ class ContextTest extends TestCase
         $experienceKey = 'test-experience-ab-fullstack-2';
         $result = $this->context->runExperience($experienceKey, new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertInstanceOf(\ConvertSdk\DTO\BucketedVariation::class, $result);
@@ -414,7 +413,7 @@ class ContextTest extends TestCase
     {
         $result = $this->context->runExperience('nonexistent-experience', new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertNull($result);
@@ -424,7 +423,7 @@ class ContextTest extends TestCase
     {
         $variations = $this->context->runExperiences(new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertIsArray($variations);
@@ -454,7 +453,7 @@ class ContextTest extends TestCase
         $featureKey = 'feature-2';
         $result = $this->context->runFeature($featureKey, new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $result);
@@ -467,7 +466,7 @@ class ContextTest extends TestCase
     {
         $result = $this->context->runFeature('nonexistent-feature', new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertNull($result);
@@ -477,7 +476,7 @@ class ContextTest extends TestCase
     {
         $features = $this->context->runFeatures(new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         $this->assertIsArray($features);
@@ -495,7 +494,7 @@ class ContextTest extends TestCase
         $featureKey = 'not-attached-feature-3';
         $result = $this->context->runFeature($featureKey, new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something']
+            'visitorProperties' => ['varName3' => 'something'],
         ]));
 
         // Feature exists but visitor is not bucketed → disabled DTO
@@ -520,7 +519,7 @@ class ContextTest extends TestCase
         $result = $this->context->runFeature($featureKey, new BucketingAttributes([
             'locationProperties' => ['url' => 'https://convert.com/'],
             'visitorProperties' => ['varName3' => 'something'],
-            'typeCasting' => true
+            'typeCasting' => true,
         ]));
 
         $this->assertInstanceOf(\ConvertSdk\DTO\BucketedFeature::class, $result);

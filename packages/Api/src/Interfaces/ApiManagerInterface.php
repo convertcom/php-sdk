@@ -11,8 +11,8 @@ declare(strict_types=1);
 namespace ConvertSdk\Interfaces;
 
 use OpenAPI\Client\Model\ConfigResponseData;
-use OpenAPI\Client\Model\VisitorTrackingEvents;
 use OpenAPI\Client\Model\VisitorSegments;
+use OpenAPI\Client\Model\VisitorTrackingEvents;
 
 /**
  * Interface for ApiManager

@@ -10,8 +10,8 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Event;
 
-use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 
 final class EventManager implements EventManagerInterface
@@ -90,7 +90,7 @@ final class EventManager implements EventManagerInterface
                 'event' => $key,
                 'args' => $args,
                 'err' => $err,
-                'deferred' => $deferred
+                'deferred' => $deferred,
             ]);
             $this->loggerManager->debug('EventManager.fire()', $mapped);
         }

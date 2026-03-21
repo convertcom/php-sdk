@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace ConvertSdk\Utils;
+
 use lastguest\Murmur;
 
 class StringUtils
@@ -15,7 +16,7 @@ class StringUtils
             return $template;
         }
         $i = 0;
-        $result = preg_replace_callback('/(%?)(%([sj]))/', function($matches) use (&$i, $args) {
+        $result = preg_replace_callback('/(%?)(%([sj]))/', function ($matches) use (&$i, $args) {
             if ($matches[1] !== '') {
                 // Escaped
                 return $matches[0];
@@ -37,17 +38,17 @@ class StringUtils
     public static function camelCase(string $input): string
     {
         $words = preg_split('/\s+/', strtolower($input));
-    
+
         $words = array_map(function ($word, $index) {
             if ($index === 0) {
                 return $word; // Keep the first word in lowercase
             }
             return ucfirst($word); // Capitalize the first letter of subsequent words
         }, $words, array_keys($words));
-    
+
         return implode('', $words); // Join the words back together
     }
-    
+
 
     /**
      * Generate a MurmurHash3 (32-bit) hash value.

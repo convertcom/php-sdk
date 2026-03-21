@@ -11,8 +11,8 @@ namespace ConvertSdk\Interfaces;
  * License Apache-2.0
  */
 
-use OpenAPI\Client\Model\ConfigFeature;
 use OpenAPI\Client\BucketingAttributes;
+use OpenAPI\Client\Model\ConfigFeature;
 
 /**
  * Interface FeatureManagerInterface

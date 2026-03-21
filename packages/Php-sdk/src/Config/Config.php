@@ -21,12 +21,12 @@ final class Config
         $defaultLoggerSettings = [
             'logger' => [
                 'logLevel' => LogLevel::Warn,
-                'customLoggers' => []
-            ]
+                'customLoggers' => [],
+            ],
         ];
 
         $defaultEnvironmentSettings = [
-            'environment' => 'production'
+            'environment' => 'production',
         ];
 
         // Retrieve the default configuration.

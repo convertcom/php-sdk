@@ -4,25 +4,25 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
 use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\Event\EventManager;
-use ConvertSdk\DataManager;
-use ConvertSdk\ExperienceManager;
-use ConvertSdk\FeatureManager;
-use ConvertSdk\SegmentsManager;
-use ConvertSdk\LogManager;
+use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\Context;
+use ConvertSdk\DataManager;
 use ConvertSdk\DTO\ConversionAttributes;
 use ConvertSdk\DTO\GoalData;
 use ConvertSdk\Enums\GoalDataKey;
+use ConvertSdk\Event\EventManager;
+use ConvertSdk\ExperienceManager;
+use ConvertSdk\FeatureManager;
 use ConvertSdk\Interfaces\ApiManagerInterface;
+use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
+use ConvertSdk\SegmentsManager;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
+use PHPUnit\Framework\TestCase;
 
 class ContextRevenueTest extends TestCase
 {
@@ -41,13 +41,13 @@ class ContextRevenueTest extends TestCase
             'api' => [
                 'endpoint' => [
                     'config' => 'http://127.0.0.1:9501',
-                    'track' => 'http://127.0.0.1:9501'
-                ]
+                    'track' => 'http://127.0.0.1:9501',
+                ],
             ],
             'events' => [
                 'batch_size' => 5,
-                'release_interval' => 1000
-            ]
+                'release_interval' => 1000,
+            ],
         ]);
         $configuration['data'] = new ConfigResponseData($configuration['data']);
         if (isset($configuration['sdkKey'])) {

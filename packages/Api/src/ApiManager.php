@@ -10,22 +10,21 @@ declare(strict_types=1);
 
 namespace ConvertSdk;
 
-use Psr\Http\Client\ClientInterface;
-use Psr\Http\Client\ClientExceptionInterface;
-use Psr\Http\Message\RequestFactoryInterface;
-use Psr\Http\Message\StreamFactoryInterface;
-use Http\Discovery\Psr18ClientDiscovery;
-use Http\Discovery\Psr17FactoryDiscovery;
-use ConvertSdk\Interfaces\ApiManagerInterface;
+use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\Interfaces\EventManagerInterface;
+use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
+use Http\Discovery\Psr17FactoryDiscovery;
+use Http\Discovery\Psr18ClientDiscovery;
 use OpenAPI\Client\Config;
-use OpenAPI\Client\VisitorsQueue;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorSegments;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
-use ConvertSdk\Enums\SystemEvents;
-
+use OpenAPI\Client\VisitorsQueue;
+use Psr\Http\Client\ClientExceptionInterface;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 
 /**
  * Class ApiManager
@@ -34,11 +33,11 @@ use ConvertSdk\Enums\SystemEvents;
  */
 class ApiManager implements ApiManagerInterface
 {
-   /**
-     * Default HTTP headers
-     */
+    /**
+      * Default HTTP headers
+      */
     private const DEFAULT_HEADERS = [
-        'Content-Type' => 'application/json'
+        'Content-Type' => 'application/json',
     ];
 
     /**
@@ -187,7 +186,7 @@ class ApiManager implements ApiManagerInterface
             'enrichData' => $this->enrichData,
             'accountId' => $this->accountId,
             'projectId' => $this->projectId,
-            'visitors' => []
+            'visitors' => [],
         ];
         $this->trackingEnabled = $config && $config->getNetwork() && isset($config->getNetwork()['tracking'])
             ? (bool) $config->getNetwork()['tracking']
@@ -228,7 +227,7 @@ class ApiManager implements ApiManagerInterface
             $request = $request->withHeader($name, $value);
         }
 
-        if (in_array(strtoupper($method), ['POST', 'PUT', 'PATCH']) && !empty($data)) {
+        if (in_array(strtoupper($method), ['POST', 'PUT', 'PATCH'], true) && !empty($data)) {
             $body = $this->streamFactory->createStream(json_encode($data, JSON_THROW_ON_ERROR));
             $request = $request->withBody($body);
         }
@@ -331,7 +330,7 @@ class ApiManager implements ApiManagerInterface
                     'POST',
                     [
                         'base' => str_replace('[project_id]', (string)$this->projectId, $this->trackEndpoint),
-                        'route' => "/track/{$this->sdkKey}"
+                        'route' => "/track/{$this->sdkKey}",
                     ],
                     call_user_func($this->mapper, $payload)
                 );
@@ -345,7 +344,7 @@ class ApiManager implements ApiManagerInterface
                         $this->eventManager->fire(SystemEvents::ApiQueueReleased, [
                             'reason' => $reason,
                             'result' => $result,
-                            'visitors' => $payload['visitors']
+                            'visitors' => $payload['visitors'],
                         ]);
                     }
                     return;
@@ -520,7 +519,7 @@ class ApiManager implements ApiManagerInterface
                 'GET',
                 [
                     'base' => $this->configEndpoint,
-                    'route' => "/config/{$this->sdkKey}{$query}"
+                    'route' => "/config/{$this->sdkKey}{$query}",
                 ]
             );
 

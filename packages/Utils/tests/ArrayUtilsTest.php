@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
 use ConvertSdk\Utils\ArrayUtils;
+use PHPUnit\Framework\TestCase;
 
 class ArrayUtilsTest extends TestCase
 {

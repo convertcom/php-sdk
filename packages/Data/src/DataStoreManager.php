@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace ConvertSdk;
 
-use ConvertSdk\Interfaces\DataStoreManagerInterface;
-use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Enums\ErrorMessages;
-use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\Interfaces\EventManagerInterface;
+use ConvertSdk\Interfaces\DataStoreManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 
 final class DataStoreManager implements DataStoreManagerInterface
@@ -23,8 +23,8 @@ final class DataStoreManager implements DataStoreManagerInterface
     private mixed $dataStore = null;
     private \Closure $mapper;
 
-    const DEFAULT_BATCH_SIZE = 1;
-    const DEFAULT_RELEASE_INTERVAL = 5000; // milliseconds
+    public const DEFAULT_BATCH_SIZE = 1;
+    public const DEFAULT_RELEASE_INTERVAL = 5000; // milliseconds
 
     /**
      * Constructor
@@ -38,12 +38,12 @@ final class DataStoreManager implements DataStoreManagerInterface
         $this->eventManager = $dependencies['eventManager'] ?? null;
 
         // Set batch size and release interval from config if available, or use defaults.
-        $this->batchSize = $config && isset($config->getEvents()['batch_size']) 
-            ? (int)$config->getEvents()['batch_size'] 
+        $this->batchSize = $config && isset($config->getEvents()['batch_size'])
+            ? (int)$config->getEvents()['batch_size']
             : self::DEFAULT_BATCH_SIZE;
 
-        $this->releaseInterval = $config && isset($config->getEvents()['release_interval']) 
-            ? (int)$config->getEvents()['release_interval'] 
+        $this->releaseInterval = $config && isset($config->getEvents()['release_interval'])
+            ? (int)$config->getEvents()['release_interval']
             : self::DEFAULT_RELEASE_INTERVAL;
 
         // Use provided dataStore (invokes setDataStore())
@@ -56,7 +56,7 @@ final class DataStoreManager implements DataStoreManagerInterface
         } elseif ($configMapper !== null) {
             $this->mapper = \Closure::fromCallable($configMapper);
         } else {
-            $this->mapper = fn($value) => $value;
+            $this->mapper = fn ($value) => $value;
         }
 
         $this->requestsQueue = [];

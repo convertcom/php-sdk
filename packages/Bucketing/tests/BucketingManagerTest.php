@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\MockObject\MockObject;
 use ConvertSdk\BucketingManager;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Utils\StringUtils;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 
 class BucketingManagerTest extends TestCase
 {
@@ -50,7 +50,7 @@ class BucketingManagerTest extends TestCase
             '100234567' => 30,
             '100234568' => 30,
             '100234569' => 30,
-            '100234570' => 10
+            '100234570' => 10,
         ];
 
         // Value 100 should fall in first bucket (0-3000 range)
@@ -87,7 +87,7 @@ class BucketingManagerTest extends TestCase
             '100234567' => 30,
             '100234568' => 30,
             '100234569' => 30,
-            '100234570' => 10
+            '100234570' => 10,
         ];
         $variationId1 = $this->bucketingManager->selectBucket($testVariations, 100);
         $variationId2 = $this->bucketingManager->selectBucket($testVariations, 200);
@@ -101,7 +101,7 @@ class BucketingManagerTest extends TestCase
             '100234567' => 30,
             '100234568' => 30,
             '100234569' => 30,
-            '100234570' => 10
+            '100234570' => 10,
         ];
         $variationId1 = $this->bucketingManager->selectBucket($testVariations, 6000);
         $variationId2 = $this->bucketingManager->selectBucket($testVariations, 6500);
@@ -135,7 +135,7 @@ class BucketingManagerTest extends TestCase
             '100234567' => 0,
             '100234568' => 0,
             '100234569' => 0,
-            '100234570' => 0
+            '100234570' => 0,
         ];
         $variationId = $this->bucketingManager->selectBucket($testVariations, 6000);
         $this->assertNull($variationId);
@@ -147,7 +147,7 @@ class BucketingManagerTest extends TestCase
             '100234567' => 30,
             '100234568' => 10,
             '100234569' => 30,
-            '100234570' => 30
+            '100234570' => 30,
         ];
         $variationId = $this->bucketingManager->selectBucket($testVariations, self::DEFAULT_MAX_TRAFFIC + 1);
         $this->assertNull($variationId);
@@ -190,7 +190,7 @@ class BucketingManagerTest extends TestCase
             '100234567' => 10,
             '100234568' => 30,
             '100234569' => 60,
-            '100234570' => 0
+            '100234570' => 0,
         ];
         $visitorId = '01ABCD';
 
@@ -250,7 +250,7 @@ class BucketingManagerTest extends TestCase
         $bucketingManager->getBucketForVisitor($buckets, 'visitor-456', ['experienceId' => 'exp-1']);
 
         // Verify getBucketForVisitor summary log was emitted
-        $summaryLogs = array_filter($debugCalls, fn($call) => $call[0] === 'BucketingManager.getBucketForVisitor()');
+        $summaryLogs = array_filter($debugCalls, fn ($call) => $call[0] === 'BucketingManager.getBucketForVisitor()');
         $this->assertNotEmpty($summaryLogs, 'Expected debug log from getBucketForVisitor()');
 
         $summaryLog = reset($summaryLogs);
