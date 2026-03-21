@@ -18,5 +18,6 @@ readonly class ConversionAttributes
         public ?array $ruleData = null,
         public ?array $conversionData = null,
         public ?array $conversionSetting = null,
-    ) {}
+    ) {
+    }
 }

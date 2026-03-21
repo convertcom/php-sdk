@@ -10,15 +10,15 @@ declare(strict_types=1);
 
 namespace ConvertSdk;
 
-use ConvertSdk\Interfaces\RuleManagerInterface;
-use ConvertSdk\Enums\RuleError;
-use ConvertSdk\Enums\Messages;
 use ConvertSdk\Enums\ErrorMessages;
-use ConvertSdk\Utils\ArrayUtils;
-use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\Utils\Comparisons;
-use ConvertSdk\Utils\StringUtils;
+use ConvertSdk\Enums\Messages;
+use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Interfaces\RuleManagerInterface;
+use ConvertSdk\Utils\ArrayUtils;
+use ConvertSdk\Utils\Comparisons;
+use ConvertSdk\Utils\ObjectUtils;
+use ConvertSdk\Utils\StringUtils;
 use OpenAPI\Client\Model\RuleElement;
 use OpenAPI\Client\Model\RuleObject;
 use OpenAPI\Client\RuleAnd;
@@ -111,10 +111,10 @@ final class RuleManager implements RuleManagerInterface
      */
     public function isRuleMatched(array $data, RuleObject $ruleSet, ?string $logEntry = null): bool|RuleError
     {
-        $mapperFn = $this->mapper ?? static fn(mixed $value): mixed => $value;
+        $mapperFn = $this->mapper ?? static fn (mixed $value): mixed => $value;
         $this->logManager?->trace('RuleManager.isRuleMatched()', $mapperFn([
             'data' => $data,
-            'ruleSet' => $ruleSet
+            'ruleSet' => $ruleSet,
         ]));
         if ($logEntry) {
             $this->logManager?->info('RuleManager.isRuleMatched()', str_replace('#', $logEntry, Messages::PROCESSING_ENTITY));
@@ -164,7 +164,7 @@ final class RuleManager implements RuleManagerInterface
      */
     public function isValidRule(RuleElement $rule): bool
     {
-        $mapperFn = $this->mapper ?? static fn(mixed $value): mixed => $value;
+        $mapperFn = $this->mapper ?? static fn (mixed $value): mixed => $value;
         $this->logManager?->trace('RuleManager.isValidRule()', $mapperFn(['rule' => $rule]));
         return isset($rule['matching']) && is_array($rule['matching']) &&
             isset($rule['matching']['match_type']) && is_string($rule['matching']['match_type']) &&
@@ -271,7 +271,9 @@ final class RuleManager implements RuleManagerInterface
                                 str_replace('#', $rule['rule_type'], Messages::RULE_MATCH_START)
                             );
                             foreach (get_class_methods($data) as $method) {
-                                if ($method === '__construct') continue;
+                                if ($method === '__construct') {
+                                    continue;
+                                }
                                 $ruleMethod = StringUtils::camelCase('get ' . str_replace('_', ' ', $rule['rule_type']));
                                 if ($method === $ruleMethod || ($data['mapper'] ?? null) === $ruleMethod) {
                                     $dataValue = $data[$method]($rule);
@@ -279,7 +281,9 @@ final class RuleManager implements RuleManagerInterface
                                     if ($ruleErrorEnum !== null) {
                                         return $ruleErrorEnum;
                                     }
-                                    if ($rule['rule_type'] === 'js_condition') return $dataValue;
+                                    if ($rule['rule_type'] === 'js_condition') {
+                                        return $dataValue;
+                                    }
                                     if (is_string($this->comparisonProcessor)) {
                                         return call_user_func(
                                             [$this->comparisonProcessor, $matching],
@@ -321,7 +325,7 @@ final class RuleManager implements RuleManagerInterface
                     } else {
                         $this->logManager?->trace('RuleManager.processRuleItem()', [
                             'warn' => ErrorMessages::RULE_DATA_NOT_VALID,
-                            'data' => $data
+                            'data' => $data,
                         ]);
                     }
                 } else {
@@ -332,7 +336,7 @@ final class RuleManager implements RuleManagerInterface
                 }
             } catch (\Throwable $error) {
                 $this->logManager?->error('RuleManager.processRuleItem()', [
-                    'error' => $error->getMessage()
+                    'error' => $error->getMessage(),
                 ]);
             }
         } else {

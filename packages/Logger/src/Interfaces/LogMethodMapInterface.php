@@ -19,10 +19,11 @@ use ConvertSdk\Enums\LogMethod;
  * To simulate a similar "dictionary" or "map" behavior in PHP, the built-in ArrayAccess is extended
  * This requires any implementing class to define these four methods: offsetGet, offsetSet, offsetExists, and offsetUnset.
  * By doing this, any class that implements LogMethodMapInterface can be used like an array (e.g., $map[LogMethod::LOG] = 'logMethodName';)
- * and will enforce the expected behavior similar to the TypeScript interface. 
+ * and will enforce the expected behavior similar to the TypeScript interface.
  */
 
-interface LogMethodMapInterface extends \ArrayAccess {
+interface LogMethodMapInterface extends \ArrayAccess
+{
     /**
      * Retrieve the mapped method name for the given log method.
      *

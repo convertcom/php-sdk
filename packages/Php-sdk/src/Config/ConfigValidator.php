@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Config;
 
-use OpenAPI\Client\Model\ConfigResponseData;
 use ConvertSdk\Exception\ConfigValidationException;
+use OpenAPI\Client\Model\ConfigResponseData;
 
 final class ConfigValidator
 {

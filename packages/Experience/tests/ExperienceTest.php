@@ -4,24 +4,19 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
+use ConvertSdk\ApiManager;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\DataManager;
+use ConvertSdk\Enums\LogLevel;
+use ConvertSdk\Event\EventManager;
+use ConvertSdk\ExperienceManager;
+use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
+use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use OpenAPI\Client\BucketingAttributes;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\Event\EventManager;
-use ConvertSdk\ApiManager;
-use ConvertSdk\LogManager;
-use ConvertSdk\DataManager;
-use ConvertSdk\ExperienceManager;
 use PHPUnit\Framework\TestCase;
-use Psr\Http\Client\ClientInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use GuzzleHttp\Psr7\Response;
-use ConvertSdk\Enums\LogLevel;
 
 /**
  * Test class for ExperienceManager.
@@ -77,7 +72,7 @@ class ExperienceTest extends TestCase
         $configuration['data'] = new ConfigResponseData($configuration['data']);
         if (isset($configuration['sdkKey'])) {
             unset($configuration['sdkKey']);
-          }
+        }
         // Create Config object
         $config = new Config($configuration);
 

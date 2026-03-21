@@ -11,28 +11,28 @@ declare(strict_types=1);
 
 namespace ConvertSdk;
 
-use ConvertSdk\Interfaces\ContextInterface;
-use ConvertSdk\Event\Interfaces\EventManagerInterface;
-use ConvertSdk\Interfaces\ExperienceManagerInterface;
-use ConvertSdk\Interfaces\FeatureManagerInterface;
-use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Interfaces\DataManagerInterface;
-use ConvertSdk\Interfaces\SegmentsManagerInterface;
-use ConvertSdk\Interfaces\ApiManagerInterface;
-use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\DTO\BucketedFeature;
+use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\DTO\ConversionAttributes;
 use ConvertSdk\DTO\GoalData;
-use ConvertSdk\Exception\InvalidArgumentException;
-use OpenAPI\Client\Config;
-use OpenAPI\Client\BucketingAttributes;
 use ConvertSdk\Enums\BucketingError;
-use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\EntityType;
+use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\FeatureStatus;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
+use ConvertSdk\Exception\InvalidArgumentException;
+use ConvertSdk\Interfaces\ApiManagerInterface;
+use ConvertSdk\Interfaces\ContextInterface;
+use ConvertSdk\Interfaces\DataManagerInterface;
+use ConvertSdk\Interfaces\ExperienceManagerInterface;
+use ConvertSdk\Interfaces\FeatureManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use ConvertSdk\Utils\ObjectUtils;
+use OpenAPI\Client\BucketingAttributes;
+use OpenAPI\Client\Config;
 
 /**
  * Provides visitor context for running experiences, features, and tracking conversions.
@@ -111,7 +111,7 @@ final class Context implements ContextInterface
                 'visitorProperties' => $visitorProperties,
                 'locationProperties' => $attributes?->getLocationProperties(),
                 'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-                'environment' => $attributes?->getEnvironment() ?? $this->environment
+                'environment' => $attributes?->getEnvironment() ?? $this->environment,
             ])
         );
 
@@ -127,7 +127,7 @@ final class Context implements ContextInterface
             [
                 'visitorId' => $this->visitorId,
                 'experienceKey' => $experienceKey,
-                'variationKey' => $result['key'] ?? null
+                'variationKey' => $result['key'] ?? null,
             ],
             null,
             true
@@ -160,7 +160,7 @@ final class Context implements ContextInterface
                 'visitorProperties' => $visitorProperties,
                 'locationProperties' => $attributes?->getLocationProperties(),
                 'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-                'environment' => $attributes?->getEnvironment() ?? $this->environment
+                'environment' => $attributes?->getEnvironment() ?? $this->environment,
             ])
         );
 
@@ -174,7 +174,7 @@ final class Context implements ContextInterface
                 [
                     'visitorId' => $this->visitorId,
                     'experienceKey' => $variation['experienceKey'] ?? null,
-                    'variationKey' => $variation['key'] ?? null
+                    'variationKey' => $variation['key'] ?? null,
                 ],
                 null,
                 true
@@ -214,7 +214,7 @@ final class Context implements ContextInterface
                 'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
                     ? $attributes->getTypeCasting()
                     : true,
-                'environment' => $attributes?->getEnvironment() ?? $this->environment
+                'environment' => $attributes?->getEnvironment() ?? $this->environment,
             ]),
             $attributes?->getExperienceKeys()
         );
@@ -237,7 +237,7 @@ final class Context implements ContextInterface
                         'visitorId' => $this->visitorId,
                         'experienceKey' => $result['experienceKey'] ?? null,
                         'featureKey' => $key,
-                        'status' => $result['status'] ?? null
+                        'status' => $result['status'] ?? null,
                     ],
                     null,
                     true
@@ -260,7 +260,7 @@ final class Context implements ContextInterface
                         'visitorId' => $this->visitorId,
                         'experienceKey' => $feature['experienceKey'] ?? null,
                         'featureKey' => $key,
-                        'status' => $feature['status'] ?? null
+                        'status' => $feature['status'] ?? null,
                     ],
                     null,
                     true
@@ -303,7 +303,7 @@ final class Context implements ContextInterface
             'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
                 ? $attributes->getTypeCasting()
                 : true,
-            'environment' => $attributes?->getEnvironment() ?? $this->environment
+            'environment' => $attributes?->getEnvironment() ?? $this->environment,
         ]));
 
         // Filter out RuleError results
@@ -330,7 +330,7 @@ final class Context implements ContextInterface
                         'visitorId' => $this->visitorId,
                         'experienceKey' => $feature['experienceKey'] ?? null,
                         'featureKey' => $feature['key'] ?? null,
-                        'status' => $feature['status'] ?? null
+                        'status' => $feature['status'] ?? null,
                     ],
                     null,
                     true
@@ -392,7 +392,7 @@ final class Context implements ContextInterface
                 SystemEvents::Conversion,
                 [
                     'visitorId' => $this->visitorId,
-                    'goalKey' => $goalKey
+                    'goalKey' => $goalKey,
                 ],
                 null,
                 true
@@ -441,7 +441,7 @@ final class Context implements ContextInterface
             );
             return null;
         }
-        $segmentsRule = $this->getVisitorProperties($attributes["ruleData"] ?? null);
+        $segmentsRule = $this->getVisitorProperties($attributes['ruleData'] ?? null);
         $error = $this->segmentsManager->selectCustomSegments(
             $this->visitorId,
             $segmentKeys,
@@ -595,7 +595,7 @@ final class Context implements ContextInterface
     private function getVisitorProperties(?array $attributes = null): array
     {
         $data = $this->dataManager->getData($this->visitorId);
-        $segments = $data && $data["segments"] ? $data["segments"] : [];
+        $segments = $data && $data['segments'] ? $data['segments'] : [];
         $segments = $segments ? $segments : [];
         $visitorProperties = $attributes
             ? ObjectUtils::objectDeepMerge($this->visitorProperties ?? [], $attributes)

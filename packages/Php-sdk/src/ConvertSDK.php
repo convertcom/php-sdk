@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace ConvertSdk;
 
-use ConvertSdk\Config\Config;
 use ConvertSdk\Cache\ArrayCache;
+use ConvertSdk\Config\Config;
 use ConvertSdk\Enums\LogLevel;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\Exception\InvalidArgumentException;
 use ConvertSdk\Utils\Comparisons;
 use OpenAPI\Client\Config as OpenApiConfig;
 use OpenAPI\Client\Model\ConfigResponseData;
 use Psr\Log\LoggerInterface;
-use ConvertSdk\Event\EventManager;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
 
@@ -31,7 +31,9 @@ final class ConvertSDK
     /**
      * Prevent direct instantiation — use {@see create()} instead.
      */
-    private function __construct() {}
+    private function __construct()
+    {
+    }
 
     /**
      * Create and initialize the SDK.

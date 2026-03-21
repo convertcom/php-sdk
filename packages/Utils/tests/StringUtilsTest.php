@@ -24,7 +24,7 @@ class StringUtilsTest extends TestCase
     public function testStringFormatWithFunctionArgument()
     {
         $template = 'Lorem %s dolor sit amet';
-        $result = StringUtils::stringFormat($template, function() {
+        $result = StringUtils::stringFormat($template, function () {
             return 'ipsum';
         });
         $this->assertEquals('Lorem ipsum dolor sit amet', $result);
@@ -69,7 +69,7 @@ class StringUtilsTest extends TestCase
     {
         $value = 'testString';
         $hash = StringUtils::generateHash($value);
-        
+
         // Assert the hash is an integer (or check with an expected value if needed)
         $this->assertIsInt($hash);
     }

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\MockObject\MockObject;
+use ConvertSdk\Enums\FeatureStatus;
+use ConvertSdk\Enums\Messages;
 use ConvertSdk\FeatureManager;
 use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Enums\FeatureStatus;
-use ConvertSdk\Enums\Messages;
 use OpenAPI\Client\BucketingAttributes;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for FeatureManager null-return reason logging (Story 4.2).

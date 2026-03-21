@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests\Cache;
 
-use PHPUnit\Framework\TestCase;
 use ConvertSdk\Cache\ArrayCache;
+use PHPUnit\Framework\TestCase;
 use Psr\SimpleCache\CacheInterface;
 
 class ArrayCacheTest extends TestCase

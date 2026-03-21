@@ -19,35 +19,35 @@ final class DefaultConfig
             'api' => [
                 'endpoint' => [
                     'config' => getenv('CONFIG_ENDPOINT') ?: '',
-                    'track'  => getenv('TRACK_ENDPOINT') ?: ''
-                ]
+                    'track'  => getenv('TRACK_ENDPOINT') ?: '',
+                ],
             ],
             'environment' => 'production',
             'bucketing' => [
                 'max_traffic' => 10000,
-                'hash_seed'   => 9999
+                'hash_seed'   => 9999,
             ],
             'data' => [],
             'dataStore' => null, // Allows 3rd party data store to be passed.
             'dataRefreshInterval' => 300000, // in milliseconds (5 minutes)
             'events' => [
                 'batch_size' => 10,
-                'release_interval' => 1000
+                'release_interval' => 1000,
             ],
             'logger' => [
                 'logLevel' => LogLevel::Debug,
-                'customLoggers' => [] // Allows 3rd party loggers to be passed.
+                'customLoggers' => [], // Allows 3rd party loggers to be passed.
             ],
             'rules' => [
                 'keys_case_sensitive' => true,
-                'comparisonProcessor' => null // Allows 3rd party comparison processor.
+                'comparisonProcessor' => null, // Allows 3rd party comparison processor.
             ],
             'network' => [
                 'tracking' => true,
-                'cacheLevel' => 'default' // Can be set to 'low' for short-lived cache.
+                'cacheLevel' => 'default', // Can be set to 'low' for short-lived cache.
             ],
             'sdkKey' => '',
-            'sdkKeySecret' => ''
+            'sdkKeySecret' => '',
         ];
     }
 }

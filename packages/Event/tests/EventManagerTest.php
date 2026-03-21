@@ -8,10 +8,10 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
+use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\Event\Interfaces\EventManagerInterface;
-use ConvertSdk\Enums\SystemEvents;
+use PHPUnit\Framework\TestCase;
 
 class EventManagerTest extends TestCase
 {
@@ -70,9 +70,9 @@ class EventManagerTest extends TestCase
             'foo' => 'bar',
             'some' => [
                 'test' => [
-                    'data' => 'value'
-                ]
-            ]
+                    'data' => 'value',
+                ],
+            ],
         ];
         $called = 0;
         $callback = function ($inputArgs, $err) use ($args, &$called) {

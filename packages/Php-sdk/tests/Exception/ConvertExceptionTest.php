@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests\Exception;
 
-use PHPUnit\Framework\TestCase;
-use ConvertSdk\Exception\ConvertException;
+use ConvertSdk\Exception\BucketingException;
 use ConvertSdk\Exception\ConfigFetchException;
 use ConvertSdk\Exception\ConfigValidationException;
+use ConvertSdk\Exception\ConvertException;
 use ConvertSdk\Exception\InvalidArgumentException;
-use ConvertSdk\Exception\BucketingException;
+use PHPUnit\Framework\TestCase;
 
 class ConvertExceptionTest extends TestCase
 {

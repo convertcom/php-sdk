@@ -11,24 +11,24 @@ declare(strict_types=1);
 
 namespace ConvertSdk;
 
-use ConvertSdk\Interfaces\CoreInterface;
-use ConvertSdk\Interfaces\ContextInterface;
-use ConvertSdk\Interfaces\DataManagerInterface;
-use ConvertSdk\Event\Interfaces\EventManagerInterface;
-use ConvertSdk\Interfaces\ExperienceManagerInterface;
-use ConvertSdk\Interfaces\FeatureManagerInterface;
-use ConvertSdk\Interfaces\SegmentsManagerInterface;
-use ConvertSdk\Interfaces\ApiManagerInterface;
-use ConvertSdk\Interfaces\LogManagerInterface;
-use OpenAPI\Client\Config;
-use OpenAPI\Client\Model\ConfigResponseData;
-use ConvertSdk\Enums\SystemEvents;
-use ConvertSdk\Enums\Messages;
-use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Config\ConfigValidator;
+use ConvertSdk\Enums\ErrorMessages;
+use ConvertSdk\Enums\Messages;
+use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Exception\ConfigFetchException;
 use ConvertSdk\Exception\ConfigValidationException;
 use ConvertSdk\Exception\InvalidArgumentException;
+use ConvertSdk\Interfaces\ApiManagerInterface;
+use ConvertSdk\Interfaces\ContextInterface;
+use ConvertSdk\Interfaces\CoreInterface;
+use ConvertSdk\Interfaces\DataManagerInterface;
+use ConvertSdk\Interfaces\ExperienceManagerInterface;
+use ConvertSdk\Interfaces\FeatureManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Interfaces\SegmentsManagerInterface;
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
 use Psr\SimpleCache\CacheInterface;
 
 /**

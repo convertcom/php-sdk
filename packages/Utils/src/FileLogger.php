@@ -36,7 +36,7 @@ class FileLogger
      */
     private function _write(string $method, mixed ...$args): void
     {
-        $prefix = sprintf("%s [%s]", (new DateTime())->format(DateTime::ATOM), strtoupper($method));
+        $prefix = sprintf('%s [%s]', (new DateTime())->format(DateTime::ATOM), strtoupper($method));
         $output = $prefix . ' ' . implode("\n" . $prefix . ' ', array_map('json_encode', $args)) . "\n";
         if ($this->appendMethod === 'append') {
             // This will throw an error if, for example, the file is invalid or not writable.
@@ -45,7 +45,7 @@ class FileLogger
             if (is_callable([$this->fs, $this->appendMethod])) {
                 call_user_func([$this->fs, $this->appendMethod], $this->file, $output);
             } else {
-                throw new \Exception("Append method not callable");
+                throw new \Exception('Append method not callable');
             }
         }
     }

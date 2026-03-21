@@ -38,6 +38,7 @@ class TypeUtils
                     }
                     return (string)$value;
                 }
+                // no break
             case 'string':
                 return (string)$value;
             case 'integer':

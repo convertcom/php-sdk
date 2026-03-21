@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace ConvertSdk;
 
-use ConvertSdk\Interfaces\BucketingManagerInterface;
-use ConvertSdk\Utils\StringUtils;
-use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Enums\Messages;
+use ConvertSdk\Interfaces\BucketingManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Utils\StringUtils;
 
 /**
  * Manages visitor bucketing for A/B test variation assignment.
@@ -64,7 +64,7 @@ final class BucketingManager implements BucketingManagerInterface
             $this->logManager->debug('BucketingManager.selectBucket()', [
                 'buckets' => $buckets,
                 'value' => $value,
-                'redistribute' => $redistribute
+                'redistribute' => $redistribute,
             ], ['variation' => $variation]);
         }
 
@@ -96,7 +96,7 @@ final class BucketingManager implements BucketingManagerInterface
                 'seed' => $seed,
                 'experienceId' => $experienceId,
                 'val' => $val,
-                'result' => $result
+                'result' => $result,
             ]);
         }
 
@@ -134,7 +134,7 @@ final class BucketingManager implements BucketingManagerInterface
 
         return [
             'variationId' => $selectedBucket,
-            'bucketingAllocation' => $value
+            'bucketingAllocation' => $value,
         ];
     }
 }

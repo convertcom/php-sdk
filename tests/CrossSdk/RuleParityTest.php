@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests\CrossSdk;
 
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\Attributes\DataProvider;
 use ConvertSdk\RuleManager;
 use ConvertSdk\Utils\Comparisons;
 use OpenAPI\Client\Model\RuleObject;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Cross-SDK rule evaluation parity tests.

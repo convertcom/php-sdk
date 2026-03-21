@@ -21,5 +21,6 @@ readonly class GoalData
     public function __construct(
         public GoalDataKey $key,
         public int|float|string $value,
-    ) {}
+    ) {
+    }
 }

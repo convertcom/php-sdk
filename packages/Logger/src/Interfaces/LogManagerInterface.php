@@ -11,9 +11,9 @@ declare(strict_types=1);
 namespace ConvertSdk\Interfaces;
 
 use ConvertSdk\Enums\LogLevel;
-use ConvertSdk\Interfaces\LogMethodMapInterface;
 
-interface LogManagerInterface {
+interface LogManagerInterface
+{
     /**
      * Log a message with a specified level.
      *

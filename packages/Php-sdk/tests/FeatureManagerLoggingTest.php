@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\MockObject\MockObject;
+use ConvertSdk\Enums\FeatureStatus;
 use ConvertSdk\FeatureManager;
 use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Enums\FeatureStatus;
 use OpenAPI\Client\BucketingAttributes;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for FeatureManager debug logging behavior (Story 4.1).
@@ -59,7 +59,7 @@ class FeatureManagerLoggingTest extends TestCase
             new BucketingAttributes([])
         );
 
-        $runFeatureCalls = array_filter($debugCalls, fn($c) => $c['method'] === 'FeatureManager.runFeature()');
+        $runFeatureCalls = array_filter($debugCalls, fn ($c) => $c['method'] === 'FeatureManager.runFeature()');
         $this->assertNotEmpty($runFeatureCalls, 'Expected at least one debug call with FeatureManager.runFeature()');
 
         // Verify entry log has visitorId and featureKey
@@ -90,11 +90,11 @@ class FeatureManagerLoggingTest extends TestCase
             new BucketingAttributes([])
         );
 
-        $runFeaturesCalls = array_filter($debugCalls, fn($c) => $c['method'] === 'FeatureManager.runFeatures()');
+        $runFeaturesCalls = array_filter($debugCalls, fn ($c) => $c['method'] === 'FeatureManager.runFeatures()');
         $this->assertNotEmpty($runFeaturesCalls, 'Expected at least one debug call with FeatureManager.runFeatures()');
 
         // Verify summary log has counts
-        $summaryCalls = array_filter($runFeaturesCalls, fn($c) => array_key_exists('totalFeatures', $c['data']));
+        $summaryCalls = array_filter($runFeaturesCalls, fn ($c) => array_key_exists('totalFeatures', $c['data']));
         $this->assertNotEmpty($summaryCalls, 'Expected summary log with totalFeatures count');
     }
 

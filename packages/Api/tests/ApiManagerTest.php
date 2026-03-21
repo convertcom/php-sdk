@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
 use ConvertSdk\ApiManager;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\Enums\SystemEvents;
-use OpenAPI\Client\Config;
-use ConvertSdk\Config\DefaultConfig;
-use OpenAPI\Client\Model\ConfigResponseData;
-use OpenAPI\Client\Model\VisitorTrackingEvents;
 use Http\Mock\Client as MockHttpClient;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Nyholm\Psr7\Response;
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\VisitorTrackingEvents;
+use PHPUnit\Framework\TestCase;
 
 class ApiManagerTest extends TestCase
 {
@@ -52,20 +52,20 @@ class ApiManagerTest extends TestCase
             'api' => [
                 'endpoint' => [
                     'config' => self::HOST . ':' . self::PORT,
-                    'track'  => self::HOST . ':' . self::PORT
-                ]
+                    'track'  => self::HOST . ':' . self::PORT,
+                ],
             ],
             'events' => [
                 'batch_size' => self::BATCH_SIZE,
-                'release_interval' => self::RELEASE_TIMEOUT
+                'release_interval' => self::RELEASE_TIMEOUT,
             ],
-            'mapper' => null // Ensure no invalid mapper value
+            'mapper' => null, // Ensure no invalid mapper value
         ];
         $finalConfig = ObjectUtils::objectDeepMerge($mergedConfig, $overrides);
         if (isset($finalConfig['sdkKey'])) {
             unset($finalConfig['sdkKey']);
         }
-        $finalConfig["data"] = new ConfigResponseData($finalConfig["data"]);
+        $finalConfig['data'] = new ConfigResponseData($finalConfig['data']);
         $this->config = new Config($finalConfig);
 
         // Instantiate ApiManager with mock PSR-18 client
@@ -119,7 +119,7 @@ class ApiManagerTest extends TestCase
     {
         $testPayload = [
             'foo' => 'bar',
-            'some' => ['test' => ['data' => 'value']]
+            'some' => ['test' => ['data' => 'value']],
         ];
 
         // Add mock response
@@ -161,7 +161,7 @@ class ApiManagerTest extends TestCase
     {
         $requestData = new VisitorTrackingEvents([
             'eventType' => 'bucketing',
-            'data' => ['experienceId' => '11', 'variationId' => '12']
+            'data' => ['experienceId' => '11', 'variationId' => '12'],
         ]);
 
         // Add mock response for the release request
@@ -189,7 +189,7 @@ class ApiManagerTest extends TestCase
 
         $requestData = new VisitorTrackingEvents([
             'eventType' => 'bucketing',
-            'data' => ['experienceId' => '11', 'variationId' => '12']
+            'data' => ['experienceId' => '11', 'variationId' => '12'],
         ]);
 
         // Add mock response
@@ -235,7 +235,7 @@ class ApiManagerTest extends TestCase
 
         $requestData = new VisitorTrackingEvents([
             'eventType' => 'bucketing',
-            'data' => ['experienceId' => '11', 'variationId' => '12']
+            'data' => ['experienceId' => '11', 'variationId' => '12'],
         ]);
 
         // Configure mock client to throw exceptions for all 3 attempts (initial + 2 retries)
@@ -506,7 +506,7 @@ class ApiManagerTest extends TestCase
                 'audiences' => [],
                 'goals' => [],
                 'locations' => [],
-            ]
+            ],
         ];
 
         $this->mockHttpClient->addResponse(
@@ -588,7 +588,7 @@ class ApiManagerTest extends TestCase
                 'audiences' => [],
                 'goals' => [],
                 'locations' => [],
-            ]
+            ],
         ];
 
         $this->mockHttpClient->addResponse(

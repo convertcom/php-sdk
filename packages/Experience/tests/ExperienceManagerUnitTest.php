@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\MockObject\MockObject;
+use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\RuleError;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Enums\RuleError;
-use ConvertSdk\Enums\BucketingError;
 use OpenAPI\Client\BucketingAttributes;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Unit test suite for ExperienceManager.
@@ -239,7 +239,7 @@ class ExperienceManagerUnitTest extends TestCase
 
         $this->dataManager
             ->method('getBucketing')
-            ->willReturnCallback(fn(string $v, string $key) => match ($key) {
+            ->willReturnCallback(fn (string $v, string $key) => match ($key) {
                 'exp-1' => $variation1,
                 'exp-2' => null,
                 'exp-3' => $variation2,

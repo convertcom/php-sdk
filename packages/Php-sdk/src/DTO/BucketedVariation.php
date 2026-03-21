@@ -24,5 +24,6 @@ readonly class BucketedVariation
         public string $variationId,
         public string $variationKey,
         public array $changes,
-    ) {}
+    ) {
+    }
 }
