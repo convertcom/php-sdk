@@ -19,6 +19,9 @@ class FileLogger
      */
     public function __construct(string $file, mixed $fs, string $appendMethod = 'append')
     {
+        if (trim($file) === '') {
+            throw new \ValueError('Path cannot be empty');
+        }
         $this->file = $file;
         $this->fs = $fs;
         $this->appendMethod = $appendMethod;

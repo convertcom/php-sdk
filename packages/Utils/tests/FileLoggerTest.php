@@ -38,8 +38,8 @@ class FileLoggerTest extends TestCase
 
     public function testShouldReturnAnErrorWithInvalidFile(): void
     {
-        $logger = new FileLogger('', new \stdClass());
         try {
+            $logger = new FileLogger('', new \stdClass());
             $logger->log('testing invalid file');
             $this->fail('Expected ValueError was not thrown.');
         } catch (\ValueError $e) {

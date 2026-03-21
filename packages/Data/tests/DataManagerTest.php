@@ -322,7 +322,7 @@ class DataManagerTest extends TestCase
     {
         $this->dataManager->setDataStore($this->dataStoreMock);
         $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
-        sleep((self::RELEASE_TIMEOUT + 1) / 1000);
+        usleep((int) ((self::RELEASE_TIMEOUT + 1) * 1000));
         $check = $this->dataManager->getDataStoreManager()->get($this->storeKey);
         $this->assertEquals($this->bucketing, $check['bucketing']);
     }
@@ -335,7 +335,7 @@ class DataManagerTest extends TestCase
         $this->dataManager->setDataStore($this->dataStoreMock);
         $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
         $this->dataManager->putData($this->visitorId, ['goals' => $this->goals]);
-        sleep((self::RELEASE_TIMEOUT + 1) / 1000);
+        usleep((int) ((self::RELEASE_TIMEOUT + 1) * 1000));
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertEquals($this->bucketing, $check['bucketing']);
         $this->assertEquals($this->goals, $check['goals']);
@@ -350,7 +350,7 @@ class DataManagerTest extends TestCase
         $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
         $this->dataManager->putData($this->visitorId, ['goals' => $this->goals]);
         $this->dataManager->putData($this->visitorId, ['segments' => $this->segments]);
-        sleep((self::RELEASE_TIMEOUT + 1) / 1000);
+        usleep((int) ((self::RELEASE_TIMEOUT + 1) * 1000));
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertEquals($this->bucketing, $check['bucketing']);
         $this->assertEquals($this->goals, $check['goals']);
@@ -365,7 +365,7 @@ class DataManagerTest extends TestCase
         $this->dataManager->putData($this->visitorId, ['bucketing' => $this->bucketing]);
         $this->dataManager->putData($this->visitorId, ['goals' => $this->goals]);
         $this->dataManager->putData($this->visitorId, ['segments' => $this->segments]);
-        sleep((self::RELEASE_TIMEOUT + 1) / 1000);
+        usleep((int) ((self::RELEASE_TIMEOUT + 1) * 1000));
         $check = $this->dataStoreMock->get($this->storeKey);
         $this->assertIsArray($check);
         $this->assertEquals($this->bucketing, $check['bucketing']);
