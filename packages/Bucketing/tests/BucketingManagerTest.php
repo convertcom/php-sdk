@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace ConvertSdk\Tests;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 use ConvertSdk\BucketingManager;
+use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Utils\StringUtils;
 
 class BucketingManagerTest extends TestCase
@@ -230,4 +232,44 @@ class BucketingManagerTest extends TestCase
         $this->assertGreaterThan($visitorCount * 0.30, $results['B']);
     }
 
+    public function testGetBucketForVisitorCallsDebugOnLogger(): void
+    {
+        /** @var LogManagerInterface&MockObject $logManager */
+        $logManager = $this->createMock(LogManagerInterface::class);
+
+        $debugCalls = [];
+        $logManager->expects($this->atLeastOnce())
+            ->method('debug')
+            ->willReturnCallback(function () use (&$debugCalls): void {
+                $debugCalls[] = func_get_args();
+            });
+
+        $bucketingManager = new BucketingManager(logManager: $logManager);
+
+        $buckets = ['A' => 50, 'B' => 50];
+        $bucketingManager->getBucketForVisitor($buckets, 'visitor-456', ['experienceId' => 'exp-1']);
+
+        // Verify getBucketForVisitor summary log was emitted
+        $summaryLogs = array_filter($debugCalls, fn($call) => $call[0] === 'BucketingManager.getBucketForVisitor()');
+        $this->assertNotEmpty($summaryLogs, 'Expected debug log from getBucketForVisitor()');
+
+        $summaryLog = reset($summaryLogs);
+        $this->assertArrayHasKey('visitorId', $summaryLog[1]);
+        $this->assertArrayHasKey('experienceId', $summaryLog[1]);
+        $this->assertArrayHasKey('bucketValue', $summaryLog[1]);
+        $this->assertArrayHasKey('selectedVariationId', $summaryLog[1]);
+        $this->assertSame('visitor-456', $summaryLog[1]['visitorId']);
+        $this->assertSame('exp-1', $summaryLog[1]['experienceId']);
+    }
+
+    public function testNoExceptionWhenLogManagerIsNull(): void
+    {
+        $bucketingManager = new BucketingManager(logManager: null);
+
+        $buckets = ['A' => 50, 'B' => 50];
+        $result = $bucketingManager->getBucketForVisitor($buckets, 'visitor-123', ['experienceId' => 'exp-1']);
+
+        $this->assertNotNull($result);
+        $this->assertIsArray($result);
+    }
 }

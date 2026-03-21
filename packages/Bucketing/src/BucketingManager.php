@@ -6,7 +6,7 @@ namespace ConvertSdk;
 
 use ConvertSdk\Interfaces\BucketingManagerInterface;
 use ConvertSdk\Utils\StringUtils;
-use ConvertSdk\Logger\LogManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Enums\Messages;
 
 /**
@@ -118,6 +118,15 @@ final class BucketingManager implements BucketingManagerInterface
     {
         $value = $this->getValueVisitorBased($visitorId, $options);
         $selectedBucket = $this->selectBucket($buckets, $value, $options['redistribute'] ?? 0);
+
+        if ($this->logManager) {
+            $this->logManager->debug('BucketingManager.getBucketForVisitor()', [
+                'visitorId' => $visitorId,
+                'experienceId' => $options['experienceId'] ?? '',
+                'bucketValue' => $value,
+                'selectedVariationId' => $selectedBucket,
+            ]);
+        }
 
         if (!$selectedBucket) {
             return null;

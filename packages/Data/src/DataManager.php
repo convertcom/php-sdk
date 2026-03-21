@@ -1393,6 +1393,23 @@ final class DataManager implements DataManagerInterface
         }
     }
 
+    if ($this->_loggerManager) {
+        $availableKeys = array_map(
+            fn($e) => $e[$identityField] ?? 'unknown',
+            $list
+        );
+        $this->_loggerManager->debug(
+            'DataManager._getEntityByField()',
+            Messages::ENTITY_LOOKUP_FAILED,
+            ($this->_mapper)([
+                'searchedFor' => $identity,
+                'entityType' => $mappedEntityType,
+                'identityField' => $identityField,
+                'availableKeys' => $availableKeys,
+            ])
+        );
+    }
+
     return null;
   }
 
@@ -1518,6 +1535,23 @@ final class DataManager implements DataManagerInterface
             }
         }
     }
+
+    // Only log at getSubItem level when the parent was found but the sub-entity wasn't.
+    // When parent is not found, _getEntityByField() already logged the failure.
+    if ($this->_loggerManager && $entity !== null) {
+        $this->_loggerManager->debug(
+            'DataManager.getSubItem()',
+            Messages::ENTITY_LOOKUP_FAILED,
+            ($this->_mapper)([
+                'entityType' => $entityType,
+                'entityIdentity' => $entityIdentity,
+                'subEntityType' => $subEntityType,
+                'subEntityIdentity' => $subEntityIdentity,
+                'parentFound' => true,
+            ])
+        );
+    }
+
     return null;
   }
 
