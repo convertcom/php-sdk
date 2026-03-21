@@ -80,7 +80,7 @@ class CoreTest extends TestCase
             $this->loggerManager
         );
         $this->experienceManager = new ExperienceManager(dataManager: $this->dataManager);
-        $this->featureManager = new FeatureManager($this->config, $this->dataManager);
+        $this->featureManager = new FeatureManager(dataManager: $this->dataManager, logManager: $this->loggerManager);
         $this->segmentsManager = new SegmentsManager($this->config, $this->dataManager, $this->ruleManager);
 
         $this->core = new Core(
@@ -167,5 +167,45 @@ class CoreTest extends TestCase
     {
         $reflection = new \ReflectionClass(Core::class);
         $this->assertTrue($reflection->isFinal());
+    }
+
+    /** @test */
+    public function flushMethodExistsAndIsPublic(): void
+    {
+        $reflection = new \ReflectionClass(Core::class);
+        $this->assertTrue($reflection->hasMethod('flush'));
+        $this->assertTrue($reflection->getMethod('flush')->isPublic());
+    }
+
+    /** @test */
+    public function flushIsNoOpWhenQueueIsEmpty(): void
+    {
+        // flush() should not throw when there are no queued events
+        $this->core->flush();
+        $this->assertTrue(true); // No exception means success
+    }
+
+    /** @test */
+    public function flushDelegatesToApiManagerReleaseQueue(): void
+    {
+        $apiManagerMock = $this->createMock(\ConvertSdk\Interfaces\ApiManagerInterface::class);
+        $apiManagerMock->expects($this->once())
+            ->method('releaseQueue')
+            ->with('flush');
+
+        $core = new Core(
+            $this->config,
+            $this->dataManager,
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->segmentsManager,
+            $apiManagerMock,
+            new ArrayCache(),
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $this->loggerManager,
+        );
+
+        $core->flush();
     }
 }

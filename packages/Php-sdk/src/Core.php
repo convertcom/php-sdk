@@ -217,6 +217,16 @@ final class Core implements CoreInterface
     }
 
     /**
+     * Flush all queued tracking events immediately.
+     *
+     * @return void
+     */
+    public function flush(): void
+    {
+        $this->apiManager->releaseQueue('flush');
+    }
+
+    /**
      * Fetch remote config data, using cache when available.
      *
      * @return void

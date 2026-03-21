@@ -14,6 +14,7 @@ namespace ConvertSdk\Interfaces;
 use OpenAPI\Client\BucketingAttributes;
 use ConvertSdk\DTO\BucketedFeature;
 use ConvertSdk\DTO\BucketedVariation;
+use ConvertSdk\DTO\ConversionAttributes;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
 
@@ -60,10 +61,10 @@ interface ContextInterface
      * Track a conversion for a given goal key.
      *
      * @param string $goalKey The key identifying the goal
-     * @param array<string, mixed>|null $attributes Conversion attributes
-     * @return RuleError|null Rule error if tracking fails
+     * @param ConversionAttributes|null $attributes Conversion attributes
+     * @return RuleError|bool|null RuleError on rule mismatch, false if goal not found, null on success
      */
-    public function trackConversion(string $goalKey, ?array $attributes): ?RuleError;
+    public function trackConversion(string $goalKey, ?ConversionAttributes $attributes = null): RuleError|bool|null;
 
     /**
      * Set default segments for the visitor.

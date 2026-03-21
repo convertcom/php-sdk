@@ -278,7 +278,22 @@ class ApiManager implements ApiManagerInterface
     }
 
     /**
-     * Send queue to server.
+     * Maximum number of retries for tracking POST requests.
+     */
+    private const MAX_RETRIES = 2;
+
+    /**
+     * Retry delays in microseconds: 100ms after first failure, 300ms after second.
+     * @var array<int, int>
+     */
+    private const RETRY_DELAYS_US = [100_000, 300_000];
+
+    /**
+     * Send queue to server with retry logic.
+     *
+     * Retries up to MAX_RETRIES times on HTTP 5xx or network errors.
+     * Does NOT retry on HTTP 4xx (client errors).
+     * Backoff: 100ms after first failure, 300ms after second (formula: 100ms * attempt^2).
      *
      * @param ?string $reason Reason for releasing the queue (optional)
      * @return void
@@ -302,40 +317,95 @@ class ApiManager implements ApiManagerInterface
         $payload['visitors'] = $this->requestsQueue->getItems();
         $payload['source'] = $this->trackingSource;
 
-        try {
-            $result = $this->request(
-                'POST',
-                [
-                    'base' => str_replace('[project_id]', (string)$this->projectId, $this->trackEndpoint),
-                    'route' => "/track/{$this->sdkKey}"
-                ],
-                call_user_func($this->mapper, $payload)
-            );
+        $lastError = null;
+        $lastStatusCode = null;
 
-            $this->requestsQueue->reset();
-            if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
-                $this->eventManager->fire(SystemEvents::ApiQueueReleased, [
-                    'reason' => $reason,
-                    'result' => $result,
-                    'visitors' => $payload['visitors']
-                ]);
-            }
-        } catch (ClientExceptionInterface $error) {
-            if ($this->loggerManager && method_exists($this->loggerManager, 'error')) {
-                $this->loggerManager->error('ApiManager.releaseQueue()', [
-                    'error' => $error->getMessage(),
-                    'code' => method_exists($error, 'getCode') ? $error->getCode() : null,
-                    'reason' => $reason
-                ]);
-            }
-            $this->startQueue();
-            if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
-                $this->eventManager->fire(
-                    SystemEvents::ApiQueueReleased,
-                    ['reason' => $reason],
-                    $error
+        for ($attempt = 0; $attempt <= self::MAX_RETRIES; $attempt++) {
+            try {
+                $result = $this->request(
+                    'POST',
+                    [
+                        'base' => str_replace('[project_id]', (string)$this->projectId, $this->trackEndpoint),
+                        'route' => "/track/{$this->sdkKey}"
+                    ],
+                    call_user_func($this->mapper, $payload)
                 );
+
+                $statusCode = $result['status'] ?? 0;
+
+                if ($statusCode >= 200 && $statusCode < 300) {
+                    // Success — clear queue and fire event
+                    $this->requestsQueue->reset();
+                    if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
+                        $this->eventManager->fire(SystemEvents::ApiQueueReleased, [
+                            'reason' => $reason,
+                            'result' => $result,
+                            'visitors' => $payload['visitors']
+                        ]);
+                    }
+                    return;
+                }
+
+                if ($statusCode >= 400 && $statusCode < 500) {
+                    // Client error — do NOT retry, discard batch
+                    if ($this->loggerManager && method_exists($this->loggerManager, 'warn')) {
+                        $this->loggerManager->warn('ApiManager.releaseQueue()', [
+                            'error' => "Tracking POST returned client error HTTP {$statusCode}",
+                            'statusCode' => $statusCode,
+                            'endpoint' => "/track/{$this->sdkKey}",
+                            'reason' => $reason,
+                        ]);
+                    }
+                    $this->requestsQueue->reset();
+                    if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
+                        $this->eventManager->fire(
+                            SystemEvents::ApiQueueReleased,
+                            ['reason' => $reason, 'error' => "HTTP {$statusCode}"],
+                            new \RuntimeException("Tracking POST returned client error HTTP {$statusCode}")
+                        );
+                    }
+                    return;
+                }
+
+                // Server error (5xx) — retry if attempts remain
+                $lastStatusCode = $statusCode;
+                $lastError = null;
+                if ($attempt < self::MAX_RETRIES) {
+                    usleep(self::RETRY_DELAYS_US[$attempt]);
+                }
+            } catch (ClientExceptionInterface $e) {
+                // Network error — retry if attempts remain
+                $lastError = $e;
+                $lastStatusCode = null;
+                if ($attempt < self::MAX_RETRIES) {
+                    usleep(self::RETRY_DELAYS_US[$attempt]);
+                }
             }
+        }
+
+        // All retries exhausted — discard batch and log warning
+        $logContext = [
+            'endpoint' => "/track/{$this->sdkKey}",
+            'reason' => $reason,
+            'attempts' => self::MAX_RETRIES + 1,
+        ];
+        if ($lastError !== null) {
+            $logContext['error'] = $lastError->getMessage();
+        }
+        if ($lastStatusCode !== null) {
+            $logContext['statusCode'] = $lastStatusCode;
+        }
+        if ($this->loggerManager && method_exists($this->loggerManager, 'warn')) {
+            $this->loggerManager->warn('ApiManager.releaseQueue()', $logContext);
+        }
+
+        $this->requestsQueue->reset();
+        if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
+            $this->eventManager->fire(
+                SystemEvents::ApiQueueReleased,
+                ['reason' => $reason, 'error' => $lastError ? $lastError->getMessage() : "HTTP {$lastStatusCode}"],
+                $lastError
+            );
         }
     }
 

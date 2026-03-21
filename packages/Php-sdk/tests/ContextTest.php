@@ -19,10 +19,13 @@ use ConvertSdk\Exception\InvalidArgumentException;
 use OpenAPI\Client\Config;
 use ConvertSdk\Enums\EntityType;
 use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\Model\ConversionAttributes;
+use ConvertSdk\DTO\ConversionAttributes;
+use ConvertSdk\Enums\ConversionSettingKey;
+use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\VisitorTrackingEvents;
 
 class ContextTest extends TestCase
 {
@@ -247,32 +250,6 @@ class ContextTest extends TestCase
     public function testRunFeatures(): void
     {
         $this->testGetFeaturesWithStatuses();
-    }
-
-    public function testTrackConversion(): void
-    {
-        $goalKey = 'increase-engagement';
-        $this->context->trackConversion($goalKey, [
-            'ruleData' => ['action' => 'buy'],
-            'conversionData' => [
-                ['key' => 'amount', 'value' => 10.3],
-                ['key' => 'productsCount', 'value' => 2]
-            ]
-        ]);
-        $this->assertTrue(true);
-    }
-
-    public function testTrackConversionInvalidGoalData(): void
-    {
-        $goalKey = 'increase-engagement';
-        $response = $this->context->trackConversion($goalKey, [
-            'ruleData' => ['action' => 'buy'],
-            'conversionData' => [
-                ['key' => 'amount', 'value' => 10.3],
-                ['key' => 'productsCount', 'value' => 2]
-            ]
-        ]);
-        $this->assertNull($response);
     }
 
     public function testSetDefaultSegments(): void
@@ -564,5 +541,127 @@ class ContextTest extends TestCase
             }
         }
         $this->assertTrue($hasNonString, 'At least one variable should be type-cast to a non-string type');
+    }
+
+    // =========================================================================
+    // forceMultipleTransactions integration tests
+    // =========================================================================
+
+    /**
+     * Helper: create a Context with a mock ApiManager for tracking enqueue() calls.
+     *
+     * @return array{context: Context, apiMock: ApiManagerInterface&\PHPUnit\Framework\MockObject\MockObject, dataManager: DataManager}
+     */
+    private function createContextWithMockApi(): array
+    {
+        $apiMock = $this->createMock(ApiManagerInterface::class);
+
+        $dataManager = new DataManager(
+            $this->config,
+            $this->bucketingManager,
+            $this->ruleManager,
+            $this->eventManager,
+            $apiMock,
+            $this->loggerManager
+        );
+
+        $experienceManager = new ExperienceManager(dataManager: $dataManager);
+        $featureManager = new FeatureManager(dataManager: $dataManager);
+        $segmentsManager = new SegmentsManager($this->config, $dataManager, $this->ruleManager);
+
+        $context = new Context(
+            $this->config,
+            $this->visitorId,
+            $this->eventManager,
+            $experienceManager,
+            $featureManager,
+            $dataManager,
+            $segmentsManager,
+            $apiMock,
+        );
+
+        return ['context' => $context, 'apiMock' => $apiMock, 'dataManager' => $dataManager];
+    }
+
+    /**
+     * Verifies that the forceMultipleTransactions setting actually reaches DataManager
+     * by proving a repeat call with force=true sends a transaction (impossible without the flag).
+     * @group forceMultipleTransactions
+     */
+    public function testTrackConversionWithForceMultipleTransactionsPassesSettingThrough(): void
+    {
+        ['context' => $ctx, 'apiMock' => $apiMock] = $this->createContextWithMockApi();
+
+        $capturedEvents = [];
+        $apiMock->method('enqueue')
+            ->willReturnCallback(function (string $visitorId, VisitorTrackingEvents $event) use (&$capturedEvents) {
+                $capturedEvents[] = (array) $event->jsonSerialize();
+            });
+
+        // First call WITHOUT force: triggers conversion only (1 event)
+        $ctx->trackConversion('goal-without-rule');
+        $this->assertCount(1, $capturedEvents, 'First trigger without goalData should send conversion only');
+
+        // Second call WITH force + goalData: proves the flag passes through to DataManager
+        // Without the flag reaching DataManager, dedup would block this entirely (0 new events)
+        $ctx->trackConversion('goal-without-rule', new ConversionAttributes(
+            conversionData: [['key' => 'amount', 'value' => 19.99]],
+            conversionSetting: [ConversionSettingKey::ForceMultipleTransactions->value => true]
+        ));
+        $this->assertCount(2, $capturedEvents, 'Repeat with force+goalData must send transaction — proves flag passed through');
+    }
+
+    /**
+     * @group forceMultipleTransactions
+     */
+    public function testRepeatedTrackConversionWithForceAndGoalDataSendsTransaction(): void
+    {
+        ['context' => $ctx, 'apiMock' => $apiMock] = $this->createContextWithMockApi();
+
+        $capturedEvents = [];
+        $apiMock->method('enqueue')
+            ->willReturnCallback(function (string $visitorId, VisitorTrackingEvents $event) use (&$capturedEvents) {
+                $capturedEvents[] = (array) $event->jsonSerialize();
+            });
+
+        // First call: conversion + transaction = 2 events
+        $goalData = [['key' => 'amount', 'value' => 19.99]];
+        $ctx->trackConversion('goal-without-rule', new ConversionAttributes(
+            conversionData: $goalData,
+            conversionSetting: [ConversionSettingKey::ForceMultipleTransactions->value => true]
+        ));
+        $this->assertCount(2, $capturedEvents);
+
+        // Second call with force + goalData: transaction only = 3 total events
+        $ctx->trackConversion('goal-without-rule', new ConversionAttributes(
+            conversionData: [['key' => 'amount', 'value' => 29.99]],
+            conversionSetting: [ConversionSettingKey::ForceMultipleTransactions->value => true]
+        ));
+        $this->assertCount(3, $capturedEvents, 'Repeat with force+goalData should send transaction only');
+
+        // The 3rd event should be a transaction (has goalData)
+        $this->assertArrayHasKey('goalData', $capturedEvents[2]['data']);
+    }
+
+    /**
+     * @group forceMultipleTransactions
+     */
+    public function testRepeatedTrackConversionWithoutForceSendsNothing(): void
+    {
+        ['context' => $ctx, 'apiMock' => $apiMock] = $this->createContextWithMockApi();
+
+        $capturedEvents = [];
+        $apiMock->method('enqueue')
+            ->willReturnCallback(function (string $visitorId, VisitorTrackingEvents $event) use (&$capturedEvents) {
+                $capturedEvents[] = (array) $event->jsonSerialize();
+            });
+
+        // First call: conversion = 1 event
+        $ctx->trackConversion('goal-without-rule');
+        $this->assertCount(1, $capturedEvents);
+
+        // Second call without force: nothing sent (dedup)
+        $ctx->trackConversion('goal-without-rule');
+        $this->assertCount(1, $capturedEvents, 'Repeat without force should send nothing');
     }
 }

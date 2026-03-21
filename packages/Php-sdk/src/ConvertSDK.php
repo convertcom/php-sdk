@@ -146,7 +146,15 @@ final class ConvertSDK
         $featureManager = new FeatureManager(dataManager: $dataManager, logManager: $logManager);
         $segmentsManager = new SegmentsManager($openApiConfig, $dataManager, $ruleManager, $logManager);
 
-        // 8. Construct and return Core
+        // 8. Register shutdown function for FPM auto-flush
+        register_shutdown_function(static function () use ($apiManager): void {
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+            $apiManager->releaseQueue('shutdown');
+        });
+
+        // 9. Construct and return Core
         return new Core(
             $openApiConfig,
             $dataManager,

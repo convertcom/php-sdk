@@ -21,6 +21,8 @@ use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\DTO\BucketedFeature;
+use ConvertSdk\DTO\ConversionAttributes;
+use ConvertSdk\DTO\GoalData;
 use ConvertSdk\Exception\InvalidArgumentException;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\BucketingAttributes;
@@ -345,40 +347,45 @@ final class Context implements ContextInterface
      * Trigger conversion tracking.
      *
      * @param string $goalKey A goal key
-     * @param array<string, mixed>|null $attributes Conversion attributes
-     * @return RuleError|null Rule error if conversion tracking fails
+     * @param ConversionAttributes|null $attributes Conversion attributes
+     * @return RuleError|bool|null RuleError on rule mismatch, false if goal not found or rule failed, null on success
      */
-    public function trackConversion(string $goalKey, ?array $attributes): ?RuleError
+    public function trackConversion(string $goalKey, ?ConversionAttributes $attributes = null): RuleError|bool|null
     {
         if (empty($this->visitorId)) {
             $this->loggerManager?->error(
                 'Context.trackConversion()',
                 ErrorMessages::VISITOR_ID_REQUIRED
             );
-            return null;
+            return false;
         }
-        $goalRule = $attributes['ruleData'] ?? [];
-        $goalData = $attributes['conversionData'] ?? [];
-        if ($goalData !== null && !is_array($goalData)) {
-            $this->loggerManager?->error(
-                'Context.trackConversion()',
-                ErrorMessages::GOAL_DATA_NOT_VALID
+
+        // Map DTO GoalData objects to plain arrays for DataManager serialization
+        $conversionData = $attributes?->conversionData;
+        if ($conversionData !== null) {
+            $conversionData = array_map(
+                fn ($item) => $item instanceof GoalData
+                    ? ['key' => $item->key->value, 'value' => $item->value]
+                    : $item,
+                $conversionData
             );
-            return null;
         }
 
         $segments = $this->segmentsManager->getSegments($this->visitorId);
         $triggered = $this->dataManager->convert(
             $this->visitorId,
             $goalKey,
-            $goalRule,
-            $goalData,
+            $attributes?->ruleData,
+            $conversionData,
             $segments,
-            $attributes['conversionData'] ?? []
+            $attributes?->conversionSetting
         );
 
         if ($triggered instanceof RuleError) {
             return $triggered;
+        }
+        if ($triggered === false) {
+            return false;
         }
         if ($triggered) {
             $this->eventManager->fire(

@@ -226,7 +226,7 @@ class ApiManagerTest extends TestCase
     }
 
     /**
-     * Test that an event is fired when queue is released with a 500 error.
+     * Test that an event is fired when queue is released with network error after all retries.
      */
     public function testEventFiringOnReleaseWithError(): void
     {
@@ -237,12 +237,14 @@ class ApiManagerTest extends TestCase
             'data' => ['experienceId' => '11', 'variationId' => '12']
         ]);
 
-        // Configure mock client to throw an exception
-        $this->mockHttpClient->addException(
-            new \Http\Client\Exception\NetworkException('Server error', $this->psr17Factory->createRequest('POST', 'http://localhost'))
-        );
+        // Configure mock client to throw exceptions for all 3 attempts (initial + 2 retries)
+        for ($i = 0; $i < 3; $i++) {
+            $this->mockHttpClient->addException(
+                new \Http\Client\Exception\NetworkException('Server error', $this->psr17Factory->createRequest('POST', 'http://localhost'))
+            );
+        }
 
-        // Expect event to be fired with error
+        // Expect event to be fired with error after all retries exhausted
         $this->eventManagerMock->expects($this->once())
             ->method('fire')
             ->with(
@@ -259,6 +261,232 @@ class ApiManagerTest extends TestCase
         for ($i = 1; $i <= self::BATCH_SIZE; $i++) {
             $this->apiManager->enqueue("VID$i", $requestData);
         }
+    }
+
+    /**
+     * Populate the ApiManager's internal queue via reflection to bypass enqueue()
+     * (which has a pre-existing PHP 8.4 end() compatibility issue).
+     */
+    private function populateQueueViaReflection(int $count = 1): void
+    {
+        $reflection = new \ReflectionClass($this->apiManager);
+        $queueProperty = $reflection->getProperty('requestsQueue');
+
+        $queue = $queueProperty->getValue($this->apiManager);
+        for ($i = 1; $i <= $count; $i++) {
+            $queue->push(
+                "VID$i",
+                ['eventType' => 'bucketing', 'data' => ['experienceId' => '11', 'variationId' => '12']],
+                []
+            );
+        }
+    }
+
+    /**
+     * Test retry on HTTP 503: verify 2 retries then discard (AC #4).
+     */
+    public function testRetryOnHttp503ThenDiscard(): void
+    {
+        $this->populateQueueViaReflection(self::BATCH_SIZE);
+
+        // Queue 3 x 503 responses (initial + 2 retries)
+        for ($i = 0; $i < 3; $i++) {
+            $this->mockHttpClient->addResponse(
+                new Response(503, ['Content-Type' => 'application/json'], '{"error": "service unavailable"}')
+            );
+        }
+
+        // Expect warning logged after retries exhausted
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('warn')
+            ->with(
+                $this->equalTo('ApiManager.releaseQueue()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['statusCode']) && $data['statusCode'] === 503
+                        && isset($data['attempts']) && $data['attempts'] === 3;
+                })
+            );
+
+        // Expect event fired with error info
+        $this->eventManagerMock->expects($this->once())
+            ->method('fire')
+            ->with(
+                SystemEvents::ApiQueueReleased,
+                $this->callback(function ($args) {
+                    return isset($args['error']) && str_contains($args['error'], '503');
+                }),
+                $this->anything()
+            );
+
+        $this->apiManager->releaseQueue('test');
+    }
+
+    /**
+     * Test no retry on HTTP 400: verify immediate discard and warning log (AC #5).
+     */
+    public function testNoRetryOnHttp400(): void
+    {
+        $this->populateQueueViaReflection(self::BATCH_SIZE);
+
+        // Queue only 1 response — should NOT retry
+        $this->mockHttpClient->addResponse(
+            new Response(400, ['Content-Type' => 'application/json'], '{"error": "bad request"}')
+        );
+
+        // Expect warning logged immediately (no retry)
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('warn')
+            ->with(
+                $this->equalTo('ApiManager.releaseQueue()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['statusCode']) && $data['statusCode'] === 400;
+                })
+            );
+
+        // Expect event fired with error
+        $this->eventManagerMock->expects($this->once())
+            ->method('fire')
+            ->with(
+                SystemEvents::ApiQueueReleased,
+                $this->callback(function ($args) {
+                    return isset($args['error']) && str_contains($args['error'], '400');
+                }),
+                $this->callback(function ($err) {
+                    return $err instanceof \RuntimeException;
+                })
+            );
+
+        $this->apiManager->releaseQueue('test');
+
+        // Verify exactly 1 HTTP request was made (no retries)
+        $this->assertCount(1, $this->mockHttpClient->getRequests());
+    }
+
+    /**
+     * Test retry on network exception (ClientExceptionInterface) (AC #4).
+     */
+    public function testRetryOnNetworkException(): void
+    {
+        $this->populateQueueViaReflection(self::BATCH_SIZE);
+
+        // Queue 3 network exceptions for all attempts
+        for ($i = 0; $i < 3; $i++) {
+            $this->mockHttpClient->addException(
+                new \Http\Client\Exception\NetworkException(
+                    'Connection refused',
+                    $this->psr17Factory->createRequest('POST', 'http://localhost')
+                )
+            );
+        }
+
+        // Expect warning after all retries
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('warn')
+            ->with(
+                $this->equalTo('ApiManager.releaseQueue()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['error']) && str_contains($data['error'], 'Connection refused')
+                        && isset($data['attempts']) && $data['attempts'] === 3;
+                })
+            );
+
+        $this->apiManager->releaseQueue('test');
+    }
+
+    /**
+     * Test successful POST after first retry (AC #4).
+     */
+    public function testSuccessAfterFirstRetry(): void
+    {
+        $this->populateQueueViaReflection(self::BATCH_SIZE);
+
+        // First attempt: 503, second attempt: 200
+        $this->mockHttpClient->addResponse(
+            new Response(503, ['Content-Type' => 'application/json'], '{"error": "unavailable"}')
+        );
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{"data": "ok"}')
+        );
+
+        // Expect success event (no error)
+        $this->eventManagerMock->expects($this->once())
+            ->method('fire')
+            ->with(
+                SystemEvents::ApiQueueReleased,
+                $this->callback(function ($args) {
+                    return $args['reason'] === 'test'
+                        && isset($args['result'])
+                        && isset($args['visitors']);
+                })
+            );
+
+        $this->apiManager->releaseQueue('test');
+    }
+
+    /**
+     * Test payload structure matches expected JSON shape (AC #3, #9).
+     */
+    public function testPayloadStructure(): void
+    {
+        $this->populateQueueViaReflection(self::BATCH_SIZE);
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
+        $this->apiManager->releaseQueue('test');
+
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $body = json_decode($sentRequest->getBody()->getContents(), true);
+
+        $this->assertArrayHasKey('accountId', $body);
+        $this->assertArrayHasKey('projectId', $body);
+        $this->assertArrayHasKey('enrichData', $body);
+        $this->assertArrayHasKey('source', $body);
+        $this->assertArrayHasKey('visitors', $body);
+        $this->assertIsArray($body['visitors']);
+    }
+
+    /**
+     * Test enrichData is true when no DataStoreManager configured (AC #9).
+     */
+    public function testEnrichDataTrueWithoutDataStore(): void
+    {
+        $this->populateQueueViaReflection(1);
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
+        $this->apiManager->releaseQueue('test');
+
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $body = json_decode($sentRequest->getBody()->getContents(), true);
+
+        $this->assertTrue($body['enrichData']);
+    }
+
+    /**
+     * Test source is set correctly in payload (AC #9).
+     */
+    public function testSourceInPayload(): void
+    {
+        $this->populateQueueViaReflection(1);
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
+        $this->apiManager->releaseQueue('test');
+
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $body = json_decode($sentRequest->getBody()->getContents(), true);
+
+        // Source comes from config network.source; test config doesn't set it explicitly,
+        // so ApiManager constructor defaults to 'js-sdk'. In production, ConvertSDK::create()
+        // sets 'php-sdk'. This test validates the field exists and has a string value.
+        $this->assertIsString($body['source']);
+        $this->assertNotEmpty($body['source']);
     }
 
     /**

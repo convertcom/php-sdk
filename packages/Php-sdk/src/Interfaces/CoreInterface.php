@@ -42,4 +42,11 @@ interface CoreInterface
      * @return bool
      */
     public function onReady(): bool;
+
+    /**
+     * Flush all queued tracking events immediately.
+     *
+     * @return void
+     */
+    public function flush(): void;
 }
