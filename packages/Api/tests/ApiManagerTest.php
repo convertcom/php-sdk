@@ -264,10 +264,10 @@ class ApiManagerTest extends TestCase
     }
 
     /**
-     * Populate the ApiManager's internal queue via reflection to bypass enqueue()
-     * (which has a pre-existing PHP 8.4 end() compatibility issue).
+     * Populate the ApiManager's internal queue via reflection to isolate
+     * queue state from enqueue() side effects (auto-release, tracking).
      */
-    private function populateQueueViaReflection(int $count = 1): void
+    private function populateQueue(int $count = 1): void
     {
         $reflection = new \ReflectionClass($this->apiManager);
         $queueProperty = $reflection->getProperty('requestsQueue');
@@ -287,7 +287,7 @@ class ApiManagerTest extends TestCase
      */
     public function testRetryOnHttp503ThenDiscard(): void
     {
-        $this->populateQueueViaReflection(self::BATCH_SIZE);
+        $this->populateQueue(self::BATCH_SIZE);
 
         // Queue 3 x 503 responses (initial + 2 retries)
         for ($i = 0; $i < 3; $i++) {
@@ -326,7 +326,7 @@ class ApiManagerTest extends TestCase
      */
     public function testNoRetryOnHttp400(): void
     {
-        $this->populateQueueViaReflection(self::BATCH_SIZE);
+        $this->populateQueue(self::BATCH_SIZE);
 
         // Queue only 1 response — should NOT retry
         $this->mockHttpClient->addResponse(
@@ -367,7 +367,7 @@ class ApiManagerTest extends TestCase
      */
     public function testRetryOnNetworkException(): void
     {
-        $this->populateQueueViaReflection(self::BATCH_SIZE);
+        $this->populateQueue(self::BATCH_SIZE);
 
         // Queue 3 network exceptions for all attempts
         for ($i = 0; $i < 3; $i++) {
@@ -398,7 +398,7 @@ class ApiManagerTest extends TestCase
      */
     public function testSuccessAfterFirstRetry(): void
     {
-        $this->populateQueueViaReflection(self::BATCH_SIZE);
+        $this->populateQueue(self::BATCH_SIZE);
 
         // First attempt: 503, second attempt: 200
         $this->mockHttpClient->addResponse(
@@ -428,7 +428,7 @@ class ApiManagerTest extends TestCase
      */
     public function testPayloadStructure(): void
     {
-        $this->populateQueueViaReflection(self::BATCH_SIZE);
+        $this->populateQueue(self::BATCH_SIZE);
 
         $this->mockHttpClient->addResponse(
             new Response(200, ['Content-Type' => 'application/json'], '{}')
@@ -452,7 +452,7 @@ class ApiManagerTest extends TestCase
      */
     public function testEnrichDataTrueWithoutDataStore(): void
     {
-        $this->populateQueueViaReflection(1);
+        $this->populateQueue(1);
 
         $this->mockHttpClient->addResponse(
             new Response(200, ['Content-Type' => 'application/json'], '{}')
@@ -471,7 +471,7 @@ class ApiManagerTest extends TestCase
      */
     public function testSourceInPayload(): void
     {
-        $this->populateQueueViaReflection(1);
+        $this->populateQueue(1);
 
         $this->mockHttpClient->addResponse(
             new Response(200, ['Content-Type' => 'application/json'], '{}')

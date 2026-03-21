@@ -33,17 +33,17 @@ class CustomMappingClient {
 
 // A simple anonymous class implementing the LogMethodMapInterface for custom mapping.
 class CustomLogMethodMap implements LogMethodMapInterface {
-    private $map = [];
-    public function offsetExists($offset): bool {
+    private array $map = [];
+    public function offsetExists(mixed $offset): bool {
         return isset($this->map[$offset]);
     }
-    public function offsetGet($offset) {
+    public function offsetGet(mixed $offset): mixed {
         return $this->map[$offset] ?? null;
     }
-    public function offsetSet($offset, $value): void {
+    public function offsetSet(mixed $offset, mixed $value): void {
         $this->map[$offset] = $value;
     }
-    public function offsetUnset($offset): void {
+    public function offsetUnset(mixed $offset): void {
         unset($this->map[$offset]);
     }
     public function __construct() {
@@ -344,7 +344,6 @@ class LogManagerTest extends TestCase
     {
         $reflection = new \ReflectionClass(get_class($object));
         $prop = $reflection->getProperty($property);
-        $prop->setAccessible(true);
         return $prop->getValue($object);
     }
 }

@@ -265,8 +265,13 @@ class ApiManager implements ApiManagerInterface
                 call_user_func($this->mapper, ['eventRequest' => $eventRequest])
             );
         }
-        // @phpstan-ignore-next-line OpenAPI model objects are cast to arrays via end() for VisitorsQueue compatibility
-        $this->requestsQueue->push($visitorId, end($eventRequest), end($segments));
+        /** @var array<string, mixed> $eventArray */
+        $eventArray = json_decode((string) json_encode($eventRequest), true) ?? [];
+        /** @var array<string, mixed> $segmentsArray */
+        $segmentsArray = $segments !== null
+            ? (json_decode((string) json_encode($segments), true) ?? [])
+            : [];
+        $this->requestsQueue->push($visitorId, $eventArray, $segmentsArray);
         if ($this->trackingEnabled) {
             $this->releaseQueue('size');
             if ($this->requestsQueue->length === $this->getBatchSize()) {

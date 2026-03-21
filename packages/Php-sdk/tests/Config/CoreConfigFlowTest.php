@@ -80,7 +80,18 @@ class CoreConfigFlowTest extends TestCase
         $deps = $this->makeDependencies($apiManager, $dataManager);
         $cache = new ArrayCache();
 
-        $core = new Core($config, $deps, $cache);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $deps['loggerManager'],
+        );
         $this->assertInstanceOf(Core::class, $core);
     }
 
@@ -107,7 +118,18 @@ class CoreConfigFlowTest extends TestCase
         $deps = $this->makeDependencies($apiManager, $dataManager);
         $cache = new ArrayCache();
 
-        $core = new Core($config, $deps, $cache);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $deps['loggerManager'],
+        );
         $this->assertInstanceOf(Core::class, $core);
     }
 
@@ -136,7 +158,18 @@ class CoreConfigFlowTest extends TestCase
 
         $deps = $this->makeDependencies($apiManager, $dataManager);
 
-        $core = new Core($config, $deps, $cache);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $deps['loggerManager'],
+        );
         $this->assertInstanceOf(Core::class, $core);
     }
 
@@ -161,7 +194,18 @@ class CoreConfigFlowTest extends TestCase
 
         $deps = $this->makeDependencies($apiManager);
 
-        $core = new Core($config, $deps, $cache, 600);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            600,
+            $deps['loggerManager'],
+        );
 
         // Verify cache was populated
         $cached = $cache->get($cacheKey);
@@ -193,7 +237,18 @@ class CoreConfigFlowTest extends TestCase
         $deps = $this->makeDependencies($apiManager, null, $eventManager);
         $cache = new ArrayCache();
 
-        $core = new Core($config, $deps, $cache);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $deps['loggerManager'],
+        );
         $this->assertInstanceOf(Core::class, $core);
 
         // Verify the RuntimeException was wrapped in ConfigFetchException
@@ -228,7 +283,18 @@ class CoreConfigFlowTest extends TestCase
         $cache = new ArrayCache();
 
         // The ConfigValidationException is caught by initialize()
-        $core = new Core($config, $deps, $cache);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $deps['loggerManager'],
+        );
         $this->assertInstanceOf(Core::class, $core);
     }
 
@@ -248,7 +314,18 @@ class CoreConfigFlowTest extends TestCase
         $deps = $this->makeDependencies(null, null, $eventManager);
         $cache = new ArrayCache();
 
-        $core = new Core($config, $deps, $cache);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $deps['loggerManager'],
+        );
         $this->assertInstanceOf(Core::class, $core);
     }
 
@@ -273,7 +350,18 @@ class CoreConfigFlowTest extends TestCase
         $deps = $this->makeDependencies($apiManager);
 
         // Use custom TTL of 600 seconds
-        $core = new Core($config, $deps, $cache, 600);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            600,
+            $deps['loggerManager'],
+        );
 
         // The config should be cached
         $cacheKey = 'convert_sdk.config.' . $sdkKey;
@@ -307,7 +395,18 @@ class CoreConfigFlowTest extends TestCase
 
         $deps = $this->makeDependencies($apiManager);
 
-        $core = new Core($config, $deps, $cache, 300);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            300,
+            $deps['loggerManager'],
+        );
 
         // Cache should be re-populated with fresh data
         $this->assertTrue($cache->has($cacheKey));
@@ -334,7 +433,18 @@ class CoreConfigFlowTest extends TestCase
 
         $deps = $this->makeDependencies($apiManager);
 
-        $core = new Core($config, $deps, $cache);
+        $core = new Core(
+            $config,
+            $deps['dataManager'],
+            $deps['eventManager'],
+            $deps['experienceManager'],
+            $deps['featureManager'],
+            $deps['segmentsManager'],
+            $deps['apiManager'],
+            $cache,
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $deps['loggerManager'],
+        );
 
         // The key should be hashed since it contains '/'
         $expectedKey = 'convert_sdk.config.' . substr(hash('sha256', $sdkKey), 0, 16);
