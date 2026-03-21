@@ -18,7 +18,7 @@ use ConvertSdk\Utils\ArrayUtils;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Utils\Comparisons;
 use ConvertSdk\Utils\StringUtils;
-use ConvertSdk\Logger\LogManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
 use OpenAPI\Client\Model\RuleElement;
 use OpenAPI\Client\Model\RuleObject;
 use OpenAPI\Client\RuleAnd;

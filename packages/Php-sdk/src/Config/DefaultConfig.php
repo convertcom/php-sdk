@@ -18,8 +18,8 @@ final class DefaultConfig
         return [
             'api' => [
                 'endpoint' => [
-                    'config' => getenv('CONFIG_ENDPOINT'),
-                    'track'  => getenv('TRACK_ENDPOINT')
+                    'config' => getenv('CONFIG_ENDPOINT') ?: '',
+                    'track'  => getenv('TRACK_ENDPOINT') ?: ''
                 ]
             ],
             'environment' => 'production',

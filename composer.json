@@ -36,7 +36,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "ConvertSdk\\Tests\\CrossSdk\\": "tests/CrossSdk/"
+            "ConvertSdk\\Tests\\CrossSdk\\": "tests/CrossSdk/",
+            "ConvertSdk\\Tests\\Integration\\": "tests/Integration/"
         }
     },
     "scripts": {
@@ -46,6 +47,7 @@
         "test": "phpunit",
         "test:unit": "phpunit --testsuite unit",
         "test:cross-sdk": "phpunit --testsuite cross-sdk",
+        "test:integration": "phpunit --testsuite integration",
         "test:coverage": "phpunit --coverage-html coverage-report",
         "api:build": "cd packages/Api && composer run-script build",
         "data:build": "cd packages/Data && composer run-script build",
