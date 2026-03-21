@@ -23,7 +23,7 @@
     },
     "require": {
         "php": "^8.2",
-        "convertcom/php-sdk-enums": "^1.0.0",
+        "convertcom/php-sdk-enums": ">=1.0.0",
         "lastguest/murmurhash": "^2.1"
     },
     "require-dev": {
