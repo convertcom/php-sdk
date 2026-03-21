@@ -21,11 +21,12 @@ use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use GuzzleHttp\Psr7\Response;
+use ConvertSdk\Enums\LogLevel;
 
 /**
  * Test class for ExperienceManager.
  */
-class ExperienceManagerTest extends TestCase
+class ExperienceTest extends TestCase
 {
     /** @var DataManager */
     private $dataManager;
@@ -92,8 +93,8 @@ class ExperienceManagerTest extends TestCase
         );
         $ruleManager = new RuleManager();
         $eventManager = new EventManager();
-        $apiManager = new ApiManager($config, $eventManager);
-        $loggerManager = new LogManager($config);
+        $loggerManager = new LogManager(null, LogLevel::Trace);
+        $apiManager = new ApiManager($config, $eventManager, $loggerManager);
         $this->dataManager = new DataManager(
             $config,
             $bucketingManager,

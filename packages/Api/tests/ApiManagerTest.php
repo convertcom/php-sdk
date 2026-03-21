@@ -211,10 +211,11 @@ class ApiManagerTest extends TestCase
                 })
             );
 
-        // Enqueue batch_size requests
-        for ($i = 1; $i <= self::BATCH_SIZE; $i++) {
-            $this->apiManager->enqueue("VID$i", $requestData);
-        }
+        // Populate queue via reflection (bypasses enqueue auto-release)
+        $this->populateQueue(self::BATCH_SIZE);
+
+        // Explicitly release the queue
+        $this->apiManager->releaseQueue('size');
     }
 
     /**
@@ -257,10 +258,11 @@ class ApiManagerTest extends TestCase
                 })
             );
 
-        // Enqueue batch_size requests
-        for ($i = 1; $i <= self::BATCH_SIZE; $i++) {
-            $this->apiManager->enqueue("VID$i", $requestData);
-        }
+        // Populate queue via reflection (bypasses enqueue auto-release)
+        $this->populateQueue(self::BATCH_SIZE);
+
+        // Explicitly release the queue
+        $this->apiManager->releaseQueue('size');
     }
 
     /**

@@ -24,6 +24,8 @@
         </include>
         <exclude>
             <directory>packages/Segments/src</directory>
+            <!-- Types: auto-generated OpenAPI models (lib/ not src/), no tests, excluded from coverage -->
+            <directory>packages/Types</directory>
         </exclude>
     </source>
 </phpunit>

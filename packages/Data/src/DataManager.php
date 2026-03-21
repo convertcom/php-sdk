@@ -1571,7 +1571,7 @@ final class DataManager implements DataManagerInterface
   public function isValidConfigData(ConfigResponseData $data): bool {
     return (
         (!empty($data->getAccountId()) && !empty($data->getProject()["id"])) ||
-        !empty($data->getError())
+        !empty($data['error'])
     );
   }
 }

@@ -3,3 +3,6 @@
 /packages/*/composer.lock
 .DS_Store
 .phpunit.result.cache
+coverage-report/
+coverage.xml
+.php-cs-fixer.cache
