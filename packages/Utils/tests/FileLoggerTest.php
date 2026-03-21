@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
 use ConvertSdk\Utils\FileLogger;
+use PHPUnit\Framework\TestCase;
 
 class FileLoggerTest extends TestCase
 {
@@ -57,7 +57,7 @@ class FileLoggerTest extends TestCase
             $logger->log('testing read-only log file');
             $this->fail('Expected error was not thrown.');
         } catch (\ErrorException $e) {
-            $this->assertStringContainsString("Failed to open stream", $e->getMessage());
+            $this->assertStringContainsString('Failed to open stream', $e->getMessage());
         }
     }
 
@@ -74,5 +74,68 @@ class FileLoggerTest extends TestCase
         // We'll check that the log content contains [LOG] and the JSON-encoded message.
         $this->assertStringContainsString('[LOG]', $logContent);
         $this->assertStringContainsString(json_encode($output), $logContent);
+    }
+
+    public function testInfoShouldWriteWithInfoPrefix(): void
+    {
+        $logger = new FileLogger($this->testFile, null);
+        $logger->info('info message');
+        $logContent = file_get_contents($this->testFile);
+        $this->assertStringContainsString('[INFO]', $logContent);
+        $this->assertStringContainsString(json_encode('info message'), $logContent);
+    }
+
+    public function testDebugShouldWriteWithDebugPrefix(): void
+    {
+        $logger = new FileLogger($this->testFile, null);
+        $logger->debug('debug message');
+        $logContent = file_get_contents($this->testFile);
+        $this->assertStringContainsString('[DEBUG]', $logContent);
+        $this->assertStringContainsString(json_encode('debug message'), $logContent);
+    }
+
+    public function testWarnShouldWriteWithWarnPrefix(): void
+    {
+        $logger = new FileLogger($this->testFile, null);
+        $logger->warn('warn message');
+        $logContent = file_get_contents($this->testFile);
+        $this->assertStringContainsString('[WARN]', $logContent);
+        $this->assertStringContainsString(json_encode('warn message'), $logContent);
+    }
+
+    public function testErrorShouldWriteWithErrorPrefix(): void
+    {
+        $logger = new FileLogger($this->testFile, null);
+        $logger->error('error message');
+        $logContent = file_get_contents($this->testFile);
+        $this->assertStringContainsString('[ERROR]', $logContent);
+        $this->assertStringContainsString(json_encode('error message'), $logContent);
+    }
+
+    public function testCustomAppendMethodShouldCallFsMethod(): void
+    {
+        $fs = new class () {
+            public string $capturedFile = '';
+            public string $capturedContent = '';
+            public function customAppend(string $file, string $content): void
+            {
+                $this->capturedFile = $file;
+                $this->capturedContent = $content;
+            }
+        };
+
+        $logger = new FileLogger($this->testFile, $fs, 'customAppend');
+        $logger->log('custom append test');
+        $this->assertSame($this->testFile, $fs->capturedFile);
+        $this->assertStringContainsString('[LOG]', $fs->capturedContent);
+    }
+
+    public function testNonCallableAppendMethodShouldThrowException(): void
+    {
+        $fs = new \stdClass();
+        $logger = new FileLogger($this->testFile, $fs, 'nonExistentMethod');
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Append method not callable');
+        $logger->log('should fail');
     }
 }

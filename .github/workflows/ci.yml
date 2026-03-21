@@ -89,7 +89,30 @@ jobs:
             composer-php${{ matrix.php-version }}-
       - name: Install dependencies
         run: composer update --${{ matrix.dependency-preference }} --prefer-stable --no-interaction --no-progress
-      - name: Run tests
+      - name: Run tests with coverage
+        if: matrix.php-version == '8.4' && matrix.dependency-preference == 'prefer-stable'
+        run: composer test:coverage:ci
+      - name: Enforce 85% coverage threshold
+        if: matrix.php-version == '8.4' && matrix.dependency-preference == 'prefer-stable'
+        run: |
+          php -r "
+            \$x = new SimpleXMLElement(file_get_contents('coverage.xml'));
+            \$m = \$x->project->metrics;
+            \$statements = (int)\$m['statements'];
+            if (\$statements === 0) { echo 'Error: zero statements in coverage report'; exit(1); }
+            \$pct = round(((int)\$m['coveredstatements'] / \$statements) * 100, 2);
+            echo \"Code coverage: {\$pct}%\n\";
+            exit(\$pct >= 85.0 ? 0 : 1);
+          "
+      - name: Upload coverage report
+        if: matrix.php-version == '8.4' && matrix.dependency-preference == 'prefer-stable'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
+      - name: Run tests without coverage
+        if: matrix.php-version != '8.4' || matrix.dependency-preference != 'prefer-stable'
         run: composer test
       - name: Run cross-SDK parity tests
         run: composer test:cross-sdk

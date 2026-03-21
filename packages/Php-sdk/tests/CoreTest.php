@@ -2,26 +2,24 @@
 
 declare(strict_types=1);
 
-use PHPUnit\Framework\TestCase;
-use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\Event\EventManager;
 use ConvertSdk\ApiManager;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\Cache\ArrayCache;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\Context;
+use ConvertSdk\Core;
 use ConvertSdk\DataManager;
+use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
 use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
 use ConvertSdk\SegmentsManager;
-use ConvertSdk\Core;
-use ConvertSdk\Context;
-use ConvertSdk\Cache\ArrayCache;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\Enums\EntityType;
-use ConvertSdk\Enums\SystemEvents;
-use ConvertSdk\Enums\ErrorMessages;
+use PHPUnit\Framework\TestCase;
 
 class CoreTest extends TestCase
 {
@@ -48,13 +46,13 @@ class CoreTest extends TestCase
             'api' => [
                 'endpoint' => [
                     'config' => 'http://127.0.0.1:9501',
-                    'track' => 'http://127.0.0.1:9501'
-                ]
+                    'track' => 'http://127.0.0.1:9501',
+                ],
             ],
             'events' => [
                 'batch_size' => 5,
-                'release_interval' => 1000
-            ]
+                'release_interval' => 1000,
+            ],
         ]);
         $this->configuration['data'] = new ConfigResponseData($this->configuration['data']);
         if (isset($this->configuration['sdkKey'])) {
@@ -208,4 +206,35 @@ class CoreTest extends TestCase
 
         $core->flush();
     }
+
+    /** @test */
+    public function isReadyShouldReturnFalseWhenConfigDataThrows(): void
+    {
+        $dataManagerMock = $this->createMock(\ConvertSdk\Interfaces\DataManagerInterface::class);
+        $dataManagerMock->method('getConfigData')
+            ->willThrowException(new \RuntimeException('No config'));
+
+        $core = new Core(
+            $this->config,
+            $dataManagerMock,
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->segmentsManager,
+            $this->apiManager,
+            new ArrayCache(),
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $this->loggerManager,
+        );
+
+        $this->assertFalse($core->isReady());
+    }
+
+    /** @test */
+    public function createContextShouldThrowWhenVisitorIdEmpty(): void
+    {
+        $this->expectException(\ConvertSdk\Exception\InvalidArgumentException::class);
+        $this->core->createContext('');
+    }
+
 }

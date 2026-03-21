@@ -543,6 +543,10 @@ class ApiManager implements ApiManagerInterface
 
             $data = $response['data'] ?? [];
             $configData = new ConfigResponseData($data);
+            // Preserve error field if present — ConfigResponseData constructor drops unknown keys
+            if (isset($data['error'])) {
+                $configData['error'] = $data['error'];
+            }
 
             if ($this->loggerManager) {
                 $project = $configData->getProject();

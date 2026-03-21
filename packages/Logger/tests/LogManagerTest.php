@@ -8,45 +8,55 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
-use ConvertSdk\LogManager;
 use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Enums\LogMethod;
 use ConvertSdk\Interfaces\LogMethodMapInterface;
-use Monolog\Logger as MonologLogger;
-use Monolog\Level as MonologLoggerLevel;
+use ConvertSdk\LogManager;
 use Monolog\Handler\TestHandler;
+use Monolog\Level as MonologLoggerLevel;
+use Monolog\Logger as MonologLogger;
+use PHPUnit\Framework\TestCase;
 
 // A client that only implements the "log" method to force fallback behavior.
-class MissingMethodClient {
-    public function log(...$args) {
+class MissingMethodClient
+{
+    public function log(...$args)
+    {
         echo implode(' ', $args) . "\n";
     }
 }
 
 // A client with a custom method (named "send") used for method mapping.
-class CustomMappingClient {
-    public function send(...$args) {
+class CustomMappingClient
+{
+    public function send(...$args)
+    {
         echo implode(' ', $args) . "\n";
     }
 }
 
 // A simple anonymous class implementing the LogMethodMapInterface for custom mapping.
-class CustomLogMethodMap implements LogMethodMapInterface {
+class CustomLogMethodMap implements LogMethodMapInterface
+{
     private array $map = [];
-    public function offsetExists(mixed $offset): bool {
+    public function offsetExists(mixed $offset): bool
+    {
         return isset($this->map[$offset]);
     }
-    public function offsetGet(mixed $offset): mixed {
+    public function offsetGet(mixed $offset): mixed
+    {
         return $this->map[$offset] ?? null;
     }
-    public function offsetSet(mixed $offset, mixed $value): void {
+    public function offsetSet(mixed $offset, mixed $value): void
+    {
         $this->map[$offset] = $value;
     }
-    public function offsetUnset(mixed $offset): void {
+    public function offsetUnset(mixed $offset): void
+    {
         unset($this->map[$offset]);
     }
-    public function __construct() {
+    public function __construct()
+    {
         // For custom mapping, map the TRACE log method to the 'send' method.
         $this->map[LogMethod::Trace->value] = 'send';
     }
@@ -112,7 +122,7 @@ class LogManagerTest extends TestCase
         $output = 'testing log method';
         $argument = 'with multiple arguments';
         $this->logger->log(LogLevel::Trace, $output, $argument);
-        $expectedMessage = $output . " " . $argument;
+        $expectedMessage = $output . ' ' . $argument;
         $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Info));
     }
 
@@ -122,7 +132,7 @@ class LogManagerTest extends TestCase
         $argument = 'with multiple arguments';
         $this->logger->trace($output, $argument);
         // LogManager maps TRACE to Monolog's debug level
-        $expectedMessage = $output . " " . $argument;
+        $expectedMessage = $output . ' ' . $argument;
         $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Debug));
     }
 
@@ -131,7 +141,7 @@ class LogManagerTest extends TestCase
         $output = 'testing debug method';
         $argument = 'with multiple arguments';
         $this->logger->debug($output, $argument);
-        $expectedMessage = $output . " " . $argument;
+        $expectedMessage = $output . ' ' . $argument;
         $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Debug));
     }
 
@@ -140,7 +150,7 @@ class LogManagerTest extends TestCase
         $output = 'testing info method';
         $argument = 'with multiple arguments';
         $this->logger->info($output, $argument);
-        $expectedMessage = $output . " " . $argument;
+        $expectedMessage = $output . ' ' . $argument;
         $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Info));
     }
 
@@ -149,7 +159,7 @@ class LogManagerTest extends TestCase
         $output = 'testing warn method';
         $argument = 'with multiple arguments';
         $this->logger->warn($output, $argument);
-        $expectedMessage = $output . " " . $argument;
+        $expectedMessage = $output . ' ' . $argument;
         $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Warning));
     }
 
@@ -158,7 +168,7 @@ class LogManagerTest extends TestCase
         $output = 'testing error method';
         $argument = 'with multiple arguments';
         $this->logger->error($output, $argument);
-        $expectedMessage = $output . " " . $argument;
+        $expectedMessage = $output . ' ' . $argument;
         $this->assertTrue($this->testHandler->hasRecord($expectedMessage, MonologLoggerLevel::Error));
     }
 
@@ -335,6 +345,47 @@ class LogManagerTest extends TestCase
 
         $logger = new LogManager($mockLogger, LogLevel::Trace);
         $logger->error('error via PSR-3');
+    }
+
+    public function testSetClientLevelShouldUpdateSpecificClient(): void
+    {
+        // Logger was initialized with Monolog at Trace level
+        $clients = $this->getPrivateProperty($this->logger, '_clients');
+        $this->assertSame(LogLevel::Trace, $clients[0]['level']);
+
+        // Set level to Error for the specific Monolog client
+        $this->logger->setClientLevel(LogLevel::Error, $this->monolog);
+
+        $clients = $this->getPrivateProperty($this->logger, '_clients');
+        $this->assertSame(LogLevel::Error, $clients[0]['level']);
+    }
+
+    public function testSetClientLevelShouldUpdateAllClientsWhenNoClientSpecified(): void
+    {
+        // Add a second client
+        $testHandler2 = new TestHandler();
+        $monolog2 = new MonologLogger('test2');
+        $monolog2->pushHandler($testHandler2);
+        $this->logger->addClient($monolog2, LogLevel::Trace);
+
+        // Set all clients to Error level
+        $this->logger->setClientLevel(LogLevel::Error);
+
+        $clients = $this->getPrivateProperty($this->logger, '_clients');
+        foreach ($clients as $client) {
+            $this->assertSame(LogLevel::Error, $client['level']);
+        }
+    }
+
+    public function testSetClientLevelShouldLogErrorWhenClientNotFound(): void
+    {
+        $unknownClient = new \stdClass();
+        // This should trigger error_log 'Client SDK not found' — no exception expected
+        $this->logger->setClientLevel(LogLevel::Error, $unknownClient);
+
+        // Verify existing client level was NOT changed
+        $clients = $this->getPrivateProperty($this->logger, '_clients');
+        $this->assertSame(LogLevel::Trace, $clients[0]['level']);
     }
 
     /**
