@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace ConvertSdk\Interfaces;
 
 use OpenAPI\Client\BucketingAttributes;
+use ConvertSdk\DTO\BucketedFeature;
 use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
@@ -43,15 +44,15 @@ interface ContextInterface
      *
      * @param string $key The key identifying the feature
      * @param BucketingAttributes|null $attributes Optional attributes for bucketing
-     * @return mixed The feature result (bucketed feature, RuleError, array, or null)
+     * @return BucketedFeature|null The bucketed feature DTO, or null for not-found/error paths
      */
-    public function runFeature(string $key, ?BucketingAttributes $attributes = null): mixed;
+    public function runFeature(string $key, ?BucketingAttributes $attributes = null): ?BucketedFeature;
 
     /**
      * Run multiple features with optional bucketing attributes.
      *
      * @param BucketingAttributes|null $attributes Optional attributes for bucketing
-     * @return array<int, mixed> Array of feature results
+     * @return BucketedFeature[] Array of bucketed feature DTOs
      */
     public function runFeatures(?BucketingAttributes $attributes = null): array;
 

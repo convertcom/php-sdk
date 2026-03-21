@@ -20,12 +20,14 @@ use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\DTO\BucketedVariation;
+use ConvertSdk\DTO\BucketedFeature;
 use ConvertSdk\Exception\InvalidArgumentException;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\BucketingAttributes;
 use ConvertSdk\Enums\BucketingError;
 use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\EntityType;
+use ConvertSdk\Enums\FeatureStatus;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Utils\ObjectUtils;
@@ -186,9 +188,9 @@ final class Context implements ContextInterface
      *
      * @param string $key A feature key
      * @param BucketingAttributes|null $attributes Attributes for the visitor
-     * @return mixed The bucketed feature result (BucketedFeature, RuleError, array, or null)
+     * @return BucketedFeature|null The bucketed feature DTO, or null for not-found/error paths
      */
-    public function runFeature(string $key, ?BucketingAttributes $attributes = null): mixed
+    public function runFeature(string $key, ?BucketingAttributes $attributes = null): ?BucketedFeature
     {
         if (empty($this->visitorId)) {
             $this->loggerManager?->error(
@@ -200,7 +202,7 @@ final class Context implements ContextInterface
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
 
-        $bucketedFeature = $this->featureManager->runFeature(
+        $result = $this->featureManager->runFeature(
             $this->visitorId,
             $key,
             new BucketingAttributes([
@@ -215,15 +217,41 @@ final class Context implements ContextInterface
             $attributes?->getExperienceKeys()
         );
 
-        if (is_array($bucketedFeature)) {
-            $matchedErrors = array_filter($bucketedFeature, function ($match) {
-                return $match instanceof RuleError;
-            });
-            if (!empty($matchedErrors)) {
-                return array_values($matchedErrors);
+        // Determine if result is a single feature array or array of feature arrays
+        // Single feature: has 'status' key directly; multi: indexed array of feature arrays
+        if (isset($result['status'])) {
+            // Feature not declared (no 'id') → return null per consumer contract
+            if (!isset($result['id'])) {
+                return null;
             }
 
-            foreach ($bucketedFeature as $feature) {
+            $dto = $this->mapToBucketedFeatureDto($result);
+
+            // Fire event only for enabled features
+            if ($dto->status === FeatureStatus::Enabled) {
+                $this->eventManager->fire(
+                    SystemEvents::Bucketing,
+                    [
+                        'visitorId' => $this->visitorId,
+                        'experienceKey' => $result['experienceKey'] ?? null,
+                        'featureKey' => $key,
+                        'status' => $result['status'] ?? null
+                    ],
+                    null,
+                    true
+                );
+            }
+
+            return $dto;
+        }
+
+        // Array of feature arrays (multi-experience) — return first enabled one
+        foreach ($result as $feature) {
+            if (!is_array($feature)) {
+                continue;
+            }
+            $dto = $this->mapToBucketedFeatureDto($feature);
+            if ($dto->status === FeatureStatus::Enabled) {
                 $this->eventManager->fire(
                     SystemEvents::Bucketing,
                     [
@@ -235,35 +263,24 @@ final class Context implements ContextInterface
                     null,
                     true
                 );
-            }
-        } else {
-            if ($bucketedFeature instanceof RuleError) {
-                return $bucketedFeature;
-            }
-
-            if ($bucketedFeature) {
-                $this->eventManager->fire(
-                    SystemEvents::Bucketing,
-                    [
-                        'visitorId' => $this->visitorId,
-                        'experienceKey' => $bucketedFeature['experienceKey'] ?? null,
-                        'featureKey' => $key,
-                        'status' => $bucketedFeature['status'] ?? null
-                    ],
-                    null,
-                    true
-                );
+                return $dto;
             }
         }
 
-        return $bucketedFeature;
+        // No enabled features found — return first feature as disabled DTO
+        $firstFeature = $result[0] ?? null;
+        if (is_array($firstFeature)) {
+            return $this->mapToBucketedFeatureDto($firstFeature);
+        }
+
+        return null;
     }
 
     /**
      * Get features and their statuses.
      *
      * @param BucketingAttributes|null $attributes Attributes for the visitor
-     * @return array<int, mixed> Array of bucketed features or rule errors
+     * @return BucketedFeature[] Array of bucketed feature DTOs
      */
     public function runFeatures(?BucketingAttributes $attributes = null): array
     {
@@ -287,28 +304,41 @@ final class Context implements ContextInterface
             'environment' => $attributes?->getEnvironment() ?? $this->environment
         ]));
 
+        // Filter out RuleError results
         $matchedErrors = array_filter($bucketedFeatures, function ($match) {
             return $match instanceof RuleError;
         });
         if (!empty($matchedErrors)) {
-            return array_values($matchedErrors);
+            return [];
         }
 
+        $dtos = [];
         foreach ($bucketedFeatures as $feature) {
-            $this->eventManager->fire(
-                SystemEvents::Bucketing,
-                [
-                    'visitorId' => $this->visitorId,
-                    'experienceKey' => $feature['experienceKey'] ?? null,
-                    'featureKey' => $feature['key'] ?? null,
-                    'status' => $feature['status'] ?? null
-                ],
-                null,
-                true
-            );
+            if (!is_array($feature)) {
+                continue;
+            }
+
+            $dto = $this->mapToBucketedFeatureDto($feature);
+
+            // Fire event only for enabled features
+            if ($dto->status === FeatureStatus::Enabled) {
+                $this->eventManager->fire(
+                    SystemEvents::Bucketing,
+                    [
+                        'visitorId' => $this->visitorId,
+                        'experienceKey' => $feature['experienceKey'] ?? null,
+                        'featureKey' => $feature['key'] ?? null,
+                        'status' => $feature['status'] ?? null
+                    ],
+                    null,
+                    true
+                );
+            }
+
+            $dtos[] = $dto;
         }
 
-        return $bucketedFeatures;
+        return $dtos;
     }
 
     /**
@@ -564,6 +594,22 @@ final class Context implements ContextInterface
             ? ObjectUtils::objectDeepMerge($this->visitorProperties ?? [], $attributes)
             : $this->visitorProperties;
         return ObjectUtils::objectDeepMerge($segments, $visitorProperties ?? []);
+    }
+
+    /**
+     * Map internal bucketed feature array to consumer-facing readonly DTO.
+     *
+     * @param array<string, mixed> $feature The internal bucketed feature array from FeatureManager
+     * @return BucketedFeature The readonly consumer DTO
+     */
+    private function mapToBucketedFeatureDto(array $feature): BucketedFeature
+    {
+        return new BucketedFeature(
+            featureId: (string) ($feature['id'] ?? ''),
+            featureKey: (string) ($feature['key'] ?? ''),
+            status: FeatureStatus::tryFrom($feature['status'] ?? 'disabled') ?? FeatureStatus::Disabled,
+            variables: (array) ($feature['variables'] ?? []),
+        );
     }
 
     /**

@@ -7,18 +7,13 @@ namespace ConvertSdk;
 use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigFeature;
-use OpenAPI\Client\Model\ConfigExperience;
 use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\BucketedVariation;
 use ConvertSdk\Enums\FeatureStatus;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\VariationChangeType;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\Utils\TypeUtils;
-use ConvertSdk\Utils\ArrayUtils;
-use ConvertSdk\Utils\ObjectUtils;
 
 /**
  * Manages features within the Convert SDK, handling bucketing and feature status.
@@ -26,14 +21,12 @@ use ConvertSdk\Utils\ObjectUtils;
 final class FeatureManager implements FeatureManagerInterface
 {
     /**
-     * @param Config $config SDK configuration
      * @param DataManagerInterface $dataManager Data manager instance
-     * @param LogManagerInterface|null $loggerManager Optional logger instance
+     * @param LogManagerInterface|null $logManager Optional logger instance
      */
     public function __construct(
-        private readonly Config $config,
         private readonly DataManagerInterface $dataManager,
-        private readonly ?LogManagerInterface $loggerManager = null,
+        private readonly ?LogManagerInterface $logManager = null,
     ) {}
 
     /**
@@ -149,14 +142,14 @@ final class FeatureManager implements FeatureManagerInterface
      * @param string $featureKey Feature key
      * @param BucketingAttributes $attributes Bucketing attributes
      * @param array<int, string>|null $experienceKeys Optional array of experience keys
-     * @return mixed Returns a single bucketed feature, rule error, or array of features/errors
+     * @return array<string, mixed> Returns a single bucketed feature array or array of feature arrays
      */
     public function runFeature(
         string $visitorId,
         string $featureKey,
         BucketingAttributes $attributes,
         ?array $experienceKeys = null
-    ) {
+    ): array {
         $declaredFeature = $this->dataManager->getEntity($featureKey, 'features');
         if ($declaredFeature) {
             $features = $this->runFeatures($visitorId, $attributes, [
@@ -164,11 +157,14 @@ final class FeatureManager implements FeatureManagerInterface
                 'experiences' => $experienceKeys
             ]);
 
-            if (!empty($features)) {
-                if (count($features) === 1) {
-                    return $features[0];
+            // Filter out RuleError items (runFeatures may return them)
+            $validFeatures = array_filter($features, fn($f) => is_array($f));
+
+            if (!empty($validFeatures)) {
+                if (count($validFeatures) === 1) {
+                    return reset($validFeatures);
                 } else {
-                    return $features;
+                    return array_values($validFeatures);
                 }
             }
 
@@ -208,7 +204,8 @@ final class FeatureManager implements FeatureManagerInterface
                 'features' => [$featureKey],
                 'experiences' => $experienceKeys
             ]);
-            return !empty($features);
+            $validFeatures = array_filter($features, fn($f) => is_array($f));
+            return !empty($validFeatures);
         }
 
         return false;
@@ -221,14 +218,14 @@ final class FeatureManager implements FeatureManagerInterface
      * @param string $featureId Feature ID
      * @param BucketingAttributes $attributes Bucketing attributes
      * @param array<int, string>|null $experienceIds Optional array of experience IDs
-     * @return mixed Returns a single bucketed feature, rule error, or array of features/errors
+     * @return array<string, mixed> Returns a single bucketed feature array or array of feature arrays
      */
     public function runFeatureById(
         string $visitorId,
         string $featureId,
         BucketingAttributes $attributes,
         ?array $experienceIds = null
-    ) {
+    ): array {
         $declaredFeature = $this->dataManager->getEntityById($featureId, 'features');
 
         if ($declaredFeature) {
@@ -241,17 +238,14 @@ final class FeatureManager implements FeatureManagerInterface
                 'experiences' => $experienceKeys
             ]);
 
-            if (!empty($features)) {
-                if (count($features) === 1) {
-                    return $features[0];
+            // Filter out RuleError items
+            $validFeatures = array_filter($features, fn($f) => is_array($f));
+
+            if (!empty($validFeatures)) {
+                if (count($validFeatures) === 1) {
+                    return reset($validFeatures);
                 } else {
-                    $matchedErrors = array_filter($features, function ($match) {
-                        return $match instanceof RuleError;
-                    });
-                    if (!empty($matchedErrors)) {
-                        return $matchedErrors;
-                    }
-                    return $features;
+                    return array_values($validFeatures);
                 }
             }
 
@@ -314,7 +308,7 @@ final class FeatureManager implements FeatureManagerInterface
             }
             foreach ($changes as $change) {
                 if (($change['type'] ?? null) !== VariationChangeType::FullstackFeature->value) {
-                    $this->loggerManager?->warn(
+                    $this->logManager?->warn(
                         'FeatureManager.runFeatures()',
                         Messages::VARIATION_CHANGE_NOT_SUPPORTED
                     );
@@ -322,7 +316,7 @@ final class FeatureManager implements FeatureManagerInterface
                 }
                 $featureId = $change['data']['feature_id'] ?? null;
                 if (!$featureId) {
-                    $this->loggerManager?->warn(
+                    $this->logManager?->warn(
                         'FeatureManager.runFeatures()',
                         Messages::FEATURE_NOT_FOUND
                     );
@@ -336,7 +330,7 @@ final class FeatureManager implements FeatureManagerInterface
                     $variables = $change['data']['variables_data'] ?? null;
 
                     if ($variables === null) {
-                        $this->loggerManager?->warn(
+                        $this->logManager?->warn(
                             'FeatureManager.runFeatures()',
                             Messages::FEATURE_VARIABLES_NOT_FOUND
                         );
@@ -354,7 +348,7 @@ final class FeatureManager implements FeatureManagerInterface
                             if ($variableDefinition && isset($variableDefinition['type'])) {
                                 $variables[$variableName] = $this->castType($value, $variableDefinition['type']);
                             } else {
-                                $this->loggerManager?->warn(
+                                $this->logManager?->warn(
                                     'FeatureManager.runFeatures()',
                                     Messages::FEATURE_VARIABLES_TYPE_NOT_FOUND
                                 );
