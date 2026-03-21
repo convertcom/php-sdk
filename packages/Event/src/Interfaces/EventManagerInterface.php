@@ -8,7 +8,7 @@ declare(strict_types=1);
  * License Apache-2.0
  */
 
-namespace ConvertSdk\Interfaces;
+namespace ConvertSdk\Event\Interfaces;
 
 use ConvertSdk\Enums\SystemEvents;
 
@@ -32,7 +32,7 @@ interface EventManagerInterface
      * Fires an event, optionally with arguments and an error.
      *
      * @param SystemEvents|string $event The event name or constant.
-     * @param array $args Optional associative array of arguments.
+     * @param array<string, mixed>|mixed $args Optional arguments.
      * @param mixed $err Optional error or exception.
      * @param bool $deferred Optional flag indicating if the event should be deferred.
      * @return void

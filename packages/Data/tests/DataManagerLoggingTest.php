@@ -9,7 +9,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use ConvertSdk\DataManager;
 use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\BucketingManagerInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Interfaces\RuleManagerInterface;
 use ConvertSdk\Enums\Messages;

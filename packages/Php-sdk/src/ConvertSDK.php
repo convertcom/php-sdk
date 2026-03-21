@@ -12,6 +12,7 @@ use ConvertSdk\Utils\Comparisons;
 use OpenAPI\Client\Config as OpenApiConfig;
 use OpenAPI\Client\Model\ConfigResponseData;
 use Psr\Log\LoggerInterface;
+use ConvertSdk\Event\EventManager;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
 
@@ -97,7 +98,11 @@ final class ConvertSDK
         $openApiConfig = new OpenApiConfig($configuration);
 
         // 7. Instantiate managers in dependency order
-        $eventManager = new EventManager($openApiConfig, ['loggerManager' => $logManager]);
+        $mapper = $openApiConfig->getMapper();
+        $eventManager = new EventManager(
+            loggerManager: $logManager,
+            mapper: is_callable($mapper) ? $mapper : null,
+        );
 
         try {
             $apiManager = new ApiManager($openApiConfig, $eventManager, $logManager);
@@ -116,7 +121,6 @@ final class ConvertSDK
             logManager: $logManager,
         );
         $rulesConfig = $openApiConfig->getRules() ?? [];
-        $mapper = $openApiConfig->getMapper();
         $ruleManager = new RuleManager(
             comparisonProcessor: $rulesConfig['comparisonProcessor'] ?? Comparisons::class,
             negation: isset($rulesConfig['negation']) ? (string) $rulesConfig['negation'] : '!',

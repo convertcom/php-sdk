@@ -14,7 +14,7 @@ namespace ConvertSdk;
 use ConvertSdk\Interfaces\CoreInterface;
 use ConvertSdk\Interfaces\ContextInterface;
 use ConvertSdk\Interfaces\DataManagerInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;

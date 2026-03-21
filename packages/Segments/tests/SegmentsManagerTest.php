@@ -6,7 +6,7 @@ namespace ConvertSdk\Tests;
 
 use ConvertSdk\BucketingManager;
 use ConvertSdk\RuleManager;
-use ConvertSdk\EventManager;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\ApiManager;
 use ConvertSdk\DataManager;
 use ConvertSdk\SegmentsManager;
@@ -82,7 +82,7 @@ class SegmentsManagerTest extends TestCase
             hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
         );
         $ruleManager = new RuleManager();
-        $eventManager = new EventManager($config);
+        $eventManager = new EventManager();
         $apiManager = new ApiManager($config, $eventManager);
         $loggerManager = new LogManager($config);
         self::$dataManager = new DataManager(

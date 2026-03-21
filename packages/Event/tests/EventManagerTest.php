@@ -9,73 +9,62 @@ declare(strict_types=1);
 namespace ConvertSdk\Tests;
 
 use PHPUnit\Framework\TestCase;
-use ConvertSdk\EventManager;
+use ConvertSdk\Event\EventManager;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Enums\SystemEvents;
-use OpenAPI\Client\Config;
-use OpenAPI\Client\Model\ConfigResponseData;
 
 class EventManagerTest extends TestCase
 {
-    /**
-     * @var EventManager
-     */
-    protected $eventManager;
+    protected EventManager $eventManager;
 
     protected function setUp(): void
     {
-        // Minimal Config instance for setup
-        $config = new Config(['environment' => 'test', 'sdkKey' => 'test-key']);
-        $this->eventManager = new EventManager($config, []);
+        $this->eventManager = new EventManager();
     }
 
-    public function testShouldExposeEventManager()
+    public function testClassIsFinal(): void
     {
-        $this->assertTrue(class_exists(EventManager::class));
+        $reflection = new \ReflectionClass(EventManager::class);
+        $this->assertTrue($reflection->isFinal());
     }
 
-    public function testImportedEntityShouldBeConstructorOfEventManagerInstance()
+    public function testImplementsEventManagerInterface(): void
     {
-        $config = new Config(['environment' => 'test', 'sdkKey' => 'test-key']);
-        $em = new EventManager($config, []);
+        $this->assertInstanceOf(EventManagerInterface::class, $this->eventManager);
+    }
+
+    public function testConstructorWithDefaults(): void
+    {
+        $em = new EventManager();
         $this->assertInstanceOf(EventManager::class, $em);
         $reflection = new \ReflectionClass($em);
         $this->assertEquals('EventManager', $reflection->getShortName());
     }
 
-    public function testShouldSuccessfullyCreateNewEventManagerInstanceWithDefaultConfig()
+    public function testConstructorWithMapper(): void
     {
-        // Mimic TypeScript's empty config
-        $config = new Config(['environment' => 'test', 'sdkKey' => 'test-key']); // Adjust based on Config requirements
-        $em = new EventManager($config, []);
+        $mapper = static fn (mixed $value): mixed => $value;
+        $em = new EventManager(mapper: $mapper);
         $this->assertInstanceOf(EventManager::class, $em);
-        $reflection = new \ReflectionClass($em);
-        $this->assertEquals('EventManager', $reflection->getShortName());
     }
 
-    public function testShouldCreateNewEventManagerInstance()
+    public function testMapperTransformsArgsBeforePassingToListener(): void
     {
-        // Load test configuration from JSON file
-        $configPath = __DIR__ . '/test-config.json';
-        $configuration = json_decode(file_get_contents($configPath), true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->fail('Invalid JSON in test-config.json: ' . json_last_error_msg());
-        }
-        // Ensure required fields (adjust based on actual Config constructor)
-        $configuration['environment'] = $configuration['environment'] ?? 'test';
-        if (!isset($configuration['sdkKey']) && !isset($configuration['data'])) {
-            $configuration['sdkKey'] = 'test-key';
-        }
-        if (isset($configuration['data'])) {
-            $configuration['data'] = new ConfigResponseData($configuration['data']);
-        }
-        $config = new Config($configuration);
-        $em = new EventManager($config, []);
-        $this->assertInstanceOf(EventManager::class, $em);
-        $reflection = new \ReflectionClass($em);
-        $this->assertEquals('EventManager', $reflection->getShortName());
+        $mapper = static fn (mixed $value): mixed => is_array($value) ? array_merge($value, ['mapped' => true]) : $value;
+        $em = new EventManager(mapper: $mapper);
+
+        $receivedArgs = null;
+        $em->on('TEST', function ($args, $err) use (&$receivedArgs) {
+            $receivedArgs = $args;
+        });
+        $em->fire('TEST', ['original' => true]);
+
+        $this->assertIsArray($receivedArgs);
+        $this->assertTrue($receivedArgs['original']);
+        $this->assertTrue($receivedArgs['mapped']);
     }
 
-    public function testShouldSubscribeToEventAndBeFiredWithProvidedDataAndNoErrors()
+    public function testShouldSubscribeToEventAndBeFiredWithProvidedDataAndNoErrors(): void
     {
         $args = [
             'foo' => 'bar',
@@ -96,7 +85,7 @@ class EventManagerTest extends TestCase
         $this->assertEquals(1, $called);
     }
 
-    public function testShouldNotBeFiredBecauseEventListenersAreRemoved()
+    public function testShouldNotBeFiredBecauseEventListenersAreRemoved(): void
     {
         $called = 0;
         $callback = function ($inputArgs, $err) use (&$called) {
@@ -108,7 +97,7 @@ class EventManagerTest extends TestCase
         $this->assertEquals(0, $called);
     }
 
-    public function testDeferredEventListenerShouldBeFiredEvenIfSubscribedAfterTheEvent()
+    public function testDeferredEventListenerShouldBeFiredEvenIfSubscribedAfterTheEvent(): void
     {
         $called = 0;
         $callback = function ($inputArgs, $err) use (&$called) {
@@ -120,7 +109,31 @@ class EventManagerTest extends TestCase
         $this->assertEquals(1, $called);
     }
 
-    public function testShouldSubscribeToEventAndBeFiredWithErrorProvided()
+    public function testDeferredReplayFiresAllRegisteredListeners(): void
+    {
+        $earlyCallCount = 0;
+        $lateCallCount = 0;
+
+        // Register early listener before the deferred fire
+        $this->eventManager->on('DEFERRED', function ($args, $err) use (&$earlyCallCount) {
+            $earlyCallCount++;
+        });
+
+        // Fire deferred — early listener fires once here
+        $this->eventManager->fire('DEFERRED', ['data' => 1], null, true);
+        $this->assertEquals(1, $earlyCallCount, 'Early listener fires on original fire()');
+
+        // Register late listener — triggers deferred replay of ALL listeners
+        $this->eventManager->on('DEFERRED', function ($args, $err) use (&$lateCallCount) {
+            $lateCallCount++;
+        });
+
+        // Deferred replay fires ALL listeners (JS SDK parity behavior)
+        $this->assertEquals(2, $earlyCallCount, 'Early listener fires again on deferred replay');
+        $this->assertEquals(1, $lateCallCount, 'Late listener fires on deferred replay');
+    }
+
+    public function testShouldSubscribeToEventAndBeFiredWithErrorProvided(): void
     {
         $called = 0;
         $callback = function ($inputArgs, $err) use (&$called) {
@@ -131,5 +144,74 @@ class EventManagerTest extends TestCase
         $this->eventManager->on('EVENT3', $callback);
         $this->eventManager->fire('EVENT3', null, new \Error('Custom error message'));
         $this->assertEquals(1, $called);
+    }
+
+    public function testTenListenersOnSingleEventFireCorrectly(): void
+    {
+        $callCounts = array_fill(0, 10, 0);
+        for ($i = 0; $i < 10; $i++) {
+            $idx = $i;
+            $this->eventManager->on('MULTI_EVENT', function ($args, $err) use (&$callCounts, $idx) {
+                $callCounts[$idx]++;
+            });
+        }
+
+        $this->eventManager->fire('MULTI_EVENT', ['test' => 'data']);
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->assertEquals(1, $callCounts[$i], "Listener $i should have been called exactly once");
+        }
+    }
+
+    public function testSystemEventsEnumUsedForOnAndFire(): void
+    {
+        $called = 0;
+        $this->eventManager->on(SystemEvents::Ready, function ($args, $err) use (&$called) {
+            $called++;
+        });
+        $this->eventManager->fire(SystemEvents::Ready, ['status' => 'ok']);
+        $this->assertEquals(1, $called);
+    }
+
+    /**
+     * @group performance
+     */
+    public function testPerformanceUnder1msFor10Listeners(): void
+    {
+        $em = new EventManager();
+        for ($i = 0; $i < 10; $i++) {
+            $em->on('PERF_EVENT', function ($args, $err) {
+                // minimal no-op listener
+            });
+        }
+
+        // Warm up to avoid cold-start measurement skew
+        $em->fire('PERF_EVENT', ['warmup' => true]);
+
+        // Measure over multiple iterations and take the median
+        $timings = [];
+        for ($run = 0; $run < 10; $run++) {
+            $start = hrtime(true);
+            $em->fire('PERF_EVENT', ['data' => 'value']);
+            $timings[] = (hrtime(true) - $start) / 1_000_000;
+        }
+        sort($timings);
+        $median = $timings[4]; // median of 10
+
+        $this->assertLessThan(1.0, $median, "Median event fire with 10 listeners should complete in <1ms, took {$median}ms");
+    }
+
+    public function testExceptionInListenerDoesNotBreakOtherListeners(): void
+    {
+        $secondCalled = false;
+        $this->eventManager->on('ERROR_EVENT', function () {
+            throw new \RuntimeException('listener error');
+        });
+        $this->eventManager->on('ERROR_EVENT', function () use (&$secondCalled) {
+            $secondCalled = true;
+        });
+
+        $this->eventManager->fire('ERROR_EVENT', []);
+        $this->assertTrue($secondCalled, 'Second listener should still fire after first throws');
     }
 }

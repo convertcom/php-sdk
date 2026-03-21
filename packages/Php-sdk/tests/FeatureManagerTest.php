@@ -7,7 +7,7 @@ namespace ConvertSdk\Tests;
 use PHPUnit\Framework\TestCase;
 use ConvertSdk\BucketingManager;
 use ConvertSdk\RuleManager;
-use ConvertSdk\EventManager;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\ApiManager;
 use ConvertSdk\DataManager;
 use ConvertSdk\FeatureManager;
@@ -68,7 +68,7 @@ class FeatureManagerTest extends TestCase
         );
         $ruleManager = new RuleManager();
         $loggerManager = new LogManager($this->config);
-        $this->eventManager = new EventManager($this->config);
+        $this->eventManager = new EventManager();
         $this->apiManager = new ApiManager($this->config, $this->eventManager);
         $this->dataManager = new DataManager(
             $this->config,

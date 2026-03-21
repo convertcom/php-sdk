@@ -6,7 +6,7 @@ namespace ConvertSdk\Tests;
 
 use PHPUnit\Framework\TestCase;
 use ConvertSdk\ApiManager;
-use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Enums\SystemEvents;

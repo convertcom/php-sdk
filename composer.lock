@@ -248,12 +248,11 @@
             "dist": {
                 "type": "path",
                 "url": "packages/Event",
-                "reference": "a776829fab2dbd123b60294cb8e06141cb64c596"
+                "reference": "9f52e2b3aa905283a413253b2855556756f7fe89"
             },
             "require": {
                 "convertcom/php-sdk-enums": ">=1.0.0",
                 "convertcom/php-sdk-logger": ">=1.0.0",
-                "convertcom/php-sdk-types": ">=1.0.0",
                 "php": "^8.2"
             },
             "require-dev": {
@@ -263,7 +262,7 @@
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "ConvertSdk\\": "src/"
+                    "ConvertSdk\\Event\\": "src/"
                 }
             },
             "scripts": {

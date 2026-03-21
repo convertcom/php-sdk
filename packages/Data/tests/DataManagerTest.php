@@ -7,7 +7,7 @@ namespace ConvertSdk\Tests;
 use ConvertSdk\DataManager;
 use ConvertSdk\BucketingManager;
 use ConvertSdk\RuleManager;
-use ConvertSdk\EventManager;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\ApiManager;
 use ConvertSdk\LogManager;
 use ConvertSdk\Utils\ObjectUtils;
@@ -120,7 +120,7 @@ class DataManagerTest extends TestCase
             hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
         );
         $this->ruleManager = new RuleManager();
-        $this->eventManager = new EventManager($this->config);
+        $this->eventManager = new EventManager();
         $this->apiManager = new ApiManager(
             $this->config,
             $this->eventManager,

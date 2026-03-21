@@ -17,7 +17,7 @@ use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\BucketingManagerInterface;
 use ConvertSdk\Interfaces\DataStoreManagerInterface;
 use ConvertSdk\Interfaces\DataManagerInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Interfaces\RuleManagerInterface;
 use OpenAPI\Client\Model\ExperienceVariationConfig;
