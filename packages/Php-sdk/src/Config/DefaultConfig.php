@@ -1,9 +1,12 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Config;
 
 use ConvertSdk\Enums\LogLevel;
 
-class DefaultConfig
+final class DefaultConfig
 {
     /**
      * Get the default configuration array.
@@ -32,7 +35,7 @@ class DefaultConfig
                 'release_interval' => 1000
             ],
             'logger' => [
-                'logLevel' => LogLevel::DEBUG,
+                'logLevel' => LogLevel::Debug,
                 'customLoggers' => [] // Allows 3rd party loggers to be passed.
             ],
             'rules' => [

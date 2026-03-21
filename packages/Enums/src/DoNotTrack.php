@@ -1,9 +1,13 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class DoNotTrack {
-    const OFF = 'OFF';
-    const EU_ONLY = 'EU ONLY';
-    const EEA_ONLY = 'EEA ONLY';
-    const WORLDWIDE = 'Worldwide';
+enum DoNotTrack: string
+{
+    case Off = 'OFF';
+    case EuOnly = 'EU ONLY';
+    case EeaOnly = 'EEA ONLY';
+    case Worldwide = 'Worldwide';
 }

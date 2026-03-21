@@ -1,8 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 // File: src/Enums/ErrorMessages.php
 namespace ConvertSdk\Enums;
 
-class ErrorMessages {
+final class ErrorMessages {
     public const SDK_KEY_MISSING = 'SDK key is missing';
     public const DATA_OBJECT_MISSING = 'Data object is missing';
     public const CONFIG_DATA_NOT_VALID = 'Config Data is not valid';

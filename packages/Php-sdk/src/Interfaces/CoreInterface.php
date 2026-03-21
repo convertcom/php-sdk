@@ -1,34 +1,44 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Interfaces;
 
-use ConvertSdk\Enums\SystemEvents;
-use ConvertSdk\Interfaces\ContextInterface;
-use GuzzleHttp\Promise\PromiseInterface;
-
+/**
+ * Core SDK interface defining the public API for SDK consumers.
+ */
 interface CoreInterface
 {
     /**
      * Create a visitor context.
      *
-     * @param string $visitorId
-     * @param array|null $visitorAttributes Optional associative array.
-     * @return ContextInterface
+     * @param string $visitorId A unique visitor identifier
+     * @param array<string, mixed>|null $visitorAttributes Optional associative array for audience/segments targeting
+     * @return ContextInterface|null The visitor context, or null if SDK is not initialized
      */
     public function createContext(string $visitorId, ?array $visitorAttributes = null): ?ContextInterface;
 
     /**
      * Attach an event handler to a system event.
      *
-     * @param SystemEvents $event
-     * @param callable $fn Callback function with optional arguments.
+     * @param string $event Event name (SystemEvents value)
+     * @param callable $fn Callback function which will be fired
      * @return void
      */
     public function on(string $event, callable $fn): void;
 
     /**
-     * Returns a promise that resolves when the core is ready.
+     * Check if the SDK is fully initialized and ready to use.
      *
-     * @return PromiseInterface
+     * @return bool True if the SDK is initialized with valid config data
      */
-    public function onReady(): PromiseInterface;
+    public function isReady(): bool;
+
+    /**
+     * Check if the system is ready.
+     *
+     * @deprecated Use isReady() instead
+     * @return bool
+     */
+    public function onReady(): bool;
 }

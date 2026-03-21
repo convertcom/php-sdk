@@ -1,14 +1,18 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class BrowserType {
-    const IE  = 'IE';
-    const CH  = 'CH';
-    const FF  = 'FF';
-    const OP  = 'OP';
-    const SF  = 'SF';
-    const EDG = 'EDG';
-    const MO  = 'MO';
-    const NS  = 'NS';
-    const OTH = 'OTH';
+enum BrowserType: string
+{
+    case Ie = 'IE';
+    case Ch = 'CH';
+    case Ff = 'FF';
+    case Op = 'OP';
+    case Sf = 'SF';
+    case Edg = 'EDG';
+    case Mo = 'MO';
+    case Ns = 'NS';
+    case Oth = 'OTH';
 }

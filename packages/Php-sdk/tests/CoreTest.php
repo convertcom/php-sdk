@@ -1,9 +1,8 @@
 <?php
+
+declare(strict_types=1);
+
 use PHPUnit\Framework\TestCase;
-use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Psr7\Response;
 use ConvertSdk\BucketingManager;
 use ConvertSdk\RuleManager;
 use ConvertSdk\EventManager;
@@ -15,6 +14,7 @@ use ConvertSdk\LogManager;
 use ConvertSdk\SegmentsManager;
 use ConvertSdk\Core;
 use ConvertSdk\Context;
+use ConvertSdk\Cache\ArrayCache;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use ConvertSdk\Config\DefaultConfig;
@@ -22,8 +22,6 @@ use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Enums\EntityType;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Enums\ErrorMessages;
-
-
 
 class CoreTest extends TestCase
 {
@@ -39,17 +37,13 @@ class CoreTest extends TestCase
     private $loggerManager;
     private $segmentsManager;
     private $core;
-    private $host = 'http://localhost';
-    private $port = 8090;
-    private $releaseTimeout = 1000;
-    private $testTimeout = 1100; // releaseTimeout + 100
-    private $batchSize = 5;
+    private $accountId;
+    private $projectId;
 
     protected function setUp(): void
     {
-        // Initialize configuration
         $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
-        $defaultConfig = DefaultConfig::getDefault(); // Assume DefaultConfig exists
+        $defaultConfig = DefaultConfig::getDefault();
         $this->configuration = ObjectUtils::objectDeepMerge($testConfig, $defaultConfig, [
             'api' => [
                 'endpoint' => [
@@ -68,32 +62,35 @@ class CoreTest extends TestCase
         }
         $this->config = new Config($this->configuration);
 
-        // Initialize managers
-        $this->loggerManager = new LogManager($this->config);
-
+        $this->loggerManager = new LogManager();
         $this->bucketingManager = new BucketingManager($this->config);
         $this->ruleManager = new RuleManager($this->config);
         $this->eventManager = new EventManager($this->config);
         $this->apiManager = new ApiManager($this->config, $this->eventManager, $this->loggerManager);
         $this->dataManager = new DataManager(
-          $this->config,
-          $this->bucketingManager,
-          $this->ruleManager,
-          $this->eventManager,
-          $this->apiManager,
-          $this->loggerManager
-      );
+            $this->config,
+            $this->bucketingManager,
+            $this->ruleManager,
+            $this->eventManager,
+            $this->apiManager,
+            $this->loggerManager
+        );
         $this->experienceManager = new ExperienceManager($this->config, ['dataManager' => $this->dataManager]);
         $this->featureManager = new FeatureManager($this->config, $this->dataManager);
         $this->segmentsManager = new SegmentsManager($this->config, $this->dataManager, $this->ruleManager);
-        $this->core = new Core($this->config, [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => $this->apiManager
-        ]);
+
+        $this->core = new Core(
+            $this->config,
+            $this->dataManager,
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->segmentsManager,
+            $this->apiManager,
+            new ArrayCache(),
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $this->loggerManager,
+        );
 
         $this->accountId = $this->config->getData() ? $this->config->getData()->getAccountId() : '';
         $project = $this->config->getData() ? $this->config->getData()->getProject() : null;
@@ -130,11 +127,10 @@ class CoreTest extends TestCase
     public function shouldSuccessfullyTriggerReadyEvent()
     {
         $triggered = false;
-        $this->eventManager->on(SystemEvents::READY, function ($args, $err) use (&$triggered) {
+        $this->eventManager->on(SystemEvents::Ready, function ($args, $err) use (&$triggered) {
             $this->assertNull($err);
             $triggered = true;
         });
-        // Simulate triggering the ready event (adjust based on actual Core implementation)
         $this->core->onReady();
         $this->assertTrue($triggered);
     }
@@ -151,32 +147,21 @@ class CoreTest extends TestCase
     }
 
     /** @test */
-    public function shouldSuccessfullyGetConfigUsingSdkKey()
+    public function shouldReturnTrueFromIsReady()
     {
-        $mock = new MockHandler([
-            new Response(200, [], '{}')
-        ]);
-        $handlerStack = HandlerStack::create($mock);
-        $client = new Client(['handler' => $handlerStack]);
+        $this->assertTrue($this->core->isReady());
+    }
 
-        $accountId = $this->accountId;
-        $projectId = $this->projectId;
-        $config = [
-            'sdkKey' => "$accountId/$projectId",
-            'api' => $this->configuration['api'],
-            'events' => $this->configuration['events'],
-            'environment' => $this->configuration['environment']
-        ];
+    /** @test */
+    public function isReadyAndOnReadyShouldReturnSameValue()
+    {
+        $this->assertEquals($this->core->isReady(), $this->core->onReady());
+    }
 
-        $core = new Core(new Config($config), [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => new ApiManager(new Config($config), $this->eventManager)
-        ]);
-
-        $this->assertInstanceOf(Core::class, $core);
+    /** @test */
+    public function coreShouldBeFinalClass()
+    {
+        $reflection = new \ReflectionClass(Core::class);
+        $this->assertTrue($reflection->isFinal());
     }
 }

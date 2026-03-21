@@ -1,12 +1,14 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class VariableTypes {
-    const VARIABLE_TYPES = [
-        'boolean',
-        'float',
-        'json',
-        'integer',
-        'string'
-    ];
+enum VariableTypes: string
+{
+    case Boolean = 'boolean';
+    case Float = 'float';
+    case Json = 'json';
+    case Integer = 'integer';
+    case String = 'string';
 }

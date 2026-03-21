@@ -1,10 +1,13 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Config;
 
 use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Utils\ObjectUtils;
 
-class Config
+final class Config
 {
     /**
      * Create and merge configuration settings.
@@ -17,7 +20,7 @@ class Config
     {
         $defaultLoggerSettings = [
             'logger' => [
-                'logLevel' => LogLevel::WARN,
+                'logLevel' => LogLevel::Warn,
                 'customLoggers' => []
             ]
         ];

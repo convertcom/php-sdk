@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * EventManager Module Unit Tests

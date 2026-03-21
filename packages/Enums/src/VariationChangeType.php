@@ -1,11 +1,15 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class VariationChangeType {
-    const RICH_STRUCTURE = 'richStructure';
-    const CUSTOM_CODE = 'customCode';
-    const DEFAULT_CODE = 'defaultCode';
-    const DEFAULT_CODE_MULTIPAGE = 'defaultCodeMultipage';
-    const DEFAULT_REDIRECT = 'defaultRedirect';
-    const FULLSTACK_FEATURE = 'fullStackFeature';
+enum VariationChangeType: string
+{
+    case RichStructure = 'richStructure';
+    case CustomCode = 'customCode';
+    case DefaultCode = 'defaultCode';
+    case DefaultCodeMultipage = 'defaultCodeMultipage';
+    case DefaultRedirect = 'defaultRedirect';
+    case FullstackFeature = 'fullStackFeature';
 }

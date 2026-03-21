@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk;
 
 use ConvertSdk\Interfaces\DataManagerInterface;
@@ -18,108 +20,82 @@ use ConvertSdk\Utils\TypeUtils;
 use ConvertSdk\Utils\ArrayUtils;
 use ConvertSdk\Utils\ObjectUtils;
 
-/*!
- * Convert PHP SDK
- * Version 1.0.0
- * Copyright(c) 2020 Convert Insights, Inc
- * License Apache-2.0
- */
-
 /**
- * Class FeatureManager
- *
  * Manages features within the Convert SDK, handling bucketing and feature status.
- *
- * @package ConvertSdk
  */
-class FeatureManager implements FeatureManagerInterface
+final class FeatureManager implements FeatureManagerInterface
 {
     /**
-     * @var Config Configuration instance
-     */
-    private $config;
-
-    /**
-     * @var DataManagerInterface Data manager for storing and retrieving bucketed data
-     */
-    private $dataManager;
-
-    /**
-     * @var LogManagerInterface|null Logger for warnings and errors
-     */
-    private $loggerManager;
-
-    /**
-     * FeatureManager constructor.
-     *
      * @param Config $config SDK configuration
      * @param DataManagerInterface $dataManager Data manager instance
      * @param LogManagerInterface|null $loggerManager Optional logger instance
      */
     public function __construct(
-        Config $config,
-        DataManagerInterface $dataManager,
-        ?LogManagerInterface $loggerManager = null
-    ) {
-        $this->config = $config;
-        $this->dataManager = $dataManager;
-        $this->loggerManager = $loggerManager;
-    }
+        private readonly Config $config,
+        private readonly DataManagerInterface $dataManager,
+        private readonly ?LogManagerInterface $loggerManager = null,
+    ) {}
 
     /**
-     * Get a list of all entities
-     * @return ConfigFeature[]
+     * Get a list of all features.
+     *
+     * @return array<int, ConfigFeature> List of features
      */
     public function getList(): array
     {
         return $this->dataManager->getEntitiesList('features');
     }
-    
+
     /**
-     * Get a list of all entities as object of entities grouped by identity field
-     * @param string $field A field to group entities defaults to 'id'
-     * @return array<string, ConfigFeature>
+     * Get a list of all features as object grouped by identity field.
+     *
+     * @param string $field A field to group entities, defaults to 'id'
+     * @return array<string, ConfigFeature> Features grouped by field
      */
     public function getListAsObject(string $field): array
     {
         return $this->dataManager->getEntitiesListObject('features', $field);
     }
-    
+
     /**
-     * Get the entity by key
-     * @param string $key
-     * @return ConfigFeature
+     * Get a feature entity by key.
+     *
+     * @param string $key Feature key
+     * @return ConfigFeature The feature
      */
     public function getFeature(string $key): ConfigFeature
     {
         return new ConfigFeature($this->dataManager->getEntity($key, 'features'));
     }
-    
+
     /**
-     * Get the entity by id
-     * @param string $id
-     * @return ConfigFeature
+     * Get a feature entity by ID.
+     *
+     * @param string $id Feature ID
+     * @return ConfigFeature The feature
      */
     public function getFeatureById(string $id): ConfigFeature
     {
         return new ConfigFeature($this->dataManager->getEntityById($id, 'features'));
     }
-    
+
     /**
-     * Get specific entities by array of keys
-     * @param string[] $keys
-     * @return ConfigFeature[]
+     * Get specific features by array of keys.
+     *
+     * @param array<int, string> $keys Feature keys
+     * @return array<int, ConfigFeature> Matching features
      */
     public function getFeatures(array $keys): array
     {
         return $this->dataManager->getItemsByKeys($keys, 'features');
     }
-    
+
     /**
-     * Get a specific variable type defined in a specific feature
+     * Get a specific variable type defined in a specific feature.
+     *
      * @param string $key A feature's key
-     * @param string $variableName
-     * @return string|null
+     * @param string $variableName Variable name
+     * @return string|null The variable type or null
      */
     public function getFeatureVariableType(string $key, string $variableName): ?string
     {
@@ -133,12 +109,13 @@ class FeatureManager implements FeatureManagerInterface
         }
         return null;
     }
-    
+
     /**
-     * Get a specific variable type defined in a specific feature by id
-     * @param string $id A feature's id
-     * @param string $variableName
-     * @return string|null
+     * Get a specific variable type defined in a specific feature by ID.
+     *
+     * @param string $id A feature's ID
+     * @param string $variableName Variable name
+     * @return string|null The variable type or null
      */
     public function getFeatureVariableTypeById(string $id, string $variableName): ?string
     {
@@ -152,11 +129,12 @@ class FeatureManager implements FeatureManagerInterface
         }
         return null;
     }
-    
+
     /**
-     * Check that feature is declared
-     * @param string $key ConfigFeature key
-     * @return bool
+     * Check that feature is declared.
+     *
+     * @param string $key Feature key
+     * @return bool True if feature exists
      */
     public function isFeatureDeclared(string $key): bool
     {
@@ -165,13 +143,13 @@ class FeatureManager implements FeatureManagerInterface
     }
 
     /**
-     * Get feature and its status
+     * Get feature and its status.
      *
-     * @param string $visitorId
-     * @param string $featureKey
-     * @param BucketingAttributes $attributes
-     * @param array|null $experienceKeys Optional array of experience keys
-     * @return BucketedFeature|RuleError|array Returns a single bucketed feature, rule error, or array of features/errors
+     * @param string $visitorId Visitor identifier
+     * @param string $featureKey Feature key
+     * @param BucketingAttributes $attributes Bucketing attributes
+     * @param array<int, string>|null $experienceKeys Optional array of experience keys
+     * @return mixed Returns a single bucketed feature, rule error, or array of features/errors
      */
     public function runFeature(
         string $visitorId,
@@ -188,38 +166,34 @@ class FeatureManager implements FeatureManagerInterface
 
             if (!empty($features)) {
                 if (count($features) === 1) {
-                    // Return the single bucketed feature
                     return $features[0];
                 } else {
-                    // Return an array of bucketed features (feature used in multiple experiences)
                     return $features;
                 }
             }
 
-            // Return disabled feature if visitor was not bucketed
             return [
                 'id' => $declaredFeature['id'],
                 'name' => $declaredFeature['name'],
                 'key' => $featureKey,
-                'status' => FeatureStatus::DISABLED
+                'status' => FeatureStatus::Disabled->value
             ];
         } else {
-            // Feature is not declared
             return [
                 'key' => $featureKey,
-                'status' => FeatureStatus::DISABLED
+                'status' => FeatureStatus::Disabled->value
             ];
         }
     }
 
     /**
-     * Check if feature is enabled
+     * Check if feature is enabled.
      *
-     * @param string $visitorId
-     * @param string $featureKey
-     * @param BucketingAttributes $attributes
-     * @param array|null $experienceKeys Optional array of experience keys
-     * @return bool True if feature is enabled, false otherwise
+     * @param string $visitorId Visitor identifier
+     * @param string $featureKey Feature key
+     * @param BucketingAttributes $attributes Bucketing attributes
+     * @param array<int, string>|null $experienceKeys Optional array of experience keys
+     * @return bool True if feature is enabled
      */
     public function isFeatureEnabled(
         string $visitorId,
@@ -241,13 +215,13 @@ class FeatureManager implements FeatureManagerInterface
     }
 
     /**
-     * Get feature and its status by ID
+     * Get feature and its status by ID.
      *
-     * @param string $visitorId
-     * @param string $featureId
-     * @param BucketingAttributes $attributes
-     * @param array|null $experienceIds Optional array of experience IDs
-     * @return BucketedFeature|RuleError|array Returns a single bucketed feature, rule error, or array of features/errors
+     * @param string $visitorId Visitor identifier
+     * @param string $featureId Feature ID
+     * @param BucketingAttributes $attributes Bucketing attributes
+     * @param array<int, string>|null $experienceIds Optional array of experience IDs
+     * @return mixed Returns a single bucketed feature, rule error, or array of features/errors
      */
     public function runFeatureById(
         string $visitorId,
@@ -258,7 +232,6 @@ class FeatureManager implements FeatureManagerInterface
         $declaredFeature = $this->dataManager->getEntityById($featureId, 'features');
 
         if ($declaredFeature) {
-            // Convert experience IDs to keys
             $experienceKeys = $experienceIds ? array_map(function ($exp) {
                 return $exp['key'];
             }, $this->dataManager->getEntitiesByIds($experienceIds, 'experiences')) : null;
@@ -270,89 +243,78 @@ class FeatureManager implements FeatureManagerInterface
 
             if (!empty($features)) {
                 if (count($features) === 1) {
-                    // Return the single bucketed feature
                     return $features[0];
                 } else {
-                    // Check for rule errors
                     $matchedErrors = array_filter($features, function ($match) {
-                        return in_array($match, RuleError::getConstants(), true);
+                        return $match instanceof RuleError;
                     });
                     if (!empty($matchedErrors)) {
                         return $matchedErrors;
                     }
-                    // Return array of bucketed features (feature used in multiple experiences)
                     return $features;
                 }
             }
 
-            // Return disabled feature if visitor was not bucketed
             return [
                 'id' => $featureId,
                 'name' => $declaredFeature['name'],
                 'key' => $declaredFeature['key'],
-                'status' => FeatureStatus::DISABLED
+                'status' => FeatureStatus::Disabled->value
             ];
         } else {
-            // Feature is not declared
             return [
                 'id' => $featureId,
-                'status' => FeatureStatus::DISABLED
+                'status' => FeatureStatus::Disabled->value
             ];
         }
     }
 
     /**
-     * Get features and their statuses
+     * Get features and their statuses.
      *
      * @param string $visitorId The unique identifier for the visitor
      * @param BucketingAttributes $attributes The bucketing attributes object
-     * @param array|null $filter Filter records by experiences and/or features keys
-     * @return array Array of bucketed features or rule errors
+     * @param array<string, mixed>|null $filter Filter records by experiences and/or features keys
+     * @return array<int, mixed> Array of bucketed features or rule errors
      */
     public function runFeatures(string $visitorId, BucketingAttributes $attributes, ?array $filter = null): array
     {
-        // Extract typeCasting with a default value of true
         $typeCasting = $attributes->getTypeCasting() ?? true;
 
-        // Get list of declared features grouped by id
         $declaredFeatures = $this->getListAsObject('id');
 
-        // Initialize array for bucketed features
         $bucketedFeatures = [];
-        // Retrieve all or filtered experiences
         $experiences = (!empty($filter['experiences']))
             ? $this->dataManager->getEntities($filter['experiences'], 'experiences')
             : $this->dataManager->getEntitiesList('experiences');
-        // Retrieve bucketed variations across the experiences
+
         $bucketedVariations = array_filter(array_map(function ($experience) use ($visitorId, $attributes) {
             $variation = $this->dataManager->getBucketing(
                 $visitorId,
                 $experience['key'] ?? null,
                 $attributes
             );
-            if (in_array($variation, RuleError::getConstants(), true)) {
+            if ($variation instanceof RuleError) {
                 return $variation;
             }
             return $variation;
         }, $experiences));
 
-        // Return rule errors if present
         $matchedErrors = array_filter($bucketedVariations, function ($match) {
-            return in_array($match, RuleError::getConstants(), true);
+            return $match instanceof RuleError;
         });
         if (!empty($matchedErrors)) {
             return $matchedErrors;
         }
 
-        // Collect features from bucketed variations
         foreach ($bucketedVariations as $bucketedVariation) {
             $changes = [];
-            if (is_array($bucketedVariation)){
+            if (is_array($bucketedVariation)) {
                 $changes = end($bucketedVariation)["changes"];
             }
             foreach ($changes as $change) {
-                if (($change['type'] ?? null) !== VariationChangeType::FULLSTACK_FEATURE) {
-                    $this->_loggerManager?->warn(
+                if (($change['type'] ?? null) !== VariationChangeType::FullstackFeature->value) {
+                    $this->loggerManager?->warn(
                         'FeatureManager.runFeatures()',
                         Messages::VARIATION_CHANGE_NOT_SUPPORTED
                     );
@@ -360,14 +322,13 @@ class FeatureManager implements FeatureManagerInterface
                 }
                 $featureId = $change['data']['feature_id'] ?? null;
                 if (!$featureId) {
-                    $this->_loggerManager?->warn(
+                    $this->loggerManager?->warn(
                         'FeatureManager.runFeatures()',
                         Messages::FEATURE_NOT_FOUND
                     );
                     continue;
                 }
 
-                // Take the features filter into account
                 if (
                     !isset($filter['features']) ||
                     (isset($filter['features']) && in_array($declaredFeatures[$featureId]['key'] ?? null, $filter['features']))
@@ -375,13 +336,12 @@ class FeatureManager implements FeatureManagerInterface
                     $variables = $change['data']['variables_data'] ?? null;
 
                     if ($variables === null) {
-                        $this->_loggerManager?->warn(
+                        $this->loggerManager?->warn(
                             'FeatureManager.runFeatures()',
                             Messages::FEATURE_VARIABLES_NOT_FOUND
                         );
                     }
 
-                    // Convert variables values types if typeCasting is enabled
                     if ($typeCasting && !empty($variables)) {
                         foreach ($variables as $variableName => $value) {
                             $variableDefinition = null;
@@ -394,7 +354,7 @@ class FeatureManager implements FeatureManagerInterface
                             if ($variableDefinition && isset($variableDefinition['type'])) {
                                 $variables[$variableName] = $this->castType($value, $variableDefinition['type']);
                             } else {
-                                $this->_loggerManager?->warn(
+                                $this->loggerManager?->warn(
                                     'FeatureManager.runFeatures()',
                                     Messages::FEATURE_VARIABLES_TYPE_NOT_FOUND
                                 );
@@ -402,7 +362,6 @@ class FeatureManager implements FeatureManagerInterface
                         }
                     }
 
-                    // Build the bucketed feature object
                     $bucketedFeature = array_merge(
                         [
                             'experienceId' => $bucketedVariation['experienceId'] ?? null,
@@ -413,7 +372,7 @@ class FeatureManager implements FeatureManagerInterface
                             'key' => $declaredFeatures[$featureId]['key'] ?? null,
                             'name' => $declaredFeatures[$featureId]['name'] ?? null,
                             'id' => $featureId,
-                            'status' => FeatureStatus::ENABLED,
+                            'status' => FeatureStatus::Enabled->value,
                             'variables' => $variables
                         ]
                     );
@@ -422,7 +381,6 @@ class FeatureManager implements FeatureManagerInterface
             }
         }
 
-        // Extend the list with not enabled features only if no features filter is provided
         if (!isset($filter['features'])) {
             $bucketedFeaturesIds = array_column($bucketedFeatures, 'id');
             foreach ($declaredFeatures as $declaredFeature) {
@@ -431,7 +389,7 @@ class FeatureManager implements FeatureManagerInterface
                         'id' => $declaredFeature['id'],
                         'name' => $declaredFeature['name'] ?? null,
                         'key' => $declaredFeature['key'] ?? null,
-                        'status' => FeatureStatus::DISABLED
+                        'status' => FeatureStatus::Disabled->value
                     ];
                 }
             }
@@ -441,15 +399,14 @@ class FeatureManager implements FeatureManagerInterface
     }
 
     /**
-     * Convert value's type
+     * Convert value's type.
      *
      * @param mixed $value The value to cast
      * @param string $type The target type
      * @return mixed The casted value
      */
-    public function castType($value, string $type)
+    public function castType(mixed $value, string $type): mixed
     {
-        // Assuming a utility function exists for type casting
         return TypeUtils::castType($value, $type);
     }
 }

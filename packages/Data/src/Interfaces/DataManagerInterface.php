@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert JS SDK
  * Version 1.0.0
@@ -11,21 +13,11 @@ namespace ConvertSdk\Interfaces;
 use ConvertSdk\Interfaces\DataStoreManagerInterface;
 use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
-use ConvertSdk\Enums\ConversionSettingKey;
-use OpenAPI\Client\IdentityField;
-use OpenAPI\Client\StoreData;
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\LocationAttributes;
-use OpenAPI\Client\GoalData;
-use OpenAPI\Client\BucketedVariation;
-use OpenAPI\Client\Entity;
 use OpenAPI\Client\Model\ConfigResponseData;
-use OpenAPI\Client\Model\ConfigExperience;
 use OpenAPI\Client\Model\VisitorSegments;
 
-/**
- * @typedef Entity OpenAPI\Client\Entity
- */
 interface DataManagerInterface
 {
     /**
@@ -50,7 +42,7 @@ interface DataManagerInterface
      *
      * @return DataStoreManagerInterface
      */
-    public function getDataStoreManager(): DataStoreManagerInterface;
+    public function getDataStoreManager(): ?DataStoreManagerInterface;
 
     /**
      * Set the data store manager.
@@ -101,9 +93,9 @@ interface DataManagerInterface
      * @param string $identity
      * @param string $identityField IdentityField constant (id or key)
      * @param BucketingAttributes $attributes
-     * @return ConfigExperience|RuleError
+     * @return array|RuleError|null Experience data array, RuleError, or null if not found
      */
-    public function matchRulesByField(string $visitorId, string $identity, string $identityField, BucketingAttributes $attributes): mixed;
+    public function matchRulesByField(string $visitorId, string $identity, string $identityField, BucketingAttributes $attributes): array|RuleError|null;
 
     /**
      * Get bucketing information by experience key.
@@ -111,9 +103,9 @@ interface DataManagerInterface
      * @param string $visitorId
      * @param string $experienceKey
      * @param BucketingAttributes $attributes
-     * @return BucketedVariation|RuleError|BucketingError
+     * @return array|RuleError|BucketingError|null Bucketed variation data, RuleError, BucketingError, or null
      */
-    public function getBucketing(string $visitorId, string $experienceKey, BucketingAttributes $attributes): mixed;
+    public function getBucketing(string $visitorId, string $experienceKey, BucketingAttributes $attributes): array|RuleError|BucketingError|null;
 
     /**
      * Get bucketing information by experience ID.
@@ -121,9 +113,9 @@ interface DataManagerInterface
      * @param string $visitorId
      * @param string $experienceId
      * @param BucketingAttributes $attributes
-     * @return BucketedVariation|RuleError|BucketingError
+     * @return array|RuleError|BucketingError|null Bucketed variation data, RuleError, BucketingError, or null
      */
-    public function getBucketingById(string $visitorId, string $experienceId, BucketingAttributes $attributes): mixed;
+    public function getBucketingById(string $visitorId, string $experienceId, BucketingAttributes $attributes): array|RuleError|BucketingError|null;
 
     /**
      * Record a conversion event.
@@ -136,7 +128,7 @@ interface DataManagerInterface
      * @param array|null $conversionSetting Associative array with ConversionSettingKey keys (optional)
      * @return RuleError|bool
      */
-    public function convert(string $visitorId, string $goalId, ?array $goalRule = null, ?array $goalData = null, ?VisitorSegments $segments = null, ?array $conversionSetting = null): mixed;
+    public function convert(string $visitorId, string $goalId, ?array $goalRule = null, ?array $goalData = null, ?VisitorSegments $segments = null, ?array $conversionSetting = null): bool|RuleError;
 
     /**
      * Get a list of entities by type.
@@ -235,7 +227,7 @@ interface DataManagerInterface
      * @param array $visitorProperties Associative array of visitor properties
      * @return array Filtered associative array
      */
-    public function filterReportSegments(array $visitorProperties): array;
+    public function filterReportSegments(?array $visitorProperties): array;
 
     /**
      * Validate configuration data.
@@ -251,5 +243,5 @@ interface DataManagerInterface
      * @param mixed $dataStore
      * @return void
      */
-    public function setDataStore($dataStore): void;
+    public function setDataStore(mixed $dataStore): void;
 }

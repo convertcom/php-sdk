@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk\Interfaces;
 
 
@@ -16,7 +18,7 @@ interface DataStoreManagerInterface
      * @param string $key The key to store the data under.
      * @param mixed $data The data to store.
      */
-    public function set(string $key, $data): void;
+    public function set(string $key, mixed $data): void;
 
     /**
      * Get data for a specific key.
@@ -24,7 +26,7 @@ interface DataStoreManagerInterface
      * @param string $key The key to retrieve the data for.
      * @return mixed
      */
-    public function get(string $key);
+    public function get(string $key): mixed;
 
     /**
      * Enqueue data for a specific key.
@@ -32,15 +34,15 @@ interface DataStoreManagerInterface
      * @param string $key The key to enqueue the data under.
      * @param mixed $data The data to enqueue.
      */
-    public function enqueue(string $key, $data): void;
+    public function enqueue(string $key, mixed $data): void;
 
     /**
      * Release the queue with an optional reason.
      *
      * @param string|null $reason Optional reason for releasing the queue.
-     * @return mixed
+     * @return void
      */
-    public function releaseQueue(?string $reason = null);
+    public function releaseQueue(?string $reason = null): void;
 
     /**
      * Stop the queue processing.

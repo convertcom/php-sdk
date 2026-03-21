@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -8,8 +10,12 @@
 
 namespace ConvertSdk;
 
-use GuzzleHttp\Promise\PromiseInterface;
-use GuzzleHttp\Promise\Promise;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Client\ClientExceptionInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamFactoryInterface;
+use Http\Discovery\Psr18ClientDiscovery;
+use Http\Discovery\Psr17FactoryDiscovery;
 use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
@@ -18,12 +24,6 @@ use OpenAPI\Client\VisitorsQueue;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorSegments;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
-use ConvertSdk\Utils\HttpClient;
-use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\Utils\HttpMethod;
-use ConvertSdk\Utils\HttpResponse;
-use ConvertSdk\Utils\HttpResponseType;
-use ConvertSdk\Utils\HttpRequest;
 use ConvertSdk\Enums\SystemEvents;
 
 
@@ -68,7 +68,7 @@ class ApiManager implements ApiManagerInterface
     private ?int $requestsQueueTimerID = null;
 
     /** @var bool Whether timeout-based release is enabled */
-    private bool $timeoutEnabled = true; // New property
+    private bool $timeoutEnabled = true;
 
     /** @var string Configuration endpoint URL */
     private $configEndpoint;
@@ -124,8 +124,14 @@ class ApiManager implements ApiManagerInterface
     /** @var int Release interval in milliseconds */
     private $releaseInterval;
 
-    /** @var HttpClient HTTP client instance */
-    private HttpClient $httpClient;
+    /** @var ClientInterface PSR-18 HTTP client */
+    private ClientInterface $httpClient;
+
+    /** @var RequestFactoryInterface PSR-17 request factory */
+    private RequestFactoryInterface $requestFactory;
+
+    /** @var StreamFactoryInterface PSR-17 stream factory */
+    private StreamFactoryInterface $streamFactory;
 
     /**
      * ApiManager constructor.
@@ -133,11 +139,17 @@ class ApiManager implements ApiManagerInterface
      * @param ?Config $config Configuration object
      * @param ?EventManagerInterface $eventManager Event manager dependency
      * @param ?LogManagerInterface $loggerManager Logger manager dependency
+     * @param ?ClientInterface $httpClient PSR-18 HTTP client (auto-discovered if null)
+     * @param ?RequestFactoryInterface $requestFactory PSR-17 request factory (auto-discovered if null)
+     * @param ?StreamFactoryInterface $streamFactory PSR-17 stream factory (auto-discovered if null)
      */
     public function __construct(
         ?Config $config = null,
         ?EventManagerInterface $eventManager = null,
-        ?LogManagerInterface $loggerManager = null
+        ?LogManagerInterface $loggerManager = null,
+        ?ClientInterface $httpClient = null,
+        ?RequestFactoryInterface $requestFactory = null,
+        ?StreamFactoryInterface $streamFactory = null,
     ) {
         $this->loggerManager = $loggerManager;
         $this->eventManager = $eventManager;
@@ -148,12 +160,11 @@ class ApiManager implements ApiManagerInterface
         $this->trackEndpoint = $config && $config->getApi() && isset($config->getApi()['endpoint']['track'])
             ? $config->getApi()['endpoint']['track']
             : self::DEFAULT_TRACK_ENDPOINT;
-        
+
         $this->data = $config ? $config->getData() : null;
         $this->enrichData = $config ? ($config->getDataStore() === null) : true;
         $this->environment = $config ? $config->getEnvironment() : null;
-        // $this->mapper = $config && $config->getMapper() ? $config->getMapper() : function ($value) { return $value; };
-        $this->mapper = function ($value) { return $value; }; // Default callable
+        $this->mapper = function ($value) { return $value; };
         $mapperFromConfig = $config ? $config->getMapper() : null;
         if (is_callable($mapperFromConfig)) {
             $this->mapper = $mapperFromConfig;
@@ -168,7 +179,6 @@ class ApiManager implements ApiManagerInterface
         $this->accountId = $this->data ? $this->data->getAccountId() : '';
         $project = $this->data ? $this->data->getProject() : null;
         $this->projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
-        // $this->projectId = $this->data && $this->data->getProject() ? $this->data->getProject()->getId() : '';
         $this->sdkKey = $config && $config->getSdkKey() ? $config->getSdkKey() : "{$this->accountId}/{$this->projectId}";
         if ($config && $config->getSdkKeySecret()) {
             $this->defaultHeaders['Authorization'] = "Bearer {$config->getSdkKeySecret()}";
@@ -188,7 +198,10 @@ class ApiManager implements ApiManagerInterface
         $this->cacheLevel = $config && $config->getNetwork() && isset($config->getNetwork()['cacheLevel'])
             ? $config->getNetwork()['cacheLevel']
             : '';
-        $this->httpClient = new HttpClient();
+
+        $this->httpClient = $httpClient ?? Psr18ClientDiscovery::find();
+        $this->requestFactory = $requestFactory ?? Psr17FactoryDiscovery::findRequestFactory();
+        $this->streamFactory = $streamFactory ?? Psr17FactoryDiscovery::findStreamFactory();
         $this->requestsQueue = new VisitorsQueue();
     }
 
@@ -199,25 +212,38 @@ class ApiManager implements ApiManagerInterface
      * @param array $path Path with 'base' and 'route' keys
      * @param array $data Request data
      * @param array $headers Request headers
-     * @return PromiseInterface Resolves to an HTTP response array
+     * @return array Response array with 'data', 'status', 'statusText', 'headers' keys
      */
     public function request(
         string $method,
         array $path,
         array $data = [],
         array $headers = []
-    ): PromiseInterface {
-        $requestHeaders = array_merge($this->defaultHeaders, $headers);
+    ): array {
+        $url = rtrim($path['base'] ?? '', '/') . '/' . ltrim($path['route'] ?? '', '/');
+        $request = $this->requestFactory->createRequest($method, $url);
 
-        $requestConfig = [
-            'method' => $method,
-            'path' => $path['route'] ?? '',
-            'baseURL' => $path['base'] ?? '',
-            'headers' => $requestHeaders,
-            'data' => $data,
-            'responseType' => HttpResponseType::JSON
+        $requestHeaders = array_merge($this->defaultHeaders, $headers);
+        foreach ($requestHeaders as $name => $value) {
+            $request = $request->withHeader($name, $value);
+        }
+
+        if (in_array(strtoupper($method), ['POST', 'PUT', 'PATCH']) && !empty($data)) {
+            $body = $this->streamFactory->createStream(json_encode($data, JSON_THROW_ON_ERROR));
+            $request = $request->withBody($body);
+        }
+
+        $response = $this->httpClient->sendRequest($request);
+
+        $rawBody = $response->getBody()->getContents();
+        $decoded = json_decode($rawBody, true);
+
+        return [
+            'data' => $decoded,
+            'status' => $response->getStatusCode(),
+            'statusText' => $response->getReasonPhrase(),
+            'headers' => $response->getHeaders(),
         ];
-        return $this->httpClient->request($requestConfig);
     }
 
     /**
@@ -254,12 +280,12 @@ class ApiManager implements ApiManagerInterface
      * Send queue to server.
      *
      * @param ?string $reason Reason for releasing the queue (optional)
-     * @return PromiseInterface Resolves with the server response or rejects with an error
+     * @return void
      */
-    public function releaseQueue(?string $reason = null): PromiseInterface
+    public function releaseQueue(?string $reason = null): void
     {
         if ($this->requestsQueue->length === 0) {
-            return new Promise(function () {});
+            return;
         }
 
         if ($this->loggerManager && method_exists($this->loggerManager, 'info')) {
@@ -274,46 +300,42 @@ class ApiManager implements ApiManagerInterface
         $payload = $this->trackingEvent;
         $payload['visitors'] = $this->requestsQueue->getItems();
         $payload['source'] = $this->trackingSource;
-        $promise = $this->request(
-            'POST',
-            [
-                'base' => str_replace('[project_id]', (string)$this->projectId, $this->trackEndpoint),
-                'route' => "/track/{$this->sdkKey}"
-            ],
-            call_user_func($this->mapper, $payload)
-        );
 
-        $promise->then(
-            function ($result) use ($reason, $payload) {
-                $this->requestsQueue->reset();
-                if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
-                    $this->eventManager->fire(SystemEvents::API_QUEUE_RELEASED, [
-                        'reason' => $reason,
-                        'result' => $result,
-                        'visitors' => $payload['visitors']
-                    ]);
-                }
-            },
-            function ($error) use ($reason) {
-                if ($this->loggerManager && method_exists($this->loggerManager, 'error')) {
-                    $this->loggerManager->error('ApiManager.releaseQueue()', [
-                        'error' => $error->getMessage(),
-                        'code' => method_exists($error, 'getCode') ? $error->getCode() : null,
-                        'reason' => $reason
-                    ]);
-                }
-                $this->startQueue();
-                if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
-                    $this->eventManager->fire(
-                        SystemEvents::API_QUEUE_RELEASED,
-                        ['reason' => $reason],
-                        $error
-                    );
-                }
+        try {
+            $result = $this->request(
+                'POST',
+                [
+                    'base' => str_replace('[project_id]', (string)$this->projectId, $this->trackEndpoint),
+                    'route' => "/track/{$this->sdkKey}"
+                ],
+                call_user_func($this->mapper, $payload)
+            );
+
+            $this->requestsQueue->reset();
+            if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
+                $this->eventManager->fire(SystemEvents::ApiQueueReleased, [
+                    'reason' => $reason,
+                    'result' => $result,
+                    'visitors' => $payload['visitors']
+                ]);
             }
-        )->wait();
-
-        return $promise;
+        } catch (ClientExceptionInterface $error) {
+            if ($this->loggerManager && method_exists($this->loggerManager, 'error')) {
+                $this->loggerManager->error('ApiManager.releaseQueue()', [
+                    'error' => $error->getMessage(),
+                    'code' => method_exists($error, 'getCode') ? $error->getCode() : null,
+                    'reason' => $reason
+                ]);
+            }
+            $this->startQueue();
+            if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
+                $this->eventManager->fire(
+                    SystemEvents::ApiQueueReleased,
+                    ['reason' => $reason],
+                    $error
+                );
+            }
+        }
     }
 
     /**
@@ -321,7 +343,6 @@ class ApiManager implements ApiManagerInterface
      */
     public function stopQueue(): void
     {
-        // In PHP, we don't have clearTimeout; set timer ID to null as a placeholder
         $this->requestsQueueTimerID = null;
     }
 
@@ -395,16 +416,14 @@ class ApiManager implements ApiManagerInterface
     /**
      * Get configuration data
      *
-     * @return PromiseInterface Resolves to ConfigResponseData
+     * @return ConfigResponseData
      */
-    public function getConfig(): PromiseInterface
+    public function getConfig(): ConfigResponseData
     {
-        // Optional logging if loggerManager exists and has trace method
         if ($this->loggerManager && method_exists($this->loggerManager, 'trace')) {
             $this->loggerManager->trace('ApiManager.getConfig()');
         }
 
-        // Build query string
         $query = '';
         if ($this->cacheLevel === 'low' || $this->environment) {
             $query = '?';
@@ -419,29 +438,32 @@ class ApiManager implements ApiManagerInterface
             $query .= '_conv_low_cache=1';
         }
 
-        // Make the request
-        $promise = $this->request(
-            'GET',
-            [
-                'base' => $this->configEndpoint,
-                'route' => "/config/{$this->sdkKey}{$query}"
-            ]
-        );
+        try {
+            $response = $this->request(
+                'GET',
+                [
+                    'base' => $this->configEndpoint,
+                    'route' => "/config/{$this->sdkKey}{$query}"
+                ]
+            );
 
-        // Handle the promise response
-        return $promise->then(
-            function ($response) {
-                // Extract the 'data' key from the response
-                $data = $response['data'] ?? [];
-
-                // Create and populate ConfigResponseData
-                $configData = new ConfigResponseData($data);
-
-                return $configData;
-            },
-            function ($error) {
-                throw $error; // Re-throw error for rejection
+            $statusCode = $response['status'] ?? 0;
+            if ($statusCode < 200 || $statusCode >= 300) {
+                $url = $this->configEndpoint . "/config/{$this->sdkKey}";
+                throw new \RuntimeException(
+                    "Config fetch failed: HTTP {$statusCode} from {$url}",
+                    $statusCode
+                );
             }
-        );
+
+            $data = $response['data'] ?? [];
+            return new ConfigResponseData($data);
+        } catch (ClientExceptionInterface $e) {
+            throw new \RuntimeException(
+                "Failed to fetch config from {$this->configEndpoint}/config/{$this->sdkKey}: HTTP error - {$e->getMessage()}",
+                (int)$e->getCode(),
+                $e
+            );
+        }
     }
 }
