@@ -12,7 +12,9 @@ use ConvertSdk\ApiManager;
 use ConvertSdk\LogManager;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\ConversionSettingKey;
 use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Interfaces\ApiManagerInterface;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\BucketingAttributes;
@@ -540,5 +542,200 @@ class DataManagerTest extends TestCase
             'id'
         );
         $this->assertNull($result);
+    }
+
+    // =========================================================================
+    // forceMultipleTransactions behavior matrix tests
+    // =========================================================================
+
+    /**
+     * Helper: create a DataManager with a mock ApiManager that tracks enqueue() calls.
+     *
+     * @return array{dataManager: DataManager, apiMock: ApiManagerInterface&\PHPUnit\Framework\MockObject\MockObject}
+     */
+    private function createDataManagerWithMockApi(): array
+    {
+        $apiMock = $this->createMock(ApiManagerInterface::class);
+
+        $dataManager = new DataManager(
+            $this->config,
+            $this->bucketingManager,
+            $this->ruleManager,
+            $this->eventManager,
+            $apiMock,
+            $this->loggerManager,
+            true
+        );
+
+        return ['dataManager' => $dataManager, 'apiMock' => $apiMock];
+    }
+
+    /**
+     * Scenario 1: First trigger, no goalData -> conversion sent, no transaction.
+     * @group forceMultipleTransactions
+     */
+    public function testForceMultiple_FirstTriggerNoGoalData_SendsConversionOnly(): void
+    {
+        ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
+
+        $apiMock->expects($this->once())
+            ->method('enqueue')
+            ->with(
+                $this->visitorId,
+                $this->callback(function (VisitorTrackingEvents $event) {
+                    $data = (array) $event->jsonSerialize();
+                    // Conversion event: has goalId, no goalData
+                    return isset($data['data']['goalId']) && !isset($data['data']['goalData']);
+                }),
+                $this->anything()
+            );
+
+        $result = $dm->convert($this->visitorId, 'goal-without-rule');
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Scenario 2: First trigger, with goalData -> conversion sent AND transaction sent.
+     * @group forceMultipleTransactions
+     */
+    public function testForceMultiple_FirstTriggerWithGoalData_SendsConversionAndTransaction(): void
+    {
+        ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
+
+        $capturedEvents = [];
+        $apiMock->expects($this->exactly(2))
+            ->method('enqueue')
+            ->willReturnCallback(function (string $visitorId, VisitorTrackingEvents $event) use (&$capturedEvents) {
+                $capturedEvents[] = (array) $event->jsonSerialize();
+            });
+
+        $goalData = [['key' => 'amount', 'value' => 49.99]];
+        $result = $dm->convert($this->visitorId, 'goal-without-rule', null, $goalData);
+        $this->assertTrue($result);
+
+        // First event: conversion (no goalData)
+        $this->assertEquals('conversion', $capturedEvents[0]['eventType']);
+        $this->assertArrayHasKey('goalId', $capturedEvents[0]['data']);
+        $this->assertArrayNotHasKey('goalData', $capturedEvents[0]['data']);
+
+        // Second event: transaction (with goalData)
+        $this->assertEquals('conversion', $capturedEvents[1]['eventType']);
+        $this->assertArrayHasKey('goalId', $capturedEvents[1]['data']);
+        $this->assertArrayHasKey('goalData', $capturedEvents[1]['data']);
+    }
+
+    /**
+     * Scenario 3: Repeat trigger, no force -> nothing sent (dedup blocks both).
+     * @group forceMultipleTransactions
+     */
+    public function testForceMultiple_RepeatTriggerNoForce_SendsNothing(): void
+    {
+        ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
+
+        // First call: triggers conversion
+        $apiMock->expects($this->once())
+            ->method('enqueue');
+
+        $dm->convert($this->visitorId, 'goal-without-rule');
+
+        // Second call: dedup blocks everything
+        $result = $dm->convert($this->visitorId, 'goal-without-rule');
+        $this->assertTrue($result); // Returns true (dedup recognized)
+    }
+
+    /**
+     * Scenario 4: Repeat trigger, force=true, no goalData -> nothing sent.
+     * @group forceMultipleTransactions
+     */
+    public function testForceMultiple_RepeatTriggerForceNoGoalData_SendsNothing(): void
+    {
+        ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
+
+        // First call: triggers conversion (1 enqueue)
+        // Second call with force but no goalData: nothing to send (still 1 total)
+        $apiMock->expects($this->once())
+            ->method('enqueue');
+
+        $dm->convert($this->visitorId, 'goal-without-rule');
+
+        $conversionSetting = [ConversionSettingKey::ForceMultipleTransactions->value => true];
+        $result = $dm->convert($this->visitorId, 'goal-without-rule', null, null, null, $conversionSetting);
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Scenario 3b: Repeat trigger, explicit force=false -> nothing sent (dedup blocks).
+     * Validates that explicit false behaves identically to null/absent.
+     * @group forceMultipleTransactions
+     */
+    public function testForceMultiple_RepeatTriggerExplicitFalse_SendsNothing(): void
+    {
+        ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
+
+        // First call: triggers conversion (1 enqueue)
+        $apiMock->expects($this->once())
+            ->method('enqueue');
+
+        $dm->convert($this->visitorId, 'goal-without-rule');
+
+        // Second call with explicit false: dedup blocks everything
+        $conversionSetting = [ConversionSettingKey::ForceMultipleTransactions->value => false];
+        $result = $dm->convert($this->visitorId, 'goal-without-rule', null, [['key' => 'amount', 'value' => 9.99]], null, $conversionSetting);
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Scenario 5b: Repeat trigger, force=1 (truthy integer), with goalData -> transaction sent.
+     * Validates that non-boolean truthy values also bypass dedup.
+     * @group forceMultipleTransactions
+     */
+    public function testForceMultiple_RepeatTriggerTruthyInteger_SendsTransaction(): void
+    {
+        ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
+
+        $apiMock->expects($this->exactly(2))
+            ->method('enqueue');
+
+        $dm->convert($this->visitorId, 'goal-without-rule');
+
+        // Integer 1 is truthy — should bypass dedup and send transaction
+        $conversionSetting = [ConversionSettingKey::ForceMultipleTransactions->value => 1];
+        $result = $dm->convert($this->visitorId, 'goal-without-rule', null, [['key' => 'amount', 'value' => 5.00]], null, $conversionSetting);
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Scenario 5: Repeat trigger, force=true, with goalData -> transaction sent only.
+     * @group forceMultipleTransactions
+     */
+    public function testForceMultiple_RepeatTriggerForceWithGoalData_SendsTransactionOnly(): void
+    {
+        ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
+
+        $capturedEvents = [];
+        $apiMock->expects($this->exactly(2))
+            ->method('enqueue')
+            ->willReturnCallback(function (string $visitorId, VisitorTrackingEvents $event) use (&$capturedEvents) {
+                $capturedEvents[] = (array) $event->jsonSerialize();
+            });
+
+        // First call: triggers conversion (1 enqueue)
+        $dm->convert($this->visitorId, 'goal-without-rule');
+
+        // Second call with force + goalData: triggers transaction only (2nd enqueue)
+        $goalData = [['key' => 'amount', 'value' => 29.99]];
+        $conversionSetting = [ConversionSettingKey::ForceMultipleTransactions->value => true];
+        $result = $dm->convert($this->visitorId, 'goal-without-rule', null, $goalData, null, $conversionSetting);
+        $this->assertTrue($result);
+
+        $this->assertCount(2, $capturedEvents);
+
+        // First event: conversion (no goalData)
+        $this->assertEquals('conversion', $capturedEvents[0]['eventType']);
+        $this->assertArrayNotHasKey('goalData', $capturedEvents[0]['data']);
+
+        // Second event: transaction (with goalData)
+        $this->assertEquals('conversion', $capturedEvents[1]['eventType']);
+        $this->assertArrayHasKey('goalData', $capturedEvents[1]['data']);
     }
 }
