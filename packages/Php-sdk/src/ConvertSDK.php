@@ -8,6 +8,7 @@ use ConvertSdk\Config\Config;
 use ConvertSdk\Cache\ArrayCache;
 use ConvertSdk\Enums\LogLevel;
 use ConvertSdk\Exception\InvalidArgumentException;
+use ConvertSdk\Utils\Comparisons;
 use OpenAPI\Client\Config as OpenApiConfig;
 use OpenAPI\Client\Model\ConfigResponseData;
 use Psr\Log\LoggerInterface;
@@ -108,8 +109,21 @@ final class ConvertSDK
             );
         }
 
-        $bucketingManager = new BucketingManager($openApiConfig, ['loggerManager' => $logManager]);
-        $ruleManager = new RuleManager($openApiConfig, ['loggerManager' => $logManager]);
+        $bucketingConfig = $openApiConfig->getBucketing();
+        $bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+            logManager: $logManager,
+        );
+        $rulesConfig = $openApiConfig->getRules() ?? [];
+        $mapper = $openApiConfig->getMapper();
+        $ruleManager = new RuleManager(
+            comparisonProcessor: $rulesConfig['comparisonProcessor'] ?? Comparisons::class,
+            negation: isset($rulesConfig['negation']) ? (string) $rulesConfig['negation'] : '!',
+            keysCaseSensitive: $rulesConfig['keys_case_sensitive'] ?? true,
+            logManager: $logManager,
+            mapper: is_callable($mapper) ? \Closure::fromCallable($mapper) : null,
+        );
 
         $dataManager = new DataManager(
             $openApiConfig,
@@ -120,10 +134,10 @@ final class ConvertSDK
             $logManager
         );
 
-        $experienceManager = new ExperienceManager($openApiConfig, [
-            'dataManager' => $dataManager,
-            'loggerManager' => $logManager,
-        ]);
+        $experienceManager = new ExperienceManager(
+            dataManager: $dataManager,
+            logManager: $logManager,
+        );
 
         $featureManager = new FeatureManager($openApiConfig, $dataManager, $logManager);
         $segmentsManager = new SegmentsManager($openApiConfig, $dataManager, $ruleManager, $logManager);

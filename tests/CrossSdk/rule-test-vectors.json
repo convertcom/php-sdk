@@ -1,0 +1,529 @@
+{
+  "comparison_operators": [
+    {
+      "category": "equals",
+      "method": "equals",
+      "cases": [
+        { "value": "US", "testAgainst": "US", "negation": false, "expected": true, "note": "exact match" },
+        { "value": "US", "testAgainst": "us", "negation": false, "expected": true, "note": "case-insensitive" },
+        { "value": "us", "testAgainst": "US", "negation": false, "expected": true, "note": "case-insensitive reverse" },
+        { "value": "US", "testAgainst": "GB", "negation": false, "expected": false, "note": "no match" },
+        { "value": "US", "testAgainst": "US", "negation": true, "expected": false, "note": "negated match" },
+        { "value": "US", "testAgainst": "GB", "negation": true, "expected": true, "note": "negated no-match" },
+        { "value": "", "testAgainst": "", "negation": false, "expected": true, "note": "empty strings" },
+        { "value": "123", "testAgainst": "123", "negation": false, "expected": true, "note": "numeric strings" },
+        { "value": ["a", "b", "c"], "testAgainst": "b", "negation": false, "expected": true, "note": "array indexOf match" },
+        { "value": ["a", "b", "c"], "testAgainst": "d", "negation": false, "expected": false, "note": "array indexOf no match" },
+        { "value": ["a", "b", "c"], "testAgainst": "d", "negation": true, "expected": true, "note": "array indexOf negated no-match" }
+      ]
+    },
+    {
+      "category": "equalsNumber",
+      "method": "equalsNumber",
+      "cases": [
+        { "value": 42, "testAgainst": 42, "negation": false, "expected": true, "note": "equal integers" },
+        { "value": 42, "testAgainst": 99, "negation": false, "expected": false, "note": "different integers" },
+        { "value": 42, "testAgainst": 42, "negation": true, "expected": false, "note": "negated equal" }
+      ]
+    },
+    {
+      "category": "matches",
+      "method": "matches",
+      "cases": [
+        { "value": "hello", "testAgainst": "HELLO", "negation": false, "expected": true, "note": "case-insensitive match" },
+        { "value": "hello", "testAgainst": "world", "negation": false, "expected": false, "note": "no match" }
+      ]
+    },
+    {
+      "category": "less",
+      "method": "less",
+      "cases": [
+        { "value": 5, "testAgainst": 10, "negation": false, "expected": true, "note": "int less than" },
+        { "value": 10, "testAgainst": 5, "negation": false, "expected": false, "note": "int not less than" },
+        { "value": 5, "testAgainst": 5, "negation": false, "expected": false, "note": "equal not less" },
+        { "value": -10, "testAgainst": 0, "negation": false, "expected": true, "note": "negative less than zero" },
+        { "value": 5, "testAgainst": 10, "negation": true, "expected": false, "note": "negated less" },
+        { "value": 10, "testAgainst": 5, "negation": true, "expected": true, "note": "negated not-less" },
+        { "value": "abc", "testAgainst": "xyz", "negation": false, "expected": true, "note": "string less than" },
+        { "value": "xyz", "testAgainst": "abc", "negation": false, "expected": false, "note": "string not less than" },
+        { "value": 5, "testAgainst": 10.5, "negation": false, "expected": true, "note": "int vs float parity (JS SDK normalizes both to number)" },
+        { "value": "5", "testAgainst": 10, "negation": false, "expected": true, "note": "numeric string vs int parity" }
+      ]
+    },
+    {
+      "category": "lessEqual",
+      "method": "lessEqual",
+      "cases": [
+        { "value": 5, "testAgainst": 10, "negation": false, "expected": true, "note": "less than" },
+        { "value": 5, "testAgainst": 5, "negation": false, "expected": true, "note": "equal" },
+        { "value": 10, "testAgainst": 5, "negation": false, "expected": false, "note": "greater than" },
+        { "value": 5, "testAgainst": 5, "negation": true, "expected": false, "note": "negated equal" },
+        { "value": 10, "testAgainst": 5, "negation": true, "expected": true, "note": "negated greater" },
+        { "value": 5, "testAgainst": 5.0, "negation": false, "expected": true, "note": "int vs float equal parity" }
+      ]
+    },
+    {
+      "category": "contains",
+      "method": "contains",
+      "cases": [
+        { "value": "hello world", "testAgainst": "world", "negation": false, "expected": true, "note": "substring found" },
+        { "value": "hello world", "testAgainst": "WORLD", "negation": false, "expected": true, "note": "case-insensitive" },
+        { "value": "hello world", "testAgainst": "xyz", "negation": false, "expected": false, "note": "not found" },
+        { "value": "hello world", "testAgainst": "", "negation": false, "expected": true, "note": "empty always matches" },
+        { "value": "hello world", "testAgainst": "  ", "negation": false, "expected": true, "note": "whitespace always matches" },
+        { "value": "hello world", "testAgainst": "world", "negation": true, "expected": false, "note": "negated found" },
+        { "value": "hello world", "testAgainst": "xyz", "negation": true, "expected": true, "note": "negated not-found" }
+      ]
+    },
+    {
+      "category": "isIn",
+      "method": "isIn",
+      "cases": [
+        { "value": "a", "testAgainst": "a|b|c", "negation": false, "expected": true, "note": "single value in set" },
+        { "value": "d", "testAgainst": "a|b|c", "negation": false, "expected": false, "note": "value not in set" },
+        { "value": "a|c", "testAgainst": "a|b|c|d|e", "negation": false, "expected": true, "note": "multiple values in set" },
+        { "value": "A", "testAgainst": "a|b|c", "negation": false, "expected": true, "note": "case-insensitive" },
+        { "value": "a", "testAgainst": "a|b|c", "negation": true, "expected": false, "note": "negated in-set" },
+        { "value": "d", "testAgainst": "a|b|c", "negation": true, "expected": true, "note": "negated not-in-set" },
+        { "value": "phone", "testAgainst": "phone|tablet", "negation": false, "expected": true, "note": "device matching" }
+      ]
+    },
+    {
+      "category": "startsWith",
+      "method": "startsWith",
+      "cases": [
+        { "value": "hello world", "testAgainst": "hello", "negation": false, "expected": true, "note": "prefix match" },
+        { "value": "hello world", "testAgainst": "HELLO", "negation": false, "expected": true, "note": "case-insensitive" },
+        { "value": "hello world", "testAgainst": "world", "negation": false, "expected": false, "note": "not a prefix" },
+        { "value": "hello world", "testAgainst": "", "negation": false, "expected": true, "note": "empty prefix" },
+        { "value": "hello world", "testAgainst": "hello", "negation": true, "expected": false, "note": "negated prefix match" },
+        { "value": "hello world", "testAgainst": "world", "negation": true, "expected": true, "note": "negated non-prefix" }
+      ]
+    },
+    {
+      "category": "endsWith",
+      "method": "endsWith",
+      "cases": [
+        { "value": "hello world", "testAgainst": "world", "negation": false, "expected": true, "note": "suffix match" },
+        { "value": "hello world", "testAgainst": "WORLD", "negation": false, "expected": true, "note": "case-insensitive" },
+        { "value": "hello world", "testAgainst": "hello", "negation": false, "expected": false, "note": "not a suffix" },
+        { "value": "hello world", "testAgainst": "", "negation": false, "expected": true, "note": "empty suffix" },
+        { "value": "hello world", "testAgainst": "world", "negation": true, "expected": false, "note": "negated suffix match" },
+        { "value": "hello world", "testAgainst": "hello", "negation": true, "expected": true, "note": "negated non-suffix" }
+      ]
+    },
+    {
+      "category": "regexMatches",
+      "method": "regexMatches",
+      "cases": [
+        { "value": "user-42", "testAgainst": "^user-[0-9]+$", "negation": false, "expected": true, "note": "regex match" },
+        { "value": "admin-42", "testAgainst": "^user-[0-9]+$", "negation": false, "expected": false, "note": "regex no match" },
+        { "value": "test@email.com", "testAgainst": "^[a-zA-Z0-9.]+@[a-zA-Z0-9-]+\\.[a-zA-Z]+$", "negation": false, "expected": true, "note": "email regex" },
+        { "value": "orange", "testAgainst": "\\w+", "negation": false, "expected": true, "note": "word characters" },
+        { "value": "111222", "testAgainst": "\\d+", "negation": false, "expected": true, "note": "digits" },
+        { "value": "111222", "testAgainst": "\\d+", "negation": true, "expected": false, "note": "negated digits" },
+        { "value": "USER-42", "testAgainst": "^user-[0-9]+$", "negation": false, "expected": true, "note": "case-insensitive regex" }
+      ]
+    }
+  ],
+  "rule_evaluation": [
+    {
+      "category": "equals_operator",
+      "description": "AC #1: equals operator with country US",
+      "data": { "country": "US" },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "US",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "category": "regex_operator",
+      "description": "AC #2: regex operator matching user-42",
+      "data": { "username": "user-42" },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "regexMatches", "negated": false },
+                    "value": "^user-[0-9]+$",
+                    "key": "username"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "category": "and_group_partial",
+      "description": "AC #3: AND group with 3 rules, only 2 match",
+      "data": { "country": "US", "browser": "chrome", "device": "mobile" },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "US",
+                    "key": "country"
+                  }
+                ]
+              },
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "chrome",
+                    "key": "browser"
+                  }
+                ]
+              },
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "desktop",
+                    "key": "device"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": false
+    },
+    {
+      "category": "and_group_all_match",
+      "description": "AND group with 3 rules, all match",
+      "data": { "country": "US", "browser": "chrome", "device": "desktop" },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "US",
+                    "key": "country"
+                  }
+                ]
+              },
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "chrome",
+                    "key": "browser"
+                  }
+                ]
+              },
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "desktop",
+                    "key": "device"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "category": "or_group_single_match",
+      "description": "AC #4: OR group with 3 rules, only 1 matches",
+      "data": { "country": "US" },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "GB",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "US",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "DE",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "category": "or_group_none_match",
+      "description": "OR group with 3 rules, none match",
+      "data": { "country": "FR" },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "GB",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "US",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "DE",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": false
+    },
+    {
+      "category": "negation_operator",
+      "description": "Negated equals operator",
+      "data": { "country": "US" },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": true },
+                    "value": "GB",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "category": "missing_key",
+      "description": "AC #8: Key not in data returns false (no match)",
+      "data": { "browser": "chrome" },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "US",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": false
+    },
+    {
+      "category": "case_insensitive_keys",
+      "description": "Case-insensitive key matching",
+      "data": { "COUNTRY": "US" },
+      "keysCaseSensitive": false,
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "US",
+                    "key": "country"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "category": "or_when_first_match",
+      "description": "OR_WHEN returns on first match",
+      "data": { "device": "phone" },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "phone",
+                    "key": "device"
+                  },
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "tablet",
+                    "key": "device"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "category": "nested_hierarchy",
+      "description": "Full OR → AND → OR_WHEN hierarchy",
+      "data": { "device": "tablet", "browser": "safari", "age": 31 },
+      "ruleSet": {
+        "OR": [
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "isIn", "negated": false },
+                    "value": "phone|tablet",
+                    "key": "device"
+                  }
+                ]
+              },
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "equals", "negated": false },
+                    "value": "safari",
+                    "key": "browser"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "AND": [
+              {
+                "OR_WHEN": [
+                  {
+                    "rule_type": "generic_key_value",
+                    "matching": { "match_type": "less", "negated": true },
+                    "value": 30,
+                    "key": "age"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expected": true
+    },
+    {
+      "category": "empty_ruleset",
+      "description": "Empty data and empty rule set",
+      "data": {},
+      "ruleSet": {},
+      "expected": false
+    }
+  ]
+}

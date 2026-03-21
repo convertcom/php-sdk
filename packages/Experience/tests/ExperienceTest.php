@@ -85,8 +85,12 @@ class ExperienceManagerTest extends TestCase
         $this->projectId = $configuration['data']['project']['id'];
 
         // Instantiate managers with dependencies
-        $bucketingManager = new BucketingManager($config);
-        $ruleManager = new RuleManager($config);
+        $bucketingConfig = $config->getBucketing();
+        $bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $ruleManager = new RuleManager();
         $eventManager = new EventManager($config);
         $apiManager = new ApiManager($config, $eventManager);
         $loggerManager = new LogManager($config);
@@ -99,7 +103,7 @@ class ExperienceManagerTest extends TestCase
             $loggerManager
         );
 
-        $this->experienceManager = new ExperienceManager($config, ['dataManager' => $this->dataManager]);
+        $this->experienceManager = new ExperienceManager(dataManager: $this->dataManager);
     }
 
     /**

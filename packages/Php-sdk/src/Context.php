@@ -19,15 +19,10 @@ use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use ConvertSdk\Interfaces\ApiManagerInterface;
+use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\Exception\InvalidArgumentException;
 use OpenAPI\Client\Config;
-use OpenAPI\Client\BucketedVariation;
 use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\Model\VisitorSegments;
-use OpenAPI\Client\Entity;
-use OpenAPI\Client\Model\ConfigExperience;
-use OpenAPI\Client\Model\ExperienceVariationConfig;
-use OpenAPI\Client\StoreData;
 use ConvertSdk\Enums\BucketingError;
 use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\EntityType;
@@ -92,9 +87,9 @@ final class Context implements ContextInterface
      *
      * @param string $experienceKey An experience's key that should be activated
      * @param BucketingAttributes|null $attributes Attributes for the visitor
-     * @return BucketedVariation|RuleError|BucketingError|null
+     * @return BucketedVariation|null The bucketed variation DTO, or null for all non-success paths
      */
-    public function runExperience(string $experienceKey, ?BucketingAttributes $attributes = null)
+    public function runExperience(string $experienceKey, ?BucketingAttributes $attributes = null): ?BucketedVariation
     {
         if (empty($this->visitorId)) {
             $this->loggerManager?->error(
@@ -105,7 +100,7 @@ final class Context implements ContextInterface
         }
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
-        $bucketedVariation = $this->experienceManager->selectVariation(
+        $result = $this->experienceManager->selectVariation(
             $this->visitorId,
             $experienceKey,
             new BucketingAttributes([
@@ -116,35 +111,32 @@ final class Context implements ContextInterface
             ])
         );
 
-        if ($bucketedVariation instanceof RuleError) {
-            return $bucketedVariation;
+        if ($result === null
+            || $result instanceof RuleError
+            || $result === BucketingError::VariationNotDecided
+        ) {
+            return null;
         }
 
-        if (in_array($bucketedVariation, [BucketingError::VariationNotDecided], true)) {
-            return $bucketedVariation;
-        }
+        $this->eventManager->fire(
+            SystemEvents::Bucketing,
+            [
+                'visitorId' => $this->visitorId,
+                'experienceKey' => $experienceKey,
+                'variationKey' => $result['key'] ?? null
+            ],
+            null,
+            true
+        );
 
-        if ($bucketedVariation) {
-            $this->eventManager->fire(
-                SystemEvents::Bucketing,
-                [
-                    'visitorId' => $this->visitorId,
-                    'experienceKey' => $experienceKey,
-                    'variationKey' => $bucketedVariation['key'] ?? null
-                ],
-                null,
-                true
-            );
-        }
-
-        return $bucketedVariation;
+        return $this->mapToBucketedVariationDto($result);
     }
 
     /**
      * Get variations across all experiences.
      *
      * @param BucketingAttributes|null $attributes Attributes for the visitor
-     * @return array<int, BucketedVariation|RuleError|BucketingError> Array of bucketing results
+     * @return BucketedVariation[] Array of bucketed variation DTOs
      */
     public function runExperiences(?BucketingAttributes $attributes = null): array
     {
@@ -168,21 +160,11 @@ final class Context implements ContextInterface
             ])
         );
 
-        $matchedRuleErrors = array_filter($bucketedVariations, function ($match) {
-            return $match instanceof RuleError;
-        });
-        if (!empty($matchedRuleErrors)) {
-            return array_values($matchedRuleErrors);
-        }
-
-        $matchedBucketingErrors = array_filter($bucketedVariations, function ($match) {
-            return in_array($match, [BucketingError::VariationNotDecided], true);
-        });
-        if (!empty($matchedBucketingErrors)) {
-            return array_values($matchedBucketingErrors);
-        }
-
+        $dtos = [];
         foreach ($bucketedVariations as $variation) {
+            if (!is_array($variation)) {
+                continue;
+            }
             $this->eventManager->fire(
                 SystemEvents::Bucketing,
                 [
@@ -193,9 +175,10 @@ final class Context implements ContextInterface
                 null,
                 true
             );
+            $dtos[] = $this->mapToBucketedVariationDto($variation);
         }
 
-        return $bucketedVariations;
+        return $dtos;
     }
 
     /**
@@ -205,7 +188,7 @@ final class Context implements ContextInterface
      * @param BucketingAttributes|null $attributes Attributes for the visitor
      * @return mixed The bucketed feature result (BucketedFeature, RuleError, array, or null)
      */
-    public function runFeature(string $key, ?BucketingAttributes $attributes = null)
+    public function runFeature(string $key, ?BucketingAttributes $attributes = null): mixed
     {
         if (empty($this->visitorId)) {
             $this->loggerManager?->error(
@@ -443,6 +426,50 @@ final class Context implements ContextInterface
     }
 
     /**
+     * Set a single visitor attribute.
+     *
+     * @param string $key The attribute key
+     * @param mixed $value The attribute value
+     * @return void
+     */
+    public function setAttribute(string $key, mixed $value): void
+    {
+        $this->visitorProperties = $this->visitorProperties ?? [];
+        $this->visitorProperties[$key] = $value;
+    }
+
+    /**
+     * Set multiple visitor attributes at once (merges with existing).
+     *
+     * @param array<string, mixed> $attributes Key-value pairs of attributes
+     * @return void
+     */
+    public function setAttributes(array $attributes): void
+    {
+        $this->visitorProperties = array_merge($this->visitorProperties ?? [], $attributes);
+    }
+
+    /**
+     * Get all current visitor attributes.
+     *
+     * @return array<string, mixed> The current visitor attributes
+     */
+    public function getAttributes(): array
+    {
+        return $this->visitorProperties ?? [];
+    }
+
+    /**
+     * Get the visitor ID for this context.
+     *
+     * @return string The visitor ID
+     */
+    public function getVisitorId(): string
+    {
+        return $this->visitorId;
+    }
+
+    /**
      * Get config entity by key.
      *
      * @param string $key Entity key
@@ -537,5 +564,22 @@ final class Context implements ContextInterface
             ? ObjectUtils::objectDeepMerge($this->visitorProperties ?? [], $attributes)
             : $this->visitorProperties;
         return ObjectUtils::objectDeepMerge($segments, $visitorProperties ?? []);
+    }
+
+    /**
+     * Map internal bucketed variation array to consumer-facing readonly DTO.
+     *
+     * @param array<string, mixed> $variation The internal bucketed variation array from DataManager
+     * @return BucketedVariation The readonly consumer DTO
+     */
+    private function mapToBucketedVariationDto(array $variation): BucketedVariation
+    {
+        return new BucketedVariation(
+            experienceId: (string) ($variation['experienceId'] ?? ''),
+            experienceKey: (string) ($variation['experienceKey'] ?? ''),
+            variationId: (string) ($variation['id'] ?? ''),
+            variationKey: (string) ($variation['key'] ?? ''),
+            changes: (array) ($variation['changes'] ?? []),
+        );
     }
 }
