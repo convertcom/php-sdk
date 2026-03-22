@@ -398,8 +398,10 @@ final class DataManager implements DataManagerInterface
         $audiencesMatched = false;
         $segmentsMatched = false;
 
-        if ($visitorProperties) {
-            if (isset($experience['audiences']) && is_array($experience['audiences']) && count($experience['audiences']) > 0) {
+        if (isset($experience['audiences']) && is_array($experience['audiences']) && count($experience['audiences']) > 0) {
+            // In PHP, an empty array [] is falsy (unlike JS where {} is truthy).
+            // This check correctly requires non-empty visitorProperties to evaluate audience rules.
+            if ($visitorProperties) {
                 $audiences = $this->getItemsByIds($experience['audiences'], 'audiences');
                 $audiencesToCheck = array_filter(
                     $audiences,
@@ -434,16 +436,19 @@ final class DataManager implements DataManagerInterface
                         Messages::NON_PERMANENT_AUDIENCE_NOT_RESTRICTED
                     );
                 }
-            } else {
-                $audiencesMatched = true;
-                $this->_loggerManager?->info(
-                    'DataManager.matchRulesByField()',
-                    Messages::AUDIENCE_NOT_RESTRICTED
-                );
             }
+            // If visitorProperties is null/empty and experience has audiences,
+            // audiencesMatched stays false — can't evaluate without properties
+        } else {
+            // No audiences on experience — all visitors qualify
+            $audiencesMatched = true;
+            $this->_loggerManager?->info(
+                'DataManager.matchRulesByField()',
+                Messages::AUDIENCE_NOT_RESTRICTED
+            );
         }
 
-        $segments = $this->getItemsByIds($experience['audiences'], 'segments');
+        $segments = $this->getItemsByIds($experience['audiences'] ?? [], 'segments');
         if (count($segments) > 0) {
             $matchedSegments = $this->filterMatchedCustomSegments($segments, $visitorId);
             if (count($matchedSegments) > 0) {

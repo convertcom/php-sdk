@@ -18,11 +18,16 @@ use ConvertSdk\Exception\InvalidArgumentException;
 use Http\Discovery\ClassDiscovery;
 use Http\Discovery\Strategy\MockClientStrategy;
 use OpenAPI\Client\BucketingAttributes;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class FullChainIntegrationTest extends TestCase
 {
-    private Core $sdk;
+    private const EXPERIENCE_KEY = 'test-experience-ab-fullstack-4';
+    private const FEATURE_TYPED_KEY = 'feature-2';
+    private const FEATURE_BASIC_KEY = 'feature-1';
+    private const GOAL_KEY = 'increase-engagement';
+
     private BucketingAttributes $qualifyingAttributes;
     private array $configData;
     private string $environment;
@@ -30,6 +35,10 @@ class FullChainIntegrationTest extends TestCase
     /** @var string[] */
     private static array $originalStrategies;
 
+    /**
+     * MockClientStrategy toggling uses ClassDiscovery global static state.
+     * Not safe for parallel test runners (e.g., paratest).
+     */
     public static function setUpBeforeClass(): void
     {
         /** @var string[] $strategies */
@@ -43,51 +52,85 @@ class FullChainIntegrationTest extends TestCase
         ClassDiscovery::setStrategies(self::$originalStrategies);
     }
 
-    private function sdkCreateOptions(array $overrides = []): array
+    public static function authModes(): array
     {
-        return array_merge([
+        return [
+            'static' => ['static'],
+            'live' => ['live'],
+        ];
+    }
+
+    private function skipIfLiveDisabled(string $mode): void
+    {
+        if ($mode === 'live' && !getenv('CONVERT_STAGING_SDK_KEY')) {
+            $this->markTestSkipped('Live tests require CONVERT_STAGING_SDK_KEY env var');
+        }
+    }
+
+    private function createSdk(string $mode, array $overrides = []): Core
+    {
+        if ($mode === 'live') {
+            // Restore real HTTP strategies for live CDN fetch
+            ClassDiscovery::setStrategies(self::$originalStrategies);
+            try {
+                return ConvertSDK::create(array_merge([
+                    'sdkKey' => getenv('CONVERT_STAGING_SDK_KEY'),
+                    'environment' => 'staging',
+                    'network' => ['tracking' => false, 'cacheLevel' => 'low'],
+                ], $overrides));
+            } finally {
+                // Re-add mock strategy for subsequent static tests
+                ClassDiscovery::prependStrategy(MockClientStrategy::class);
+            }
+        }
+        // Static mode
+        return ConvertSDK::create(array_merge([
             'data' => $this->configData,
             'environment' => $this->environment,
             'network' => ['tracking' => false],
-        ], $overrides);
+        ], $overrides));
     }
 
-    private function createTrackingEnabledSdk(): Core
+    private function createTrackingEnabledSdk(string $mode): Core
     {
-        return ConvertSDK::create($this->sdkCreateOptions([
-            'network' => ['tracking' => true],
-        ]));
+        return $this->createSdk($mode, [
+            'network' => ($mode === 'live')
+                ? ['tracking' => true, 'cacheLevel' => 'low']
+                : ['tracking' => true],
+        ]);
     }
 
     protected function setUp(): void
     {
-        $json = file_get_contents(__DIR__ . '/../../packages/Php-sdk/tests/test-config.json');
-        $config = json_decode($json, true);
-        $this->configData = $config['data'];
-        $this->environment = $config['environment'];
+        $json = file_get_contents(__DIR__ . '/static-config.json');
+        $this->configData = json_decode($json, true);
+        $this->environment = 'staging';
 
-        $this->sdk = ConvertSDK::create($this->sdkCreateOptions());
-
+        // Experience -4 uses pricing-location (rule: location=pricing), no audiences
         $this->qualifyingAttributes = new BucketingAttributes([
-            'locationProperties' => ['url' => 'https://convert.com/'],
-            'visitorProperties' => ['varName3' => 'something'],
+            'locationProperties' => ['location' => 'pricing'],
             'typeCasting' => true,
         ]);
     }
 
-    // ── Happy Path ──────────────────────────────────────────────────
+    // -- Happy Path --------------------------------------------------------
 
-    public function testSdkInitializesAndIsReady(): void
+    #[DataProvider('authModes')]
+    public function testSdkInitializesAndIsReady(string $mode): void
     {
-        $this->assertInstanceOf(Core::class, $this->sdk);
-        $this->assertTrue($this->sdk->isReady());
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createSdk($mode);
+        $this->assertInstanceOf(Core::class, $sdk);
+        $this->assertTrue($sdk->isReady());
     }
 
-    public function testReadyEventFiredOnInit(): void
+    #[DataProvider('authModes')]
+    public function testReadyEventFiredOnInit(string $mode): void
     {
+        $this->skipIfLiveDisabled($mode);
         $events = [];
 
-        $sdk = ConvertSDK::create($this->sdkCreateOptions());
+        $sdk = $this->createSdk($mode);
 
         // Deferred event: listener attached after create() still receives the Ready event
         $sdk->on('ready', function ($args, $err) use (&$events) {
@@ -98,27 +141,33 @@ class FullChainIntegrationTest extends TestCase
         $this->assertNull($events[0]['err'], 'Ready event should have no error');
     }
 
-    public function testCreateContextAndRunExperience(): void
+    #[DataProvider('authModes')]
+    public function testCreateContextAndRunExperience(string $mode): void
     {
-        $context = $this->sdk->createContext('visitor-integration-test', null);
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createSdk($mode);
+        $context = $sdk->createContext('visitor-integration-test', null);
         $this->assertNotNull($context);
 
-        $result = $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+        $result = $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
 
         $this->assertInstanceOf(BucketedVariation::class, $result);
-        $this->assertSame('test-experience-ab-fullstack-2', $result->experienceKey);
-        $this->assertNotEmpty($result->variationId, 'variationId should be non-empty');
+        $this->assertSame(self::EXPERIENCE_KEY, $result->experienceKey);
+        $this->assertContains($result->variationId, ['1003180877', '1003180878']);
         $this->assertNotEmpty($result->variationKey, 'variationKey should be non-empty');
         $this->assertNotEmpty($result->changes);
     }
 
-    public function testBucketingDeterminism(): void
+    #[DataProvider('authModes')]
+    public function testBucketingDeterminism(string $mode): void
     {
-        $context = $this->sdk->createContext('determinism-visitor', null);
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createSdk($mode);
+        $context = $sdk->createContext('determinism-visitor', null);
         $results = [];
 
         for ($i = 0; $i < 10; $i++) {
-            $variation = $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+            $variation = $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
             $this->assertNotNull($variation);
             $results[] = $variation->variationId;
         }
@@ -127,28 +176,34 @@ class FullChainIntegrationTest extends TestCase
         $this->assertCount(1, $unique, 'Same visitor must always get the same variation');
     }
 
-    public function testBucketingEventFiredOnExperience(): void
+    #[DataProvider('authModes')]
+    public function testBucketingEventFiredOnExperience(string $mode): void
     {
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createSdk($mode);
         $bucketingEvents = [];
 
-        $this->sdk->on('bucketing', function ($args, $err) use (&$bucketingEvents) {
+        $sdk->on('bucketing', function ($args, $err) use (&$bucketingEvents) {
             $bucketingEvents[] = ['args' => $args, 'err' => $err];
         });
 
-        $context = $this->sdk->createContext('event-spy-visitor', null);
-        $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+        $context = $sdk->createContext('event-spy-visitor', null);
+        $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
 
         $this->assertNotEmpty($bucketingEvents, 'Bucketing event should fire when running an experience');
     }
 
-    public function testRunFeatureWithTypedVariables(): void
+    #[DataProvider('authModes')]
+    public function testRunFeatureWithTypedVariables(string $mode): void
     {
-        $context = $this->sdk->createContext('feature-typed-visitor', null);
-        $result = $context->runFeature('feature-2', $this->qualifyingAttributes);
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createSdk($mode);
+        $context = $sdk->createContext('feature-typed-visitor', null);
+        $result = $context->runFeature(self::FEATURE_TYPED_KEY, $this->qualifyingAttributes);
 
         $this->assertInstanceOf(BucketedFeature::class, $result);
         $this->assertSame(FeatureStatus::Enabled, $result->status);
-        $this->assertSame('feature-2', $result->featureKey);
+        $this->assertSame(self::FEATURE_TYPED_KEY, $result->featureKey);
 
         // Verify typed variables
         $this->assertIsFloat($result->variables['price']);
@@ -161,10 +216,12 @@ class FullChainIntegrationTest extends TestCase
         $this->assertSame(2, $additionalData['v']);
     }
 
-    public function testFullChainInitContextBucketFeatureVerify(): void
+    #[DataProvider('authModes')]
+    public function testFullChainInitContextBucketFeatureVerify(string $mode): void
     {
+        $this->skipIfLiveDisabled($mode);
         // Init
-        $sdk = ConvertSDK::create($this->sdkCreateOptions());
+        $sdk = $this->createSdk($mode);
         $this->assertTrue($sdk->isReady());
 
         // Attach event spies
@@ -183,11 +240,11 @@ class FullChainIntegrationTest extends TestCase
         $this->assertNotNull($context);
 
         // Bucket
-        $variation = $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+        $variation = $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
         $this->assertInstanceOf(BucketedVariation::class, $variation);
 
         // Feature
-        $feature = $context->runFeature('feature-1', $this->qualifyingAttributes);
+        $feature = $context->runFeature(self::FEATURE_BASIC_KEY, $this->qualifyingAttributes);
         $this->assertInstanceOf(BucketedFeature::class, $feature);
         $this->assertSame(FeatureStatus::Enabled, $feature->status);
 
@@ -196,12 +253,12 @@ class FullChainIntegrationTest extends TestCase
         $this->assertNotEmpty($bucketingEvents, 'Bucketing events should fire for experience and feature runs');
 
         // Verify determinism: re-run same experience, expect same variationId
-        $secondRun = $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+        $secondRun = $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
         $this->assertNotNull($secondRun);
         $this->assertSame($variation->variationId, $secondRun->variationId);
     }
 
-    // ── Negative Paths ──────────────────────────────────────────────
+    // -- Negative Paths ----------------------------------------------------
 
     public function testCreateWithoutSdkKeyOrDataThrows(): void
     {
@@ -209,31 +266,55 @@ class FullChainIntegrationTest extends TestCase
         ConvertSDK::create([]);
     }
 
-    public function testRunFeatureWithUnknownKeyReturnsNull(): void
+    #[DataProvider('authModes')]
+    public function testRunFeatureWithUnknownKeyReturnsNull(string $mode): void
     {
-        $context = $this->sdk->createContext('null-feature-visitor', null);
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createSdk($mode);
+        $context = $sdk->createContext('null-feature-visitor', null);
         $result = $context->runFeature('completely-nonexistent-feature-key', $this->qualifyingAttributes);
         $this->assertNull($result);
     }
 
-    public function testRunExperienceWithNonQualifyingVisitorReturnsNull(): void
+    #[DataProvider('authModes')]
+    public function testRunExperienceWithNonQualifyingVisitorReturnsNull(string $mode): void
     {
-        $context = $this->sdk->createContext('non-qualifying-visitor', null);
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createSdk($mode);
+        $context = $sdk->createContext('non-qualifying-visitor', null);
 
         $nonQualifyingAttributes = new BucketingAttributes([
-            'locationProperties' => ['url' => 'https://wrong-url.com/'],
-            'visitorProperties' => [],
+            'locationProperties' => ['location' => 'nonexistent'],
         ]);
 
-        $result = $context->runExperience('test-experience-ab-fullstack-2', $nonQualifyingAttributes);
+        $result = $context->runExperience(self::EXPERIENCE_KEY, $nonQualifyingAttributes);
         $this->assertNull($result);
     }
 
-    // ── Conversion Tracking ─────────────────────────────────────────
-
-    public function testTrackConversionForGoalWithoutRules(): void
+    #[DataProvider('authModes')]
+    public function testRunExperienceWithAudienceAndNoVisitorPropertiesReturnsNull(string $mode): void
     {
-        $sdk = $this->createTrackingEnabledSdk();
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createSdk($mode);
+        $context = $sdk->createContext('audience-no-props-visitor', null);
+
+        // Experience -1 has audience adv-audience (desktop=true AND browser!="CH" OR mobile=true).
+        // Omitting visitorProperties means audience rules can't be evaluated → null.
+        $locationOnlyAttributes = new BucketingAttributes([
+            'locationProperties' => ['location' => 'pricing'],
+        ]);
+
+        $result = $context->runExperience('test-experience-ab-fullstack-1', $locationOnlyAttributes);
+        $this->assertNull($result, 'Experience with audiences should return null when visitorProperties is not provided');
+    }
+
+    // -- Conversion Tracking -----------------------------------------------
+
+    #[DataProvider('authModes')]
+    public function testTrackConversion(string $mode): void
+    {
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createTrackingEnabledSdk($mode);
 
         $queueReleasedEvents = [];
         $sdk->on(SystemEvents::ApiQueueReleased->value, function ($args) use (&$queueReleasedEvents) {
@@ -241,17 +322,19 @@ class FullChainIntegrationTest extends TestCase
         });
 
         $context = $sdk->createContext('tracking-visitor-basic');
-        $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+        $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
 
-        $result = $context->trackConversion('goal-without-rule');
+        $result = $context->trackConversion(self::GOAL_KEY);
 
         $this->assertNull($result, 'trackConversion should return null on success');
         $this->assertNotEmpty($queueReleasedEvents, 'ApiQueueReleased should fire (tracking POST sent)');
     }
 
-    public function testConversionEventFiredOnTrackConversion(): void
+    #[DataProvider('authModes')]
+    public function testConversionEventFiredOnTrackConversion(string $mode): void
     {
-        $sdk = $this->createTrackingEnabledSdk();
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createTrackingEnabledSdk($mode);
 
         $conversionEvents = [];
         $sdk->on(SystemEvents::Conversion->value, function ($args) use (&$conversionEvents) {
@@ -259,17 +342,19 @@ class FullChainIntegrationTest extends TestCase
         });
 
         $context = $sdk->createContext('tracking-visitor-event');
-        $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
-        $context->trackConversion('goal-without-rule');
+        $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
+        $context->trackConversion(self::GOAL_KEY);
 
         $this->assertCount(1, $conversionEvents, 'Conversion event should fire exactly once');
         $this->assertSame('tracking-visitor-event', $conversionEvents[0]['visitorId']);
-        $this->assertSame('goal-without-rule', $conversionEvents[0]['goalKey']);
+        $this->assertSame(self::GOAL_KEY, $conversionEvents[0]['goalKey']);
     }
 
-    public function testGoalDeduplication(): void
+    #[DataProvider('authModes')]
+    public function testGoalDeduplication(string $mode): void
     {
-        $sdk = $this->createTrackingEnabledSdk();
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createTrackingEnabledSdk($mode);
 
         $queueReleasedEvents = [];
         $sdk->on(SystemEvents::ApiQueueReleased->value, function ($args) use (&$queueReleasedEvents) {
@@ -277,22 +362,24 @@ class FullChainIntegrationTest extends TestCase
         });
 
         $context = $sdk->createContext('tracking-visitor-dedup');
-        $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+        $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
 
         // First call — should enqueue and release
-        $context->trackConversion('goal-without-rule');
+        $context->trackConversion(self::GOAL_KEY);
         $countAfterFirst = count($queueReleasedEvents);
         $this->assertGreaterThan(0, $countAfterFirst, 'First conversion should trigger API queue release');
 
         // Second call — deduplicated, no new enqueue or release
-        $secondResult = $context->trackConversion('goal-without-rule');
+        $secondResult = $context->trackConversion(self::GOAL_KEY);
         $this->assertNull($secondResult, 'Deduplicated conversion should still return null (same as first call)');
         $this->assertCount($countAfterFirst, $queueReleasedEvents, 'Second conversion should be deduplicated (no new API queue release)');
     }
 
-    public function testTrackConversionWithRevenue(): void
+    #[DataProvider('authModes')]
+    public function testTrackConversionWithRevenue(string $mode): void
     {
-        $sdk = $this->createTrackingEnabledSdk();
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createTrackingEnabledSdk($mode);
 
         $queueReleasedEvents = [];
         $sdk->on(SystemEvents::ApiQueueReleased->value, function ($args) use (&$queueReleasedEvents) {
@@ -300,9 +387,9 @@ class FullChainIntegrationTest extends TestCase
         });
 
         $context = $sdk->createContext('tracking-visitor-revenue');
-        $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+        $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
 
-        $result = $context->trackConversion('goal-without-rule', new ConversionAttributes(
+        $result = $context->trackConversion(self::GOAL_KEY, new ConversionAttributes(
             conversionData: [
                 new GoalData(GoalDataKey::Amount, 49.99),
                 new GoalData(GoalDataKey::TransactionId, 'txn-integration-001'),
@@ -318,9 +405,11 @@ class FullChainIntegrationTest extends TestCase
         $this->assertArrayHasKey('visitors', $lastEvent);
     }
 
-    public function testForceMultipleTransactions(): void
+    #[DataProvider('authModes')]
+    public function testForceMultipleTransactions(string $mode): void
     {
-        $sdk = $this->createTrackingEnabledSdk();
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createTrackingEnabledSdk($mode);
 
         $queueReleasedEvents = [];
         $sdk->on(SystemEvents::ApiQueueReleased->value, function ($args) use (&$queueReleasedEvents) {
@@ -328,17 +417,17 @@ class FullChainIntegrationTest extends TestCase
         });
 
         $context = $sdk->createContext('tracking-visitor-force');
-        $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+        $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
 
         // First call with goalData: conversion + transaction = 2 enqueues
-        $context->trackConversion('goal-without-rule', new ConversionAttributes(
+        $context->trackConversion(self::GOAL_KEY, new ConversionAttributes(
             conversionData: [new GoalData(GoalDataKey::Amount, 25.00)],
         ));
         $countAfterFirst = count($queueReleasedEvents);
         $this->assertGreaterThanOrEqual(2, $countAfterFirst, 'First revenue conversion should trigger at least 2 releases');
 
         // Second call with forceMultipleTransactions: transaction event should still be sent
-        $context->trackConversion('goal-without-rule', new ConversionAttributes(
+        $context->trackConversion(self::GOAL_KEY, new ConversionAttributes(
             conversionData: [new GoalData(GoalDataKey::Amount, 25.00)],
             conversionSetting: [ConversionSettingKey::ForceMultipleTransactions->value => true],
         ));
@@ -354,26 +443,31 @@ class FullChainIntegrationTest extends TestCase
         $this->assertArrayHasKey('goalData', $lastEvent['data'] ?? [], 'Forced repeat release should contain a transaction event with goalData');
     }
 
-    public function testTrackConversionWithNonexistentGoalReturnsFalse(): void
+    #[DataProvider('authModes')]
+    public function testTrackConversionWithNonexistentGoalReturnsFalse(string $mode): void
     {
+        $this->skipIfLiveDisabled($mode);
+        $sdk = $this->createSdk($mode);
         $conversionEvents = [];
-        $this->sdk->on(SystemEvents::Conversion->value, function ($args) use (&$conversionEvents) {
+        $sdk->on(SystemEvents::Conversion->value, function ($args) use (&$conversionEvents) {
             $conversionEvents[] = $args;
         });
 
-        $context = $this->sdk->createContext('tracking-visitor-fake-goal');
+        $context = $sdk->createContext('tracking-visitor-fake-goal');
         $result = $context->trackConversion('totally-fake-goal');
 
         $this->assertFalse($result, 'Non-existent goal should return false');
         $this->assertEmpty($conversionEvents, 'No conversion event should fire for non-existent goal');
     }
 
-    // ── Complete Chain ──────────────────────────────────────────────
+    // -- Complete Chain ----------------------------------------------------
 
-    public function testCompleteChainInitThroughFlush(): void
+    #[DataProvider('authModes')]
+    public function testCompleteChainInitThroughFlush(string $mode): void
     {
+        $this->skipIfLiveDisabled($mode);
         // Init with tracking enabled
-        $sdk = $this->createTrackingEnabledSdk();
+        $sdk = $this->createTrackingEnabledSdk($mode);
         $this->assertTrue($sdk->isReady());
 
         // Attach event spies
@@ -400,20 +494,19 @@ class FullChainIntegrationTest extends TestCase
         $this->assertNotNull($context);
 
         // Bucket — runExperience
-        $variation = $context->runExperience('test-experience-ab-fullstack-2', $this->qualifyingAttributes);
+        $variation = $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
         $this->assertInstanceOf(BucketedVariation::class, $variation);
 
         // Feature — runFeature
-        $feature = $context->runFeature('feature-1', $this->qualifyingAttributes);
+        $feature = $context->runFeature(self::FEATURE_BASIC_KEY, $this->qualifyingAttributes);
         $this->assertInstanceOf(BucketedFeature::class, $feature);
         $this->assertSame(FeatureStatus::Enabled, $feature->status);
 
         // Track — conversion
-        $result = $context->trackConversion('goal-without-rule');
+        $result = $context->trackConversion(self::GOAL_KEY);
         $this->assertNull($result, 'trackConversion should return null on success');
 
         // Flush — release any remaining queue items (may be no-op if auto-released on enqueue)
-        $releasedBeforeFlush = count($queueReleasedEvents);
         $sdk->flush();
         // flush() is called for completeness; with tracking=true, enqueue auto-releases,
         // so flush may find an empty queue — either way the chain is exercised without error.
