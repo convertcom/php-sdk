@@ -123,7 +123,6 @@ final class DataManager implements DataManagerInterface
     /**
      * Flag indicating if storage is asynchronous.
      */
-    private bool $_asyncStorage;
 
     /**
      * Environment string.
@@ -144,7 +143,6 @@ final class DataManager implements DataManagerInterface
      * @param EventManagerInterface $eventManager
      * @param ApiManagerInterface $apiManager
      * @param LogManagerInterface|null $loggerManager
-     * @param bool $asyncStorage
      */
     public function __construct(
         Config $config,
@@ -153,7 +151,6 @@ final class DataManager implements DataManagerInterface
         EventManagerInterface $eventManager,
         ApiManagerInterface $apiManager,
         ?LogManagerInterface $loggerManager = null,
-        bool $asyncStorage = true
     ) {
         $this->_environment = $config->getEnvironment();
         $this->_apiManager = $apiManager;
@@ -164,12 +161,15 @@ final class DataManager implements DataManagerInterface
         $this->_config = $config;
         $mapper = $config->getMapper();
         $this->_mapper = $mapper instanceof \Closure ? $mapper : ($mapper !== null ? \Closure::fromCallable($mapper) : fn ($value) => $value);
-        $this->_asyncStorage = $asyncStorage;
         $this->_data = $config->getData() ?? new ConfigResponseData();
         $this->_accountId = $this->_data ? $this->_data->getAccountId() : '';
         $project = $this->_data ? $this->_data->getProject() : null;
         $this->_projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
-        $this->_dataStoreManager = $config->getDataStore();
+        $this->_dataStoreManager = null;
+        $rawDataStore = $config->getDataStore();
+        if ($rawDataStore !== null) {
+            $this->setDataStore($rawDataStore);
+        }
         $this->_dataEntities = DataEntities::DATA_ENTITIES;
         $this->_loggerManager?->trace(
             'DataManager()',
@@ -841,17 +841,9 @@ final class DataManager implements DataManagerInterface
                     $mergedData = ObjectUtils::objectDeepMerge($dataWithoutSegments, [
                         'segments' => array_merge($reportSegments, $newSegments),
                     ]);
-                    if ($this->_asyncStorage) {
-                        $this->_dataStoreManager->enqueue($storeKey, $mergedData);
-                    } else {
-                        $this->_dataStoreManager->set($storeKey, $mergedData);
-                    }
+                    $this->_dataStoreManager->set($storeKey, $mergedData);
                 } else {
-                    if ($this->_asyncStorage) {
-                        $this->_dataStoreManager->enqueue($storeKey, $updatedData);
-                    } else {
-                        $this->_dataStoreManager->set($storeKey, $updatedData);
-                    }
+                    $this->_dataStoreManager->set($storeKey, $updatedData);
                 }
             }
         }

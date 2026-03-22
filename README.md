@@ -10,6 +10,7 @@ Bucket visitors into experiment variations, resolve feature flags with typed var
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
+- [Data Persistence](#data-persistence)
 - [Visitor Context](#visitor-context)
 - [Experience Bucketing](#experience-bucketing)
 - [Feature Flags](#feature-flags)
@@ -153,6 +154,8 @@ $sdk = ConvertSDK::create([
 
 Pass any PSR-16 `CacheInterface`. When omitted, an in-memory `ArrayCache` is used (no persistence between requests).
 
+**Important:** The PSR-16 cache also serves as the visitor data store. When you provide a persistent cache (Redis, Memcached, filesystem), the SDK automatically persists visitor bucketing decisions across HTTP requests. This enables conversion tracking in later requests to be correctly attributed to experiment variations. See [Data Persistence](#data-persistence) for details.
+
 ### Full configuration options
 
 ```php
@@ -160,13 +163,76 @@ $sdk = ConvertSDK::create([
     'sdkKey'              => 'your-sdk-key',     // SDK key for remote config
     'data'                => [...],               // Direct config data (alternative to sdkKey)
     'logger'              => $logger,             // PSR-3 LoggerInterface
-    'cache'               => $cache,              // PSR-16 CacheInterface
+    'cache'               => $cache,              // PSR-16 CacheInterface (also used for visitor data persistence)
+    'dataStore'           => $customStore,        // Custom data store (overrides cache for visitor data)
     'dataRefreshInterval' => 300000,              // Config cache TTL in milliseconds (default: 300000 = 5 min)
     'environment'         => 'production',        // Environment targeting
 ]);
 ```
 
 You must provide either `sdkKey` or `data`. If both are missing, an `InvalidArgumentException` is thrown.
+
+## Data Persistence
+
+Unlike browser-based SDKs (where `localStorage` persists visitor state automatically), PHP scripts are short-lived — each HTTP request starts fresh. For conversion tracking to work across requests (e.g., bucketing on page 1, purchase on page 3), the SDK needs persistent storage for visitor bucketing decisions.
+
+### How it works
+
+The SDK uses the PSR-16 cache for two purposes:
+
+1. **Config caching** — caches project configuration fetched from the Convert CDN
+2. **Visitor data store** — persists bucketing decisions and goal deduplication state
+
+When you provide a persistent PSR-16 cache (Redis, Memcached, filesystem, database), both work automatically. The default in-memory `ArrayCache` does not persist between requests.
+
+### Example: Redis-backed persistence
+
+```php
+use ConvertSdk\ConvertSDK;
+use Symfony\Component\Cache\Psr16Cache;
+use Symfony\Component\Cache\Adapter\RedisAdapter;
+
+$cache = new Psr16Cache(RedisAdapter::createConnection('redis://localhost'));
+
+$sdk = ConvertSDK::create([
+    'sdkKey' => 'your-sdk-key',
+    'cache'  => $cache,
+]);
+
+// Request 1: Visitor is bucketed
+$context = $sdk->createContext('visitor-123', ['country' => 'US']);
+$variation = $context->runExperience('homepage-redesign');
+// Bucketing decision is persisted to Redis
+
+// --- later, in a separate HTTP request ---
+
+// Request 2: Conversion is attributed to the correct variation
+$context = $sdk->createContext('visitor-123');
+$context->trackConversion('purchase-completed');
+// SDK retrieves bucketing from Redis → conversion is linked to the variation
+```
+
+### Visitor ID continuity
+
+The SDK identifies visitors by the `$visitorId` you pass to `createContext()`. You are responsible for providing the same ID across requests. Common approaches:
+
+- **Session ID** — `session_id()` (works for web apps with PHP sessions)
+- **Cookie** — a persistent cookie with a unique visitor token
+- **Authenticated user ID** — for logged-in users
+
+### Custom data store
+
+If you need a separate storage backend for visitor data (distinct from config caching), pass a `dataStore` option. Any object with `get(string $key): mixed` and `set(string $key, mixed $value): void` methods works:
+
+```php
+$sdk = ConvertSDK::create([
+    'sdkKey'    => 'your-sdk-key',
+    'cache'     => $configCache,      // Used for config caching only
+    'dataStore' => $visitorStore,     // Used for visitor data persistence
+]);
+```
+
+When `dataStore` is provided, it takes precedence over `cache` for visitor data.
 
 ## Visitor Context
 

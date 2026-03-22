@@ -29,8 +29,6 @@ class ApiManagerTest extends TestCase
 
     private const HOST = 'http://localhost';
     private const PORT = 8090;
-    private const RELEASE_TIMEOUT = 1000; // in milliseconds
-    private const TEST_TIMEOUT = self::RELEASE_TIMEOUT + 1000;
     private const BATCH_SIZE = 5;
 
     /**
@@ -57,7 +55,6 @@ class ApiManagerTest extends TestCase
             ],
             'events' => [
                 'batch_size' => self::BATCH_SIZE,
-                'release_interval' => self::RELEASE_TIMEOUT,
             ],
             'mapper' => null, // Ensure no invalid mapper value
         ];
@@ -77,7 +74,6 @@ class ApiManagerTest extends TestCase
             $this->psr17Factory,
             $this->psr17Factory
         );
-        $this->apiManager->setTimeoutEnabled(false);
     }
 
     /**
@@ -147,14 +143,6 @@ class ApiManagerTest extends TestCase
     }
 
     /**
-     * Test that N enqueued requests are released before timeout.
-     */
-    public function testEnqueueAndReleaseBeforeTimeout(): void
-    {
-        $this->markTestSkipped('Timeout-based tests require an event loop or manual simulation in PHP.');
-    }
-
-    /**
      * Test that batch_size enqueued requests are released immediately due to size limit.
      */
     public function testEnqueueAndReleaseOnBatchSize(): void
@@ -185,7 +173,6 @@ class ApiManagerTest extends TestCase
      */
     public function testEventFiringOnReleaseDueToSize(): void
     {
-        $this->apiManager->setTimeoutEnabled(false);
 
         $requestData = new VisitorTrackingEvents([
             'eventType' => 'bucketing',
@@ -219,19 +206,10 @@ class ApiManagerTest extends TestCase
     }
 
     /**
-     * Test that an event is fired when queue is released due to timeout.
-     */
-    public function testEventFiringOnReleaseDueToTimeout(): void
-    {
-        $this->markTestSkipped('Timeout-based tests require an event loop or manual simulation in PHP.');
-    }
-
-    /**
      * Test that an event is fired when queue is released with network error after all retries.
      */
     public function testEventFiringOnReleaseWithError(): void
     {
-        $this->apiManager->setTimeoutEnabled(false);
 
         $requestData = new VisitorTrackingEvents([
             'eventType' => 'bucketing',

@@ -32,7 +32,6 @@ final class DefaultConfig
             'dataRefreshInterval' => 300000, // in milliseconds (5 minutes)
             'events' => [
                 'batch_size' => 10,
-                'release_interval' => 1000,
             ],
             'logger' => [
                 'logLevel' => LogLevel::Debug,
