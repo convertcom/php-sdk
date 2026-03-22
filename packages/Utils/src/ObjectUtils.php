@@ -48,8 +48,8 @@ class ObjectUtils
                     if ($isAssoc($pVal) && $isAssoc($oVal)) {
                         $result[$key] = self::objectDeepMerge($pVal, $oVal);
                     } else {
-                        // Preserve numeric arrays without converting to associative ones
-                        $result[$key] = array_merge($pVal, $oVal);
+                        // Merge numeric arrays and deduplicate (mirrors JS SDK's Set behavior)
+                        $result[$key] = array_values(array_unique(array_merge($oVal, $pVal)));
                     }
                 } elseif (is_array($oVal)) {
                     $result[$key] = $oVal;

@@ -167,7 +167,7 @@ class RuleObject implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $attributeMap = [
-        'or' => 'OR'
+        'OR' => 'OR'
     ];
 
     /**

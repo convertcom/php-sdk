@@ -442,12 +442,15 @@ final class Context implements ContextInterface
             return null;
         }
         $segmentsRule = $this->getVisitorProperties($attributes['ruleData'] ?? null);
-        $error = $this->segmentsManager->selectCustomSegments(
+        $result = $this->segmentsManager->selectCustomSegments(
             $this->visitorId,
             $segmentKeys,
             $segmentsRule
         );
-        return $error->getCustomSegments() ? $error->getCustomSegments() : null;
+        if ($result === null || $result instanceof RuleError) {
+            return null;
+        }
+        return $result->getCustomSegments() ?: null;
     }
 
     /**

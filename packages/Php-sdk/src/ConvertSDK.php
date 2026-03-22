@@ -44,7 +44,7 @@ final class ConvertSDK
      * @param array{
      *     sdkKey?: string,
      *     data?: array<string, mixed>|ConfigResponseData,
-     *     logger?: LoggerInterface,
+     *     logger?: array{logLevel?: LogLevel, customLoggers?: array<LoggerInterface|array{logger: LoggerInterface, logLevel?: LogLevel}>},
      *     cache?: CacheInterface,
      *     dataStore?: object,
      *     dataRefreshInterval?: int,
@@ -66,8 +66,10 @@ final class ConvertSDK
 
         // 2. Merge defaults
         $configuration = Config::create($config);
-        if (!isset($configuration['network']['source'])) {
-            $configuration['network']['source'] = getenv('VERSION') ?: 'php-sdk';
+        // Allow VERSION env var to override network.source (for CI/release builds)
+        $version = getenv('VERSION');
+        if ($version !== false && $version !== '') {
+            $configuration['network']['source'] = $version;
         }
 
         // Remove empty sdkKey so OpenAPI\Client\Config processes 'data' correctly
@@ -76,12 +78,21 @@ final class ConvertSDK
             unset($configuration['sdkKey']);
         }
 
-        // 3. Resolve PSR-3 logger (accepts a single PSR-3 LoggerInterface instance)
-        $logger = (isset($config['logger']) && $config['logger'] instanceof LoggerInterface)
-            ? $config['logger']
-            : new NullLogger();
+        // 3. Resolve logger (mirrors JS SDK: logger.logLevel + logger.customLoggers[])
+        $loggerConfig = is_array($configuration['logger'] ?? null) ? $configuration['logger'] : [];
+        $logLevel = $loggerConfig['logLevel'] ?? LogLevel::Warn;
+        $logManager = new LogManager(new NullLogger(), $logLevel);
 
-        $logManager = new LogManager($logger, LogLevel::Warn);
+        // Add custom loggers — each entry is either a PSR-3 LoggerInterface
+        // or an array {logger: LoggerInterface, logLevel?: LogLevel}
+        $customLoggers = $loggerConfig['customLoggers'] ?? [];
+        foreach ($customLoggers as $entry) {
+            if ($entry instanceof LoggerInterface) {
+                $logManager->addClient($entry, $logLevel);
+            } elseif (is_array($entry) && isset($entry['logger']) && $entry['logger'] instanceof LoggerInterface) {
+                $logManager->addClient($entry['logger'], $entry['logLevel'] ?? $logLevel);
+            }
+        }
 
         // 4. Resolve PSR-16 cache
         $cache = (isset($configuration['cache']) && $configuration['cache'] instanceof CacheInterface)
