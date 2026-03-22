@@ -44,15 +44,15 @@
         }
     },
     "scripts": {
-        "analyze": "phpstan analyse",
+        "analyze": "phpstan analyse --memory-limit=512M",
         "cs-check": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix --dry-run --diff",
         "cs-fix": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix",
-        "test": "phpunit",
-        "test:unit": "phpunit --testsuite unit",
-        "test:cross-sdk": "phpunit --testsuite cross-sdk",
-        "test:integration": "phpunit --testsuite integration",
-        "test:coverage": "phpunit --coverage-html coverage-report",
-        "test:coverage:ci": "phpunit --coverage-clover coverage.xml --coverage-text --only-summary-for-coverage-text",
+        "test": "phpunit --testdox",
+        "test:unit": "phpunit --testsuite unit --testdox",
+        "test:cross-sdk": "phpunit --testsuite cross-sdk --testdox",
+        "test:integration": "phpunit --testsuite integration --testdox",
+        "test:coverage": "phpunit --coverage-html coverage-report --testdox",
+        "test:coverage:ci": "phpunit --testdox --coverage-clover coverage.xml --coverage-text --only-summary-for-coverage-text",
         "api:build": "cd packages/Api && composer run-script build",
         "data:build": "cd packages/Data && composer run-script build",
         "enums:build": "cd packages/Enums && composer run-script build",
@@ -68,5 +68,10 @@
         ],
         "build:validate": "monorepo-builder validate",
         "build:merge": "monorepo-builder merge"
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
     }
 }

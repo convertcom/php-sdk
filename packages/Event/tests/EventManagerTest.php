@@ -11,6 +11,7 @@ namespace ConvertSdk\Tests;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\Event\Interfaces\EventManagerInterface;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 class EventManagerTest extends TestCase
@@ -173,9 +174,7 @@ class EventManagerTest extends TestCase
         $this->assertEquals(1, $called);
     }
 
-    /**
-     * @group performance
-     */
+    #[Group('performance')]
     public function testPerformanceUnder1msFor10Listeners(): void
     {
         $em = new EventManager();

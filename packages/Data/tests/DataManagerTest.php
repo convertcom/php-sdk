@@ -22,6 +22,7 @@ use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 class DataStoreMock
@@ -61,11 +62,11 @@ class DataManagerTest extends TestCase
     private const BATCH_SIZE = 10;
 
     private $config;
-    private $bucketingManagerMock;
-    private $ruleManagerMock;
-    private $eventManagerMock;
-    private $apiManagerMock;
-    private $loggerManagerMock;
+    private $bucketingManager;
+    private $ruleManager;
+    private $eventManager;
+    private $apiManager;
+    private $loggerManager;
     private $dataStoreMock;
     private $dataManager;
     private $accountId;
@@ -130,7 +131,7 @@ class DataManagerTest extends TestCase
             $this->psr17Factory
         );
 
-        $this->loggerManager = new LogManager($this->config);
+        $this->loggerManager = new LogManager();
         $this->dataStoreMock = new DataStoreMock();
 
         $this->accountId = $this->config->getData()->getAccountId();
@@ -313,9 +314,7 @@ class DataManagerTest extends TestCase
         $this->assertTrue(true); // Ensures no exception is thrown
     }
 
-    /**
-     * @group persistent_enqueue
-     */
+    #[Group('persistent_enqueue')]
     public function testDataStoreEnqueueBucketing(): void
     {
         $this->dataManager->setDataStore($this->dataStoreMock);
@@ -325,9 +324,7 @@ class DataManagerTest extends TestCase
         $this->assertEquals($this->bucketing, $check['bucketing']);
     }
 
-    /**
-      * @group persistent_enqueue
-     */
+    #[Group('persistent_enqueue')]
     public function testDataStoreEnqueueGoals(): void
     {
         $this->dataManager->setDataStore($this->dataStoreMock);
@@ -339,9 +336,7 @@ class DataManagerTest extends TestCase
         $this->assertEquals($this->goals, $check['goals']);
     }
 
-    /**
-     * @group persistent_enqueue
-     */
+    #[Group('persistent_enqueue')]
     public function testDataStoreEnqueueSegments(): void
     {
         $this->dataManager->setDataStore($this->dataStoreMock);
@@ -354,9 +349,7 @@ class DataManagerTest extends TestCase
         $this->assertEquals($this->goals, $check['goals']);
     }
 
-    /**
-     * @group persistent_enqueue
-     */
+    #[Group('persistent_enqueue')]
     public function testDataStoreEnqueueShape(): void
     {
         $this->dataManager->setDataStore($this->dataStoreMock);
@@ -370,9 +363,7 @@ class DataManagerTest extends TestCase
         $this->assertEquals($this->goals, $check['goals']);
     }
 
-    /**
-     * @group persistent_set
-     */
+    #[Group('persistent_set')]
     public function testDataStoreSetImmediatelyBucketing(): void
     {
         $this->dataManager = new DataManager(
@@ -390,9 +381,7 @@ class DataManagerTest extends TestCase
         $this->assertEquals($this->bucketing, $check['bucketing']);
     }
 
-    /**
-     * @group persistent_set
-     */
+    #[Group('persistent_set')]
     public function testDataStoreSetImmediatelyGoals(): void
     {
         $this->dataManager = new DataManager(
@@ -412,9 +401,7 @@ class DataManagerTest extends TestCase
         $this->assertEquals($this->goals, $check['goals']);
     }
 
-    /**
-     * @group persistent_set
-     */
+    #[Group('persistent_set')]
     public function testDataStoreSetImmediatelySegments(): void
     {
         $this->dataManager = new DataManager(
@@ -435,9 +422,7 @@ class DataManagerTest extends TestCase
         $this->assertEquals($this->goals, $check['goals']);
     }
 
-    /**
-     * @group persistent_set
-     */
+    #[Group('persistent_set')]
     public function testDataStoreSetImmediatelyShape(): void
     {
         $this->dataManager = new DataManager(
@@ -570,8 +555,8 @@ class DataManagerTest extends TestCase
 
     /**
      * Scenario 1: First trigger, no goalData -> conversion sent, no transaction.
-     * @group forceMultipleTransactions
      */
+    #[Group('forceMultipleTransactions')]
     public function testForceMultiple_FirstTriggerNoGoalData_SendsConversionOnly(): void
     {
         ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
@@ -594,8 +579,8 @@ class DataManagerTest extends TestCase
 
     /**
      * Scenario 2: First trigger, with goalData -> conversion sent AND transaction sent.
-     * @group forceMultipleTransactions
      */
+    #[Group('forceMultipleTransactions')]
     public function testForceMultiple_FirstTriggerWithGoalData_SendsConversionAndTransaction(): void
     {
         ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
@@ -624,8 +609,8 @@ class DataManagerTest extends TestCase
 
     /**
      * Scenario 3: Repeat trigger, no force -> nothing sent (dedup blocks both).
-     * @group forceMultipleTransactions
      */
+    #[Group('forceMultipleTransactions')]
     public function testForceMultiple_RepeatTriggerNoForce_SendsNothing(): void
     {
         ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
@@ -643,8 +628,8 @@ class DataManagerTest extends TestCase
 
     /**
      * Scenario 4: Repeat trigger, force=true, no goalData -> nothing sent.
-     * @group forceMultipleTransactions
      */
+    #[Group('forceMultipleTransactions')]
     public function testForceMultiple_RepeatTriggerForceNoGoalData_SendsNothing(): void
     {
         ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
@@ -664,8 +649,8 @@ class DataManagerTest extends TestCase
     /**
      * Scenario 3b: Repeat trigger, explicit force=false -> nothing sent (dedup blocks).
      * Validates that explicit false behaves identically to null/absent.
-     * @group forceMultipleTransactions
      */
+    #[Group('forceMultipleTransactions')]
     public function testForceMultiple_RepeatTriggerExplicitFalse_SendsNothing(): void
     {
         ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
@@ -685,8 +670,8 @@ class DataManagerTest extends TestCase
     /**
      * Scenario 5b: Repeat trigger, force=1 (truthy integer), with goalData -> transaction sent.
      * Validates that non-boolean truthy values also bypass dedup.
-     * @group forceMultipleTransactions
      */
+    #[Group('forceMultipleTransactions')]
     public function testForceMultiple_RepeatTriggerTruthyInteger_SendsTransaction(): void
     {
         ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();
@@ -704,8 +689,8 @@ class DataManagerTest extends TestCase
 
     /**
      * Scenario 5: Repeat trigger, force=true, with goalData -> transaction sent only.
-     * @group forceMultipleTransactions
      */
+    #[Group('forceMultipleTransactions')]
     public function testForceMultiple_RepeatTriggerForceWithGoalData_SendsTransactionOnly(): void
     {
         ['dataManager' => $dm, 'apiMock' => $apiMock] = $this->createDataManagerWithMockApi();

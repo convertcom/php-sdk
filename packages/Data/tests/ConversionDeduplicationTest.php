@@ -59,7 +59,7 @@ class ConversionDeduplicationTest extends TestCase
         );
         $ruleManager = new RuleManager();
         $eventManager = new EventManager();
-        $loggerManager = new LogManager($this->config);
+        $loggerManager = new LogManager();
 
         // Mock ApiManager to avoid PHP 8.4 end() deprecation on objects
         $this->apiManagerMock = $this->createMock(ApiManagerInterface::class);

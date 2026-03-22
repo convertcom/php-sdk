@@ -11,6 +11,7 @@ use ConvertSdk\DTO\BucketedFeature;
 use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\Enums\FeatureStatus;
 use ConvertSdk\Exception\InvalidArgumentException;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 class ConvertSDKTest extends TestCase
@@ -25,7 +26,7 @@ class ConvertSDKTest extends TestCase
         return json_decode(file_get_contents(__DIR__ . '/test-config.json'), true)['data'];
     }
 
-    /** @test */
+    #[Test]
     public function createThrowsInvalidArgumentExceptionWhenBothSdkKeyAndDataAreMissing(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -34,7 +35,7 @@ class ConvertSDKTest extends TestCase
         ConvertSDK::create([]);
     }
 
-    /** @test */
+    #[Test]
     public function createThrowsInvalidArgumentExceptionWithEmptyConfig(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -42,7 +43,7 @@ class ConvertSDKTest extends TestCase
         ConvertSDK::create(['sdkKey' => '', 'data' => []]);
     }
 
-    /** @test */
+    #[Test]
     public function createWithDataKeyReturnsCoreInstance(): void
     {
         $sdk = ConvertSDK::create(['data' => $this->getTestData()]);
@@ -50,7 +51,7 @@ class ConvertSDKTest extends TestCase
         $this->assertInstanceOf(Core::class, $sdk);
     }
 
-    /** @test */
+    #[Test]
     public function createContextReturnsContextInstance(): void
     {
         $sdk = ConvertSDK::create(['data' => $this->getTestData()]);
@@ -59,7 +60,7 @@ class ConvertSDKTest extends TestCase
         $this->assertInstanceOf(Context::class, $context);
     }
 
-    /** @test */
+    #[Test]
     public function contextThrowsInvalidArgumentExceptionForEmptyVisitorId(): void
     {
         $sdk = ConvertSDK::create(['data' => $this->getTestData()]);
@@ -70,7 +71,7 @@ class ConvertSDKTest extends TestCase
         $sdk->createContext('');
     }
 
-    /** @test */
+    #[Test]
     public function bucketedVariationDtoIsReadonlyWithExpectedProperties(): void
     {
         $dto = new BucketedVariation(
@@ -93,7 +94,7 @@ class ConvertSDKTest extends TestCase
         $this->assertTrue($reflection->isReadOnly());
     }
 
-    /** @test */
+    #[Test]
     public function bucketedFeatureDtoIsReadonlyWithExpectedProperties(): void
     {
         $dto = new BucketedFeature(
@@ -114,7 +115,7 @@ class ConvertSDKTest extends TestCase
         $this->assertTrue($reflection->isReadOnly());
     }
 
-    /** @test */
+    #[Test]
     public function isReadyReturnsTrueAfterSuccessfulInitializationWithData(): void
     {
         $sdk = ConvertSDK::create(['data' => $this->getTestData()]);
@@ -122,7 +123,7 @@ class ConvertSDKTest extends TestCase
         $this->assertTrue($sdk->isReady());
     }
 
-    /** @test */
+    #[Test]
     public function convertSdkIsNotDirectlyInstantiable(): void
     {
         $reflection = new \ReflectionClass(ConvertSDK::class);
@@ -132,7 +133,7 @@ class ConvertSDKTest extends TestCase
         $this->assertTrue($constructor->isPrivate());
     }
 
-    /** @test */
+    #[Test]
     public function createIsStaticMethod(): void
     {
         $reflection = new \ReflectionClass(ConvertSDK::class);
@@ -142,14 +143,14 @@ class ConvertSDKTest extends TestCase
         $this->assertTrue($method->isPublic());
     }
 
-    /** @test */
+    #[Test]
     public function convertSdkIsFinalClass(): void
     {
         $reflection = new \ReflectionClass(ConvertSDK::class);
         $this->assertTrue($reflection->isFinal());
     }
 
-    /** @test */
+    #[Test]
     public function createWithPsr3LoggerWorks(): void
     {
         $logger = new \Psr\Log\NullLogger();
@@ -162,7 +163,7 @@ class ConvertSDKTest extends TestCase
         $this->assertTrue($sdk->isReady());
     }
 
-    /** @test */
+    #[Test]
     public function coreHasFlushMethodAndShutdownHookIsRegistered(): void
     {
         // Verifies AC #6 (shutdown hook) and AC #7 (Core::flush).
@@ -178,7 +179,7 @@ class ConvertSDKTest extends TestCase
         $this->assertTrue(true);
     }
 
-    /** @test */
+    #[Test]
     public function createSetsPhpSdkAsDefaultSource(): void
     {
         // ConvertSDK::create() should set network.source to 'php-sdk' by default

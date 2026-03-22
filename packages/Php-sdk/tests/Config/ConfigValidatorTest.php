@@ -7,6 +7,7 @@ namespace ConvertSdk\Tests\Config;
 use ConvertSdk\Config\ConfigValidator;
 use ConvertSdk\Exception\ConfigValidationException;
 use OpenAPI\Client\Model\ConfigResponseData;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 class ConfigValidatorTest extends TestCase
@@ -18,7 +19,7 @@ class ConfigValidatorTest extends TestCase
         $this->validator = new ConfigValidator();
     }
 
-    /** @test */
+    #[Test]
     public function validConfigPassesWithoutException(): void
     {
         $config = new ConfigResponseData([
@@ -30,7 +31,7 @@ class ConfigValidatorTest extends TestCase
         $this->assertTrue(true); // No exception thrown
     }
 
-    /** @test */
+    #[Test]
     public function missingAccountIdThrowsConfigValidationException(): void
     {
         $config = new ConfigResponseData([
@@ -43,7 +44,7 @@ class ConfigValidatorTest extends TestCase
         $this->validator->validate($config);
     }
 
-    /** @test */
+    #[Test]
     public function emptyAccountIdThrowsConfigValidationException(): void
     {
         $config = new ConfigResponseData([
@@ -57,7 +58,7 @@ class ConfigValidatorTest extends TestCase
         $this->validator->validate($config);
     }
 
-    /** @test */
+    #[Test]
     public function missingProjectThrowsConfigValidationException(): void
     {
         $config = new ConfigResponseData([
@@ -70,7 +71,7 @@ class ConfigValidatorTest extends TestCase
         $this->validator->validate($config);
     }
 
-    /** @test */
+    #[Test]
     public function projectWithoutIdThrowsConfigValidationException(): void
     {
         $config = new ConfigResponseData([
@@ -84,7 +85,7 @@ class ConfigValidatorTest extends TestCase
         $this->validator->validate($config);
     }
 
-    /** @test */
+    #[Test]
     public function exceptionMessageContainsFieldName(): void
     {
         $config = new ConfigResponseData([

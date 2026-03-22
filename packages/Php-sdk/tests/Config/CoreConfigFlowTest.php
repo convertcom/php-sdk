@@ -17,6 +17,7 @@ use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 class CoreConfigFlowTest extends TestCase
@@ -61,7 +62,7 @@ class CoreConfigFlowTest extends TestCase
         ];
     }
 
-    /** @test */
+    #[Test]
     public function directDataInitializationBypassesHttp(): void
     {
         $configData = $this->validConfigData();
@@ -93,7 +94,7 @@ class CoreConfigFlowTest extends TestCase
         $this->assertInstanceOf(Core::class, $core);
     }
 
-    /** @test */
+    #[Test]
     public function sdkKeyInitializationCallsApiManagerWhenCacheEmpty(): void
     {
         $configData = $this->validConfigData();
@@ -131,7 +132,7 @@ class CoreConfigFlowTest extends TestCase
         $this->assertInstanceOf(Core::class, $core);
     }
 
-    /** @test */
+    #[Test]
     public function cacheHitReturnsCachedConfigWithoutHttpCall(): void
     {
         $configData = $this->validConfigData();
@@ -171,7 +172,7 @@ class CoreConfigFlowTest extends TestCase
         $this->assertInstanceOf(Core::class, $core);
     }
 
-    /** @test */
+    #[Test]
     public function cacheMissFetchesViaHttpAndStoresInCache(): void
     {
         $configData = $this->validConfigData();
@@ -211,7 +212,7 @@ class CoreConfigFlowTest extends TestCase
         $this->assertSame('10022898', $cached->getAccountId());
     }
 
-    /** @test */
+    #[Test]
     public function apiManagerRuntimeExceptionIsWrappedInConfigFetchException(): void
     {
         $apiManager = $this->createMock(ApiManagerInterface::class);
@@ -255,7 +256,7 @@ class CoreConfigFlowTest extends TestCase
         $this->assertSame(500, $capturedError->getStatusCode());
     }
 
-    /** @test */
+    #[Test]
     public function malformedConfigTriggersValidationError(): void
     {
         $badConfig = new ConfigResponseData([
@@ -296,7 +297,7 @@ class CoreConfigFlowTest extends TestCase
         $this->assertInstanceOf(Core::class, $core);
     }
 
-    /** @test */
+    #[Test]
     public function directDataWithInvalidConfigFiresErrorEvent(): void
     {
         $badConfig = new ConfigResponseData([
@@ -327,7 +328,7 @@ class CoreConfigFlowTest extends TestCase
         $this->assertInstanceOf(Core::class, $core);
     }
 
-    /** @test */
+    #[Test]
     public function customDataRefreshIntervalIsUsed(): void
     {
         $configData = $this->validConfigData();
@@ -366,7 +367,7 @@ class CoreConfigFlowTest extends TestCase
         $this->assertTrue($cache->has($cacheKey));
     }
 
-    /** @test */
+    #[Test]
     public function expiredCacheTriggersFreshHttpFetch(): void
     {
         $configData = $this->validConfigData();
@@ -411,7 +412,7 @@ class CoreConfigFlowTest extends TestCase
         $this->assertInstanceOf(ConfigResponseData::class, $cache->get($cacheKey));
     }
 
-    /** @test */
+    #[Test]
     public function sdkKeyWithSpecialCharsProducesHashedCacheKey(): void
     {
         $configData = $this->validConfigData();

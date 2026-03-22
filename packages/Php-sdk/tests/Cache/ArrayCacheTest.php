@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ConvertSdk\Tests\Cache;
 
 use ConvertSdk\Cache\ArrayCache;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Psr\SimpleCache\CacheInterface;
 
@@ -17,27 +18,27 @@ class ArrayCacheTest extends TestCase
         $this->cache = new ArrayCache();
     }
 
-    /** @test */
+    #[Test]
     public function implementsCacheInterface(): void
     {
         $this->assertInstanceOf(CacheInterface::class, $this->cache);
     }
 
-    /** @test */
+    #[Test]
     public function setAndGetRoundTrip(): void
     {
         $this->cache->set('key1', 'value1');
         $this->assertSame('value1', $this->cache->get('key1'));
     }
 
-    /** @test */
+    #[Test]
     public function getReturnsDefaultWhenKeyMissing(): void
     {
         $this->assertNull($this->cache->get('nonexistent'));
         $this->assertSame('fallback', $this->cache->get('nonexistent', 'fallback'));
     }
 
-    /** @test */
+    #[Test]
     public function ttlExpiryRemovesValue(): void
     {
         $this->cache->set('expiring', 'data', 1);
@@ -48,7 +49,7 @@ class ArrayCacheTest extends TestCase
         $this->assertNull($this->cache->get('expiring'));
     }
 
-    /** @test */
+    #[Test]
     public function hasReturnsFalseForExpiredKeys(): void
     {
         $this->cache->set('temp', 'val', 1);
@@ -59,7 +60,7 @@ class ArrayCacheTest extends TestCase
         $this->assertFalse($this->cache->has('temp'));
     }
 
-    /** @test */
+    #[Test]
     public function deleteRemovesKey(): void
     {
         $this->cache->set('toDelete', 'val');
@@ -69,7 +70,7 @@ class ArrayCacheTest extends TestCase
         $this->assertFalse($this->cache->has('toDelete'));
     }
 
-    /** @test */
+    #[Test]
     public function clearRemovesAllKeys(): void
     {
         $this->cache->set('a', 1);
@@ -81,7 +82,7 @@ class ArrayCacheTest extends TestCase
         $this->assertFalse($this->cache->has('b'));
     }
 
-    /** @test */
+    #[Test]
     public function getMultipleReturnsMultipleValues(): void
     {
         $this->cache->set('x', 10);
@@ -94,7 +95,7 @@ class ArrayCacheTest extends TestCase
         $this->assertSame('default', $result['z']);
     }
 
-    /** @test */
+    #[Test]
     public function setMultipleSetsMultipleValues(): void
     {
         $this->cache->setMultiple(['a' => 1, 'b' => 2]);
@@ -103,7 +104,7 @@ class ArrayCacheTest extends TestCase
         $this->assertSame(2, $this->cache->get('b'));
     }
 
-    /** @test */
+    #[Test]
     public function deleteMultipleRemovesMultipleKeys(): void
     {
         $this->cache->set('a', 1);
@@ -117,7 +118,7 @@ class ArrayCacheTest extends TestCase
         $this->assertTrue($this->cache->has('c'));
     }
 
-    /** @test */
+    #[Test]
     public function nullTtlStoresWithoutExpiry(): void
     {
         $this->cache->set('forever', 'value', null);
@@ -127,7 +128,7 @@ class ArrayCacheTest extends TestCase
         $this->assertTrue($this->cache->has('forever'));
     }
 
-    /** @test */
+    #[Test]
     public function zeroOrNegativeTtlDeletesImmediately(): void
     {
         $this->cache->set('existing', 'data');
@@ -139,7 +140,7 @@ class ArrayCacheTest extends TestCase
         $this->assertFalse($this->cache->has('existing2'));
     }
 
-    /** @test */
+    #[Test]
     public function dateIntervalTtlWorks(): void
     {
         $interval = new \DateInterval('PT10S'); // 10 seconds
@@ -147,7 +148,7 @@ class ArrayCacheTest extends TestCase
         $this->assertSame('interval_value', $this->cache->get('interval_key'));
     }
 
-    /** @test */
+    #[Test]
     public function storesVariousTypes(): void
     {
         $this->cache->set('int', 42);

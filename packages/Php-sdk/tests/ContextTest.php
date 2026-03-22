@@ -24,6 +24,7 @@ use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorTrackingEvents;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 class ContextTest extends TestCase
@@ -585,8 +586,8 @@ class ContextTest extends TestCase
     /**
      * Verifies that the forceMultipleTransactions setting actually reaches DataManager
      * by proving a repeat call with force=true sends a transaction (impossible without the flag).
-     * @group forceMultipleTransactions
      */
+    #[Group('forceMultipleTransactions')]
     public function testTrackConversionWithForceMultipleTransactionsPassesSettingThrough(): void
     {
         ['context' => $ctx, 'apiMock' => $apiMock] = $this->createContextWithMockApi();
@@ -610,9 +611,7 @@ class ContextTest extends TestCase
         $this->assertCount(2, $capturedEvents, 'Repeat with force+goalData must send transaction — proves flag passed through');
     }
 
-    /**
-     * @group forceMultipleTransactions
-     */
+    #[Group('forceMultipleTransactions')]
     public function testRepeatedTrackConversionWithForceAndGoalDataSendsTransaction(): void
     {
         ['context' => $ctx, 'apiMock' => $apiMock] = $this->createContextWithMockApi();
@@ -642,9 +641,7 @@ class ContextTest extends TestCase
         $this->assertArrayHasKey('goalData', $capturedEvents[2]['data']);
     }
 
-    /**
-     * @group forceMultipleTransactions
-     */
+    #[Group('forceMultipleTransactions')]
     public function testRepeatedTrackConversionWithoutForceSendsNothing(): void
     {
         ['context' => $ctx, 'apiMock' => $apiMock] = $this->createContextWithMockApi();

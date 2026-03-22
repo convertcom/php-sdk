@@ -19,6 +19,7 @@ use ConvertSdk\SegmentsManager;
 use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 class CoreTest extends TestCase
@@ -99,25 +100,25 @@ class CoreTest extends TestCase
         $this->projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
     }
 
-    /** @test */
+    #[Test]
     public function importedEntityShouldBeAConstructorOfCoreInstance()
     {
         $this->assertTrue(class_exists(Core::class));
     }
 
-    /** @test */
+    #[Test]
     public function shouldSuccessfullyCreateNewCoreInstance()
     {
         $this->assertInstanceOf(Core::class, $this->core);
     }
 
-    /** @test */
+    #[Test]
     public function shouldExposeCore()
     {
         $this->assertTrue(class_exists(Core::class));
     }
 
-    /** @test */
+    #[Test]
     public function shouldSuccessfullyCreateVisitorContext()
     {
         $visitorId = 'XXX';
@@ -125,7 +126,7 @@ class CoreTest extends TestCase
         $this->assertInstanceOf(Context::class, $visitorContext);
     }
 
-    /** @test */
+    #[Test]
     public function shouldSuccessfullyTriggerReadyEvent()
     {
         $triggered = false;
@@ -137,7 +138,7 @@ class CoreTest extends TestCase
         $this->assertTrue($triggered);
     }
 
-    /** @test */
+    #[Test]
     public function shouldSuccessfullyResolveOnReady()
     {
         try {
@@ -148,26 +149,26 @@ class CoreTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function shouldReturnTrueFromIsReady()
     {
         $this->assertTrue($this->core->isReady());
     }
 
-    /** @test */
+    #[Test]
     public function isReadyAndOnReadyShouldReturnSameValue()
     {
         $this->assertEquals($this->core->isReady(), $this->core->onReady());
     }
 
-    /** @test */
+    #[Test]
     public function coreShouldBeFinalClass()
     {
         $reflection = new \ReflectionClass(Core::class);
         $this->assertTrue($reflection->isFinal());
     }
 
-    /** @test */
+    #[Test]
     public function flushMethodExistsAndIsPublic(): void
     {
         $reflection = new \ReflectionClass(Core::class);
@@ -175,7 +176,7 @@ class CoreTest extends TestCase
         $this->assertTrue($reflection->getMethod('flush')->isPublic());
     }
 
-    /** @test */
+    #[Test]
     public function flushIsNoOpWhenQueueIsEmpty(): void
     {
         // flush() should not throw when there are no queued events
@@ -183,7 +184,7 @@ class CoreTest extends TestCase
         $this->assertTrue(true); // No exception means success
     }
 
-    /** @test */
+    #[Test]
     public function flushDelegatesToApiManagerReleaseQueue(): void
     {
         $apiManagerMock = $this->createMock(\ConvertSdk\Interfaces\ApiManagerInterface::class);
@@ -207,7 +208,7 @@ class CoreTest extends TestCase
         $core->flush();
     }
 
-    /** @test */
+    #[Test]
     public function isReadyShouldReturnFalseWhenConfigDataThrows(): void
     {
         $dataManagerMock = $this->createMock(\ConvertSdk\Interfaces\DataManagerInterface::class);
@@ -230,7 +231,7 @@ class CoreTest extends TestCase
         $this->assertFalse($core->isReady());
     }
 
-    /** @test */
+    #[Test]
     public function createContextShouldThrowWhenVisitorIdEmpty(): void
     {
         $this->expectException(\ConvertSdk\Exception\InvalidArgumentException::class);
