@@ -64,7 +64,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/Api",
-                "reference": "8e3d9d0c608ac69d75ee7515138f4ee35343eef4"
+                "reference": "0ad87717b5efa37751c61161a04925176a2ccd93"
             },
             "require": {
                 "convertcom/php-sdk-enums": ">=1.0.0",
@@ -79,7 +79,7 @@
                 "psr/http-message": "^1.1 || ^2.0"
             },
             "require-dev": {
-                "guzzlehttp/guzzle": "^7.0",
+                "guzzlehttp/guzzle": "^7.3",
                 "nyholm/psr7": "^1.8",
                 "php-http/mock-client": "^1.6",
                 "phpunit/phpunit": "^11.0"
@@ -486,7 +486,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/Types",
-                "reference": "e72a316d171c77fd52910cb9ff0fe55f87705e20"
+                "reference": "c00da13681443711b7e18d6880fc30f4c3f71ff1"
             },
             "require": {
                 "ext-curl": "*",
@@ -502,7 +502,10 @@
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "OpenAPI\\Client\\": "lib/"
+                    "OpenAPI\\Client\\": [
+                        "lib/",
+                        "lib/Generated/"
+                    ]
                 }
             },
             "autoload-dev": {
@@ -540,10 +543,10 @@
             "dist": {
                 "type": "path",
                 "url": "packages/Utils",
-                "reference": "a5cdc89837916c23bd5551a707d2c88bdbc55c7d"
+                "reference": "6cb32e4dd6490c0947fa7132b2734001e914fefe"
             },
             "require": {
-                "convertcom/php-sdk-enums": "^1.0.0",
+                "convertcom/php-sdk-enums": ">=1.0.0",
                 "lastguest/murmurhash": "^2.1",
                 "php": "^8.2"
             },
