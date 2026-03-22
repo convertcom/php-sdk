@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
+use ConvertSdk\Cache\ArrayCache;
 use ConvertSdk\Context;
 use ConvertSdk\ConvertSDK;
 use ConvertSdk\Core;
+use ConvertSdk\DataStoreManager;
 use ConvertSdk\DTO\BucketedFeature;
 use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\Enums\FeatureStatus;
@@ -196,5 +198,80 @@ class ConvertSDKTest extends TestCase
         $source = $sourceProp->getValue($apiManager);
 
         $this->assertEquals('php-sdk', $source);
+    }
+
+    /**
+     * Helper: extract DataStoreManager from Core via reflection.
+     */
+    private function getDataStoreManager(Core $sdk): ?DataStoreManager
+    {
+        $coreRef = new \ReflectionClass($sdk);
+        $dataManagerProp = $coreRef->getProperty('dataManager');
+        $dataManager = $dataManagerProp->getValue($sdk);
+
+        return $dataManager->getDataStoreManager();
+    }
+
+    /**
+     * Helper: extract the underlying dataStore object from DataStoreManager via reflection.
+     */
+    private function getUnderlyingDataStore(DataStoreManager $dsm): mixed
+    {
+        $ref = new \ReflectionClass($dsm);
+        $prop = $ref->getProperty('dataStore');
+        return $prop->getValue($dsm);
+    }
+
+    #[Test]
+    public function createWiresPsr16CacheAsDataStoreByDefault(): void
+    {
+        $sdk = ConvertSDK::create(['data' => $this->getTestData()]);
+
+        $dsm = $this->getDataStoreManager($sdk);
+        $this->assertInstanceOf(DataStoreManager::class, $dsm);
+
+        // Default cache is ArrayCache — verify it was wired as the underlying dataStore
+        $underlying = $this->getUnderlyingDataStore($dsm);
+        $this->assertInstanceOf(ArrayCache::class, $underlying);
+    }
+
+    #[Test]
+    public function createUsesProvidedPsr16CacheAsDataStore(): void
+    {
+        $cache = new ArrayCache();
+
+        $sdk = ConvertSDK::create([
+            'data'  => $this->getTestData(),
+            'cache' => $cache,
+        ]);
+
+        $dsm = $this->getDataStoreManager($sdk);
+        $this->assertInstanceOf(DataStoreManager::class, $dsm);
+
+        $underlying = $this->getUnderlyingDataStore($dsm);
+        $this->assertSame($cache, $underlying);
+    }
+
+    #[Test]
+    public function createUsesExplicitDataStoreOverCache(): void
+    {
+        $cache = new ArrayCache();
+        $customStore = new class {
+            private array $data = [];
+            public function get(string $key): mixed { return $this->data[$key] ?? null; }
+            public function set(string $key, mixed $value): void { $this->data[$key] = $value; }
+        };
+
+        $sdk = ConvertSDK::create([
+            'data'      => $this->getTestData(),
+            'cache'     => $cache,
+            'dataStore' => $customStore,
+        ]);
+
+        $dsm = $this->getDataStoreManager($sdk);
+        $this->assertInstanceOf(DataStoreManager::class, $dsm);
+
+        $underlying = $this->getUnderlyingDataStore($dsm);
+        $this->assertSame($customStore, $underlying);
     }
 }

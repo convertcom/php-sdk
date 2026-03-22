@@ -46,6 +46,7 @@ final class ConvertSDK
      *     data?: array<string, mixed>|ConfigResponseData,
      *     logger?: LoggerInterface,
      *     cache?: CacheInterface,
+     *     dataStore?: object,
      *     dataRefreshInterval?: int,
      *     environment?: string,
      *     network?: array<string, mixed>,
@@ -139,6 +140,10 @@ final class ConvertSDK
             $apiManager,
             $logManager
         );
+
+        // 7b. Wire PSR-16 cache as the visitor data store (enables cross-request persistence)
+        $dataStore = $configuration['dataStore'] ?? $cache;
+        $dataManager->setDataStore($dataStore);
 
         $experienceManager = new ExperienceManager(
             dataManager: $dataManager,

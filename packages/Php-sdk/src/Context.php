@@ -573,16 +573,13 @@ final class Context implements ContextInterface
     }
 
     /**
-     * Send pending API/DataStore queues to server.
+     * Send pending API queue to server.
      *
      * @param string|null $reason Optional reason for releasing queues
      * @return void
      */
     public function releaseQueues(?string $reason = null): void
     {
-        if ($this->dataManager->getDataStoreManager()) {
-            $this->dataManager->getDataStoreManager()->releaseQueue($reason);
-        }
         $this->apiManager->releaseQueue($reason);
     }
 

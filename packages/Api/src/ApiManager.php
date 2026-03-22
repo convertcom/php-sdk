@@ -46,11 +46,6 @@ class ApiManager implements ApiManagerInterface
     private const DEFAULT_BATCH_SIZE = 10;
 
     /**
-     * Default release interval in milliseconds
-     */
-    private const DEFAULT_RELEASE_INTERVAL = 10000;
-
-    /**
      * Default configuration endpoint
      */
     private const DEFAULT_CONFIG_ENDPOINT = '';
@@ -62,12 +57,6 @@ class ApiManager implements ApiManagerInterface
 
     /** @var VisitorsQueue Queue for tracking visitor requests */
     private VisitorsQueue $requestsQueue;
-
-    /** @var ?int Timer ID for the requests queue */
-    private ?int $requestsQueueTimerID = null;
-
-    /** @var bool Whether timeout-based release is enabled */
-    private bool $timeoutEnabled = true;
 
     /** @var string Configuration endpoint URL */
     private string $configEndpoint;
@@ -120,9 +109,6 @@ class ApiManager implements ApiManagerInterface
     /** @var int Batch size for queue processing */
     private int $batchSize;
 
-    /** @var int Release interval in milliseconds */
-    private int $releaseInterval;
-
     /** @var ClientInterface PSR-18 HTTP client */
     private ClientInterface $httpClient;
 
@@ -171,9 +157,6 @@ class ApiManager implements ApiManagerInterface
         $this->batchSize = $config && $config->getEvents() && isset($config->getEvents()['batch_size'])
             ? (int)$config->getEvents()['batch_size']
             : self::DEFAULT_BATCH_SIZE;
-        $this->releaseInterval = $config && $config->getEvents() && isset($config->getEvents()['release_interval'])
-            ? (int)$config->getEvents()['release_interval']
-            : self::DEFAULT_RELEASE_INTERVAL;
 
         $this->accountId = $this->data ? $this->data->getAccountId() : '';
         $project = $this->data ? $this->data->getProject() : null;
@@ -271,13 +254,8 @@ class ApiManager implements ApiManagerInterface
             ? (json_decode((string) json_encode($segments), true) ?? [])
             : [];
         $this->requestsQueue->push($visitorId, $eventArray, $segmentsArray);
-        if ($this->trackingEnabled) {
+        if ($this->trackingEnabled && $this->requestsQueue->length >= $this->getBatchSize()) {
             $this->releaseQueue('size');
-            if ($this->requestsQueue->length === $this->getBatchSize()) {
-                $this->releaseQueue('size');
-            } elseif ($this->requestsQueue->length === 1) {
-                $this->startQueue();
-            }
         }
     }
 
@@ -314,8 +292,6 @@ class ApiManager implements ApiManagerInterface
         if ($this->loggerManager && method_exists($this->loggerManager, 'trace')) {
             $this->loggerManager->trace('ApiManager.releaseQueue()', ['reason' => $reason ?? '']);
         }
-
-        $this->stopQueue();
 
         $payload = $this->trackingEvent;
         $payload['visitors'] = $this->requestsQueue->getItems();
@@ -414,46 +390,12 @@ class ApiManager implements ApiManagerInterface
     }
 
     /**
-     * Stop queue timer
-     */
-    public function stopQueue(): void
-    {
-        $this->requestsQueueTimerID = null;
-    }
-
-    /**
-     * Start queue timer
-     */
-    public function startQueue(): void
-    {
-        if ($this->timeoutEnabled && $this->requestsQueue->length > 0) {
-            $this->requestsQueueTimerID = 1;
-            $this->releaseQueue('timeout');
-        } else {
-            $this->requestsQueueTimerID = 1;
-        }
-    }
-
-    /**
      * Enable tracking
      */
     public function enableTracking(): void
     {
         $this->trackingEnabled = true;
         $this->releaseQueue('trackingEnabled');
-    }
-
-    public function setTimeoutEnabled(bool $enabled): void
-    {
-        $this->timeoutEnabled = $enabled;
-    }
-
-    /**
-     * Check if a timeout is "scheduled"
-     */
-    public function hasPendingTimeout(): bool
-    {
-        return $this->requestsQueueTimerID !== null;
     }
 
     /**

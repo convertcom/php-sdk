@@ -57,16 +57,6 @@ interface ApiManagerInterface
     public function releaseQueue(?string $reason = null): void;
 
     /**
-     * Stop queue timer
-     */
-    public function stopQueue(): void;
-
-    /**
-     * Start queue timer
-     */
-    public function startQueue(): void;
-
-    /**
      * Enable tracking
      */
     public function enableTracking(): void;
