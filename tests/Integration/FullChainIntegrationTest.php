@@ -325,6 +325,7 @@ class FullChainIntegrationTest extends TestCase
         $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
 
         $result = $context->trackConversion(self::GOAL_KEY);
+        $sdk->flush();
 
         $this->assertNull($result, 'trackConversion should return null on success');
         $this->assertNotEmpty($queueReleasedEvents, 'ApiQueueReleased should fire (tracking POST sent)');
@@ -364,13 +365,15 @@ class FullChainIntegrationTest extends TestCase
         $context = $sdk->createContext('tracking-visitor-dedup');
         $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
 
-        // First call — should enqueue and release
+        // First call — should enqueue and release on flush
         $context->trackConversion(self::GOAL_KEY);
+        $sdk->flush();
         $countAfterFirst = count($queueReleasedEvents);
         $this->assertGreaterThan(0, $countAfterFirst, 'First conversion should trigger API queue release');
 
-        // Second call — deduplicated, no new enqueue or release
+        // Second call — deduplicated, nothing enqueued, flush is no-op
         $secondResult = $context->trackConversion(self::GOAL_KEY);
+        $sdk->flush();
         $this->assertNull($secondResult, 'Deduplicated conversion should still return null (same as first call)');
         $this->assertCount($countAfterFirst, $queueReleasedEvents, 'Second conversion should be deduplicated (no new API queue release)');
     }
@@ -396,9 +399,11 @@ class FullChainIntegrationTest extends TestCase
             ],
         ));
 
+        $sdk->flush();
+
         $this->assertNull($result, 'Revenue conversion should return null on success');
-        // Revenue tracking sends conversion + transaction events, each triggers a release
-        $this->assertGreaterThanOrEqual(2, count($queueReleasedEvents), 'Revenue conversion should trigger at least 2 API releases (conversion + transaction)');
+        // Revenue tracking enqueues conversion + transaction events, flushed as a single batched release
+        $this->assertGreaterThanOrEqual(1, count($queueReleasedEvents), 'Revenue conversion should trigger at least 1 API release');
 
         // Verify released payload contains visitor data
         $lastEvent = end($queueReleasedEvents);
@@ -419,18 +424,20 @@ class FullChainIntegrationTest extends TestCase
         $context = $sdk->createContext('tracking-visitor-force');
         $context->runExperience(self::EXPERIENCE_KEY, $this->qualifyingAttributes);
 
-        // First call with goalData: conversion + transaction = 2 enqueues
+        // First call with goalData: conversion + transaction enqueued, flushed as batch
         $context->trackConversion(self::GOAL_KEY, new ConversionAttributes(
             conversionData: [new GoalData(GoalDataKey::Amount, 25.00)],
         ));
+        $sdk->flush();
         $countAfterFirst = count($queueReleasedEvents);
-        $this->assertGreaterThanOrEqual(2, $countAfterFirst, 'First revenue conversion should trigger at least 2 releases');
+        $this->assertGreaterThanOrEqual(1, $countAfterFirst, 'First revenue conversion should trigger at least 1 release');
 
         // Second call with forceMultipleTransactions: transaction event should still be sent
         $context->trackConversion(self::GOAL_KEY, new ConversionAttributes(
             conversionData: [new GoalData(GoalDataKey::Amount, 25.00)],
             conversionSetting: [ConversionSettingKey::ForceMultipleTransactions->value => true],
         ));
+        $sdk->flush();
         $this->assertGreaterThan($countAfterFirst, count($queueReleasedEvents), 'forceMultipleTransactions should allow repeat transaction');
 
         // Verify the forced release carried a transaction (visitor data with goalData)
@@ -506,10 +513,8 @@ class FullChainIntegrationTest extends TestCase
         $result = $context->trackConversion(self::GOAL_KEY);
         $this->assertNull($result, 'trackConversion should return null on success');
 
-        // Flush — release any remaining queue items (may be no-op if auto-released on enqueue)
+        // Flush — release all queued events as a single batched POST
         $sdk->flush();
-        // flush() is called for completeness; with tracking=true, enqueue auto-releases,
-        // so flush may find an empty queue — either way the chain is exercised without error.
 
         // Verify all event types fired
         $this->assertCount(1, $readyEvents, 'Ready event should fire exactly once');
