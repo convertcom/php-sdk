@@ -448,19 +448,17 @@ $context->trackConversion('subscription-renewal', new ConversionAttributes(
 
 ## Flushing Events
 
-The SDK batches tracking events and posts them to the Convert Tracking API. Events auto-flush in three ways:
+The SDK batches tracking events and posts them to the Convert Tracking API as a single HTTP POST. Events flush in two ways:
 
-1. **Batch size threshold** — when 10 events accumulate (default).
-2. **PHP-FPM shutdown** — `register_shutdown_function` calls `fastcgi_finish_request()` (releases the HTTP response first), then flushes the queue.
-3. **Manual flush** — call `flush()` explicitly.
+1. **PHP-FPM shutdown** — `register_shutdown_function` calls `fastcgi_finish_request()` (releases the HTTP response first), then flushes all queued events. This is automatic and requires no developer action.
+2. **Manual flush** — call `flush()` explicitly when you need events sent before the script ends.
 
 ```php
-// Flush all queued events across all contexts
+// Flush all queued events
 $sdk->flush();
-
-// Flush events for a specific context
-$context->releaseQueues();
 ```
+
+In typical PHP usage, the shutdown handler flushes automatically — you only need `flush()` in long-running scripts or when you need to verify events were sent (e.g., in tests).
 
 Failed POST requests are retried up to 2 times with exponential backoff (100ms, 300ms). HTTP 4xx errors are not retried.
 
