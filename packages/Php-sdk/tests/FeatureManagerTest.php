@@ -66,7 +66,7 @@ class FeatureManagerTest extends TestCase
             hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
         );
         $ruleManager = new RuleManager();
-        $loggerManager = new LogManager($this->config);
+        $loggerManager = new LogManager();
         $this->eventManager = new EventManager();
         $this->apiManager = new ApiManager($this->config, $this->eventManager);
         $this->dataManager = new DataManager(

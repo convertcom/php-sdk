@@ -84,7 +84,7 @@ class SegmentsManagerTest extends TestCase
         $ruleManager = new RuleManager();
         $eventManager = new EventManager();
         $apiManager = new ApiManager($config, $eventManager);
-        $loggerManager = new LogManager($config);
+        $loggerManager = new LogManager();
         self::$dataManager = new DataManager(
             $config,
             $bucketingManager,
