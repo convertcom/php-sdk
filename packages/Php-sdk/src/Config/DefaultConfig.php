@@ -26,6 +26,7 @@ final class DefaultConfig
             'bucketing' => [
                 'max_traffic' => 10000,
                 'hash_seed'   => 9999,
+                'excludeExperienceIdHash' => false,
             ],
             'data' => [],
             'dataStore' => null, // Allows 3rd party data store to be passed.
@@ -40,10 +41,12 @@ final class DefaultConfig
             'rules' => [
                 'keys_case_sensitive' => true,
                 'comparisonProcessor' => null, // Allows 3rd party comparison processor.
+                'negation' => '!',
             ],
             'network' => [
                 'tracking' => true,
                 'cacheLevel' => 'default', // Can be set to 'low' for short-lived cache.
+                'source' => 'php-sdk',
             ],
             'sdkKey' => '',
             'sdkKeySecret' => '',

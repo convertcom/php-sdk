@@ -108,10 +108,14 @@ class LogManager implements LogManagerInterface
                 if ($mappedMethod && method_exists($client['sdk'], $mappedMethod)) {
                     if ($client['sdk'] instanceof \Psr\Log\LoggerInterface) {
                         // Concatenate all arguments into one message
-                        $message = implode(' ', array_map(
-                            fn ($arg) => is_array($arg) ? (json_encode($arg) ?: '[unserializable]') : (is_object($arg) ? get_class($arg) : strval($arg)),
-                            $args
-                        ));
+                        try {
+                            $message = implode(' ', array_map(
+                                fn ($arg) => is_array($arg) ? (json_encode($arg) ?: '[unserializable]') : (is_object($arg) ? get_class($arg) : strval($arg)),
+                                $args
+                            ));
+                        } catch (\Throwable $e) {
+                            $message = '[log serialization error: ' . $e->getMessage() . ']';
+                        }
                         // Call the PSR-3 method with an empty context array
                         $client['sdk']->$mappedMethod($message, []);
                     } else {

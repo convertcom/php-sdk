@@ -153,12 +153,33 @@ class ConvertSDKTest extends TestCase
     }
 
     #[Test]
-    public function createWithPsr3LoggerWorks(): void
+    public function createWithCustomLoggerWorks(): void
     {
         $logger = new \Psr\Log\NullLogger();
         $sdk = ConvertSDK::create([
             'data' => $this->getTestData(),
-            'logger' => $logger,
+            'logger' => [
+                'logLevel' => \ConvertSdk\Enums\LogLevel::Debug,
+                'customLoggers' => [$logger],
+            ],
+        ]);
+
+        $this->assertInstanceOf(Core::class, $sdk);
+        $this->assertTrue($sdk->isReady());
+    }
+
+    #[Test]
+    public function createWithCustomLoggerAndPerLoggerLevelWorks(): void
+    {
+        $logger = new \Psr\Log\NullLogger();
+        $sdk = ConvertSDK::create([
+            'data' => $this->getTestData(),
+            'logger' => [
+                'logLevel' => \ConvertSdk\Enums\LogLevel::Warn,
+                'customLoggers' => [
+                    ['logger' => $logger, 'logLevel' => \ConvertSdk\Enums\LogLevel::Trace],
+                ],
+            ],
         ]);
 
         $this->assertInstanceOf(Core::class, $sdk);

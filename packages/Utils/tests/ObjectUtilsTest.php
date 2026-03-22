@@ -179,8 +179,32 @@ class ObjectUtilsTest extends TestCase
         $obj1 = ['items' => [1, 2, 3]];
         $obj2 = ['items' => [4, 5]];
 
+        // Mirrors JS SDK: [...new Set([...oVal, ...pVal])] — new values first, deduplicated
         $result = ObjectUtils::objectDeepMerge($obj1, $obj2);
-        $this->assertSame([1, 2, 3, 4, 5], $result['items']);
+        $this->assertSame([4, 5, 1, 2, 3], $result['items']);
+    }
+
+    public function testObjectDeepMergeShouldDeduplicateNumericArrays(): void
+    {
+        $obj1 = ['locations' => ['pricing', 'events']];
+        $obj2 = ['locations' => ['pricing', 'stats']];
+
+        $result = ObjectUtils::objectDeepMerge($obj1, $obj2);
+        $this->assertSame(['pricing', 'stats', 'events'], $result['locations']);
+    }
+
+    public function testObjectDeepMergeShouldNotGrowExponentially(): void
+    {
+        $data = ['locations' => ['loc-a']];
+
+        // Simulate repeated merges like putData() does on each runExperience call
+        for ($i = 0; $i < 20; $i++) {
+            $data = ObjectUtils::objectDeepMerge($data, ['locations' => ['loc-a']]);
+        }
+
+        // Without deduplication this would be 2^20 = 1,048,576 entries
+        $this->assertCount(1, $data['locations']);
+        $this->assertSame(['loc-a'], $data['locations']);
     }
 
     public function testObjectDeepMergeShouldHandleOverwritingScalarWithArray(): void
