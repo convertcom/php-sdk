@@ -256,10 +256,16 @@ class ConvertSDKTest extends TestCase
     public function createUsesExplicitDataStoreOverCache(): void
     {
         $cache = new ArrayCache();
-        $customStore = new class {
+        $customStore = new class () {
             private array $data = [];
-            public function get(string $key): mixed { return $this->data[$key] ?? null; }
-            public function set(string $key, mixed $value): void { $this->data[$key] = $value; }
+            public function get(string $key): mixed
+            {
+                return $this->data[$key] ?? null;
+            }
+            public function set(string $key, mixed $value): void
+            {
+                $this->data[$key] = $value;
+            }
         };
 
         $sdk = ConvertSDK::create([
