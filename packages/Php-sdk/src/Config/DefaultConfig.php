@@ -18,8 +18,8 @@ final class DefaultConfig
         return [
             'api' => [
                 'endpoint' => [
-                    'config' => getenv('CONFIG_ENDPOINT') ?: '',
-                    'track'  => getenv('TRACK_ENDPOINT') ?: '',
+                    'config' => getenv('CONFIG_ENDPOINT') ?: 'https://cdn-4.convertexperiments.com/api/v1',
+                    'track'  => getenv('TRACK_ENDPOINT') ?: 'https://[project_id].metrics.convertexperiments.com/v1',
                 ],
             ],
             'environment' => 'production',

@@ -67,6 +67,8 @@ jobs:
   test:
     name: Tests (PHP ${{ matrix.php-version }}, ${{ matrix.dependency-preference }})
     runs-on: ubuntu-latest
+    env:
+      CONVERT_STAGING_SDK_KEY: ${{ secrets.CONVERT_STAGING_SDK_KEY }}
     strategy:
       fail-fast: false
       matrix:

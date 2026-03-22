@@ -562,6 +562,33 @@ composer cs-check
 composer cs-fix
 ```
 
+### Integration test environment variables
+
+The integration test suite supports **live mode**, which makes real HTTP calls to the Convert staging CDN and Tracking API. Live mode requires the `CONVERT_STAGING_SDK_KEY` environment variable. When the variable is absent, live-mode tests are skipped automatically — unit and static-mode tests still run normally.
+
+PHP's `getenv()` reads **OS-level environment variables only** (not `.env` files). You must `export` the variable in your shell before running the tests:
+
+```bash
+export CONVERT_STAGING_SDK_KEY=xxx && composer test:integration
+```
+
+Or set and run in one line without persisting:
+
+```bash
+CONVERT_STAGING_SDK_KEY=your-key-here composer test:integration
+```
+
+### Supported environment variables
+
+| Variable | Used By | Default | Description |
+|---|---|---|---|
+| `CONVERT_STAGING_SDK_KEY` | Integration tests | *(none — live tests skipped when absent)* | SDK key for the Convert staging project. Enables live-mode integration tests that fetch real config and post real tracking events. |
+| `CONFIG_ENDPOINT` | SDK runtime | `https://cdn-4.convertexperiments.com/api/v1` | Override the CDN endpoint used to fetch project configuration. Useful for pointing at a staging or local server. |
+| `TRACK_ENDPOINT` | SDK runtime | `https://[project_id].metrics.convertexperiments.com/v1` | Override the Tracking API endpoint used to post events. `[project_id]` is replaced at runtime with the actual project ID. |
+| `VERSION` | SDK runtime | `php-sdk` | Override the source identifier sent with tracking requests (the `network.source` field). |
+
+> **Note:** Because `getenv()` only reads OS-level environment variables, libraries like `vlucas/phpdotenv` that populate `$_ENV` or `$_SERVER` will **not** make these values visible to the SDK. Always use `export` or inline assignment as shown above.
+
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE) for details.
