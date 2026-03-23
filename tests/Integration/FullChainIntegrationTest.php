@@ -57,6 +57,7 @@ class FullChainIntegrationTest extends TestCase
         return [
             'static' => ['static'],
             'live' => ['live'],
+            'live-secret' => ['live-secret'],
         ];
     }
 
@@ -65,19 +66,28 @@ class FullChainIntegrationTest extends TestCase
         if ($mode === 'live' && !getenv('CONVERT_STAGING_SDK_KEY')) {
             $this->markTestSkipped('Live tests require CONVERT_STAGING_SDK_KEY env var');
         }
+        if ($mode === 'live-secret' && (!getenv('CONVERT_STAGING_SDK_KEY2') || !getenv('CONVERT_STAGING_SDK_KEY2_SECRET'))) {
+            $this->markTestSkipped('Live-secret tests require CONVERT_STAGING_SDK_KEY2 and CONVERT_STAGING_SDK_KEY2_SECRET env vars');
+        }
     }
 
     private function createSdk(string $mode, array $overrides = []): Core
     {
-        if ($mode === 'live') {
+        if ($mode === 'live' || $mode === 'live-secret') {
             // Restore real HTTP strategies for live CDN fetch
             ClassDiscovery::setStrategies(self::$originalStrategies);
             try {
-                return ConvertSDK::create(array_merge([
-                    'sdkKey' => getenv('CONVERT_STAGING_SDK_KEY'),
+                $config = [
                     'environment' => 'staging',
                     'network' => ['tracking' => false, 'cacheLevel' => 'low'],
-                ], $overrides));
+                ];
+                if ($mode === 'live-secret') {
+                    $config['sdkKey'] = getenv('CONVERT_STAGING_SDK_KEY2');
+                    $config['sdkKeySecret'] = getenv('CONVERT_STAGING_SDK_KEY2_SECRET');
+                } else {
+                    $config['sdkKey'] = getenv('CONVERT_STAGING_SDK_KEY');
+                }
+                return ConvertSDK::create(array_merge($config, $overrides));
             } finally {
                 // Re-add mock strategy for subsequent static tests
                 ClassDiscovery::prependStrategy(MockClientStrategy::class);
@@ -94,7 +104,7 @@ class FullChainIntegrationTest extends TestCase
     private function createTrackingEnabledSdk(string $mode): Core
     {
         return $this->createSdk($mode, [
-            'network' => ($mode === 'live')
+            'network' => ($mode === 'live' || $mode === 'live-secret')
                 ? ['tracking' => true, 'cacheLevel' => 'low']
                 : ['tracking' => true],
         ]);
