@@ -628,25 +628,33 @@ composer cs-fix
 
 ### Integration test environment variables
 
-The integration test suite supports **live mode**, which makes real HTTP calls to the Convert staging CDN and Tracking API. Live mode requires the `CONVERT_STAGING_SDK_KEY` environment variable. When the variable is absent, live-mode tests are skipped automatically — unit and static-mode tests still run normally.
+The integration test suite supports three auth modes, each running the full test suite:
 
-PHP's `getenv()` reads **OS-level environment variables only** (not `.env` files). You must `export` the variable in your shell before running the tests:
+- **static** — uses a bundled JSON config file (no network calls)
+- **live** — fetches config from the staging CDN using `sdkKey` only (requires `CONVERT_STAGING_SDK_KEY`)
+- **live-secret** — fetches config using `sdkKey` + `sdkKeySecret` Bearer auth (requires `CONVERT_STAGING_SDK_KEY2` and `CONVERT_STAGING_SDK_KEY2_SECRET`)
+
+When the required env vars for a live mode are absent, those tests are skipped automatically — unit and static-mode tests still run normally.
+
+PHP's `getenv()` reads **OS-level environment variables only** (not `.env` files). You must `export` the variables in your shell before running the tests:
 
 ```bash
-export CONVERT_STAGING_SDK_KEY=xxx && composer test:integration
+export CONVERT_STAGING_SDK_KEY=xxx CONVERT_STAGING_SDK_KEY2=yyy CONVERT_STAGING_SDK_KEY2_SECRET=zzz && composer test:integration
 ```
 
 Or set and run in one line without persisting:
 
 ```bash
-CONVERT_STAGING_SDK_KEY=your-key-here composer test:integration
+CONVERT_STAGING_SDK_KEY=xxx CONVERT_STAGING_SDK_KEY2=yyy CONVERT_STAGING_SDK_KEY2_SECRET=zzz composer test:integration
 ```
 
 ### Supported environment variables
 
 | Variable | Used By | Default | Description |
 |---|---|---|---|
-| `CONVERT_STAGING_SDK_KEY` | Integration tests | *(none — live tests skipped when absent)* | SDK key for the Convert staging project. Enables live-mode integration tests that fetch real config and post real tracking events. |
+| `CONVERT_STAGING_SDK_KEY` | Integration tests | *(none — live tests skipped when absent)* | SDK key for the Convert staging project. Enables `live` mode integration tests that fetch real config and post real tracking events. |
+| `CONVERT_STAGING_SDK_KEY2` | Integration tests | *(none — live-secret tests skipped when absent)* | SDK key for the `live-secret` auth mode. Used with `sdkKeySecret` to test Bearer-authenticated config fetching. |
+| `CONVERT_STAGING_SDK_KEY2_SECRET` | Integration tests | *(none — live-secret tests skipped when absent)* | SDK key secret for the `live-secret` auth mode. Sent as a `Bearer` token in the `Authorization` header. |
 | `CONFIG_ENDPOINT` | SDK runtime | `https://cdn-4.convertexperiments.com/api/v1` | Override the CDN endpoint used to fetch project configuration. Useful for pointing at a staging or local server. |
 | `TRACK_ENDPOINT` | SDK runtime | `https://[project_id].metrics.convertexperiments.com/v1` | Override the Tracking API endpoint used to post events. `[project_id]` is replaced at runtime with the actual project ID. |
 | `VERSION` | SDK runtime | `php-sdk` | Override the source identifier sent with tracking requests (the `network.source` field). |

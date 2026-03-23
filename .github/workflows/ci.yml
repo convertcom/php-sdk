@@ -69,6 +69,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CONVERT_STAGING_SDK_KEY: ${{ secrets.CONVERT_STAGING_SDK_KEY }}
+      CONVERT_STAGING_SDK_KEY2: ${{ secrets.CONVERT_STAGING_SDK_KEY2 }}
+      CONVERT_STAGING_SDK_KEY2_SECRET: ${{ secrets.CONVERT_STAGING_SDK_KEY2_SECRET }}
     strategy:
       fail-fast: false
       matrix:
