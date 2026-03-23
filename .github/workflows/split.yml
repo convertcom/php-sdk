@@ -13,18 +13,18 @@ jobs:
       fail-fast: false
       matrix:
         package:
-          - { name: 'Api', local_path: 'packages/Api', split_repository: 'convert-php-sdk-api' }
-          - { name: 'Bucketing', local_path: 'packages/Bucketing', split_repository: 'convert-php-sdk-bucketing' }
-          - { name: 'Data', local_path: 'packages/Data', split_repository: 'convert-php-sdk-data' }
-          - { name: 'Enums', local_path: 'packages/Enums', split_repository: 'convert-php-sdk-enums' }
-          - { name: 'Event', local_path: 'packages/Event', split_repository: 'convert-php-sdk-event' }
-          - { name: 'Experience', local_path: 'packages/Experience', split_repository: 'convert-php-sdk-experience' }
-          - { name: 'Logger', local_path: 'packages/Logger', split_repository: 'convert-php-sdk-logger' }
-          - { name: 'Php-sdk', local_path: 'packages/Php-sdk', split_repository: 'convert-php-sdk' }
-          - { name: 'Rules', local_path: 'packages/Rules', split_repository: 'convert-php-sdk-rules' }
-          - { name: 'Segments', local_path: 'packages/Segments', split_repository: 'convert-php-sdk-segments' }
-          - { name: 'Types', local_path: 'packages/Types', split_repository: 'convert-php-sdk-types' }
-          - { name: 'Utils', local_path: 'packages/Utils', split_repository: 'convert-php-sdk-utils' }
+          - { name: 'Api', local_path: 'packages/Api', split_repository: 'php-sdk-api' }
+          - { name: 'Bucketing', local_path: 'packages/Bucketing', split_repository: 'php-sdk-bucketing' }
+          - { name: 'Data', local_path: 'packages/Data', split_repository: 'php-sdk-data' }
+          - { name: 'Enums', local_path: 'packages/Enums', split_repository: 'php-sdk-enums' }
+          - { name: 'Event', local_path: 'packages/Event', split_repository: 'php-sdk-event' }
+          - { name: 'Experience', local_path: 'packages/Experience', split_repository: 'php-sdk-experience' }
+          - { name: 'Logger', local_path: 'packages/Logger', split_repository: 'php-sdk-logger' }
+          - { name: 'Php-sdk', local_path: 'packages/Php-sdk', split_repository: 'php-sdk' }
+          - { name: 'Rules', local_path: 'packages/Rules', split_repository: 'php-sdk-rules' }
+          - { name: 'Segments', local_path: 'packages/Segments', split_repository: 'php-sdk-segments' }
+          - { name: 'Types', local_path: 'packages/Types', split_repository: 'php-sdk-types' }
+          - { name: 'Utils', local_path: 'packages/Utils', split_repository: 'php-sdk-utils' }
     env:
       GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
     steps:
