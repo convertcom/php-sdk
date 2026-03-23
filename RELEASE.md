@@ -119,11 +119,12 @@ One-time setup items required before the automated pipeline works:
   ```
 - [ ] `SPLIT_TOKEN` PAT secret configured with write access to all 12 split repos
 - [ ] Packagist webhooks configured on each split repo
-- [ ] Initial `v1.0.0` tag on `main` (semantic-release needs a starting point):
+- [ ] `yarn install` run once to generate `yarn.lock` (committed to repo)
+- [ ] After merging this branch to `main`, tag the merge commit as `v1.0.0` to establish the baseline:
   ```bash
   git checkout main && git pull && git tag v1.0.0 && git push origin v1.0.0
   ```
-- [ ] `yarn install` run once to generate `yarn.lock` (committed to repo)
+  **Important:** Tag the merge commit itself — do NOT create the tag before merging, or semantic-release will see all branch commits as new and produce an unwanted release.
 
 ## Troubleshooting
 
