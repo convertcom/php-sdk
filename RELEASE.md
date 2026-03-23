@@ -31,8 +31,9 @@ This project uses a **digit-capped semver** scheme. Each version position is cap
 | Normal minor | 1.2.5 | minor | 1.3.0 |
 | Minor at cap | 1.9.3 | minor | 2.0.0 |
 | Full cap | 1.9.9 | patch | 2.0.0 |
+| Breaking change | 1.2.5 | major | 2.0.0 |
 
-**There is no direct major bump.** Major versions only happen via rollover when minor exceeds 9.
+Major bumps happen either directly via `BREAKING CHANGE` commits (standard semver) or via rollover when a digit exceeds 9.
 
 ## Commit Convention
 
@@ -43,7 +44,7 @@ Only conventional commits trigger releases:
 | `fix:` | patch | Yes (Bug Fixes) |
 | `feat:` | patch | Yes (Features) |
 | `refactor:` | minor | Yes (Refactoring) |
-| `BREAKING CHANGE` (footer) | minor | Yes |
+| `BREAKING CHANGE` (footer) | **major** | Yes |
 | `chore:`, `docs:`, `ci:`, `test:`, `style:`, `perf:` | no release | No |
 
 ## Automated Flow

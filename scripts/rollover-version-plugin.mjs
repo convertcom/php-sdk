@@ -9,15 +9,18 @@ import { sync as parseSync } from 'conventional-commits-parser';
  *
  * Commit mapping:
  *   fix: / feat:           → logical patch
- *   refactor: / BREAKING CHANGE → logical minor
+ *   refactor:              → logical minor
+ *   BREAKING CHANGE        → logical major (direct, no rollover)
  *   everything else        → no release
  *
- * Rollover rules:
+ * Rollover rules (patch and minor only):
  *   logical patch: patch<9 → patch | minor<9 → minor | else → major
  *   logical minor: minor<9 → minor | else → major
+ *   logical major: always → major (standard semver)
  */
 
 function getLogicalType(commits) {
+  let hasMajor = false;
   let hasMinor = false;
   let hasPatch = false;
 
@@ -29,13 +32,16 @@ function getLogicalType(commits) {
     const hasBreaking =
       parsed.notes?.some((note) => note.title === 'BREAKING CHANGE') ?? false;
 
-    if (type === 'refactor' || hasBreaking) {
+    if (hasBreaking) {
+      hasMajor = true;
+    } else if (type === 'refactor') {
       hasMinor = true;
     } else if (type === 'feat' || type === 'fix') {
       hasPatch = true;
     }
   }
 
+  if (hasMajor) return 'major';
   if (hasMinor) return 'minor';
   if (hasPatch) return 'patch';
   return null;
@@ -54,6 +60,10 @@ function getEffectiveReleaseType(logicalType, lastVersion) {
 
   if (logicalType === 'minor') {
     if (minor < 9) return 'minor';
+    return 'major';
+  }
+
+  if (logicalType === 'major') {
     return 'major';
   }
 
