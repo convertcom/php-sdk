@@ -1,4 +1,6 @@
-import { sync as parseSync } from 'conventional-commits-parser';
+import { CommitParser } from 'conventional-commits-parser';
+
+const parser = new CommitParser();
 
 /**
  * Custom semantic-release analyzeCommits plugin.
@@ -25,7 +27,7 @@ function getLogicalType(commits) {
   let hasPatch = false;
 
   for (const commit of commits) {
-    const parsed = parseSync(commit.message);
+    const parsed = parser.parse(commit.message);
     if (!parsed) continue;
 
     const type = parsed.type;

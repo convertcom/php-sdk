@@ -1,9 +1,7 @@
 name: Split Monorepo
 
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
+  workflow_dispatch:
 
 jobs:
   split:
