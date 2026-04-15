@@ -38,7 +38,7 @@ The SDK auto-discovers your PSR-18 client via [`php-http/discovery`](https://git
 composer require convertcom/php-sdk
 ```
 
-This installs the SDK and all internal packages. The only external runtime dependencies are:
+This installs the SDK and its external PSR dependencies. The key runtime dependencies are:
 
 - `psr/log ^3.0` (PSR-3 logging interface)
 - `psr/simple-cache ^3.0` (PSR-16 caching interface)
