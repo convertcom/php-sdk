@@ -110,11 +110,20 @@ One-time setup items required before the automated pipeline works:
 
 - [ ] **Monorepo registered on Packagist** pointing at the monorepo GitHub URL, with the GitHub webhook configured (see Packagist Setup above)
 - [ ] `yarn install` run once to generate `yarn.lock` (committed to repo)
-- [ ] After merging this branch to `main`, tag the merge commit as `v1.0.0` to establish the baseline:
-  ```bash
-  git checkout main && git pull && git tag v1.0.0 && git push origin v1.0.0
-  ```
-  **Important:** Tag the merge commit itself -- do NOT create the tag before merging, or semantic-release will see all branch commits as new and produce an unwanted release.
+
+## First Release
+
+The first release is produced automatically by the pipeline -- no manual tagging is required. On the first merge to `main` after the release workflow is configured, semantic-release observes that no prior `v*` tag exists, so it:
+
+1. Treats every releasable commit in history (all `fix:` / `feat:` / `refactor:` since project inception) as part of the first release
+2. Emits `v1.0.0` as the version (semantic-release's fixed first-release default, regardless of the rollover logic's bump type)
+3. Generates a correspondingly long `CHANGELOG.md` entry covering the full history, grouped by commit type
+4. Commits `CHANGELOG.md` + bumped `composer.json` files and pushes tag `v1.0.0`
+5. Packagist (once registered) picks up `v1.0.0` on the tag push and publishes
+
+The one-time long CHANGELOG is expected on the first release. Every subsequent release analyzes only the commits since the previous tag and will produce a small, focused CHANGELOG entry.
+
+Do not create a `v1.0.0` tag manually before or after the first merge -- the pipeline owns this, and a pre-existing tag will either be raced or block the automated tag push.
 
 ## Troubleshooting
 
