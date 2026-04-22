@@ -17,6 +17,7 @@ use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Utils\LogUtils;
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Model\ConfigExperience;
 use OpenAPI\Client\Model\ExperienceVariationConfig;
@@ -144,7 +145,7 @@ final class ExperienceManager implements ExperienceManagerInterface
                 }
             }
 
-            $this->logManager->debug('ExperienceManager.selectVariation()', $logData);
+            $this->logManager->debug('ExperienceManager.selectVariation()', LogUtils::toLoggable($logData));
         }
 
         return $result;
@@ -197,7 +198,7 @@ final class ExperienceManager implements ExperienceManagerInterface
                 }
             }
 
-            $this->logManager->debug('ExperienceManager.selectVariationById()', $logData);
+            $this->logManager->debug('ExperienceManager.selectVariationById()', LogUtils::toLoggable($logData));
         }
 
         return $result;

@@ -25,6 +25,7 @@ use ConvertSdk\Interfaces\DataStoreManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Interfaces\RuleManagerInterface;
 use ConvertSdk\Utils\ArrayUtils;
+use ConvertSdk\Utils\LogUtils;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Utils\StringUtils;
 use OpenAPI\Client\BucketedVariation;
@@ -284,7 +285,7 @@ final class DataManager implements DataManagerInterface
         // Log trace information
         $this->_loggerManager?->trace(
             'DataManager.matchRulesByField()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
                 'visitorId' => $visitorId,
                 'identity' => $identity,
                 'identityField' => $identityField,
@@ -292,7 +293,7 @@ final class DataManager implements DataManagerInterface
                 'locationProperties' => $locationProperties,
                 'ignoreLocationProperties' => $ignoreLocationProperties,
                 'environment' => $environment,
-            ]))
+            ])))
         );
 
         // Retrieve the experience
@@ -301,10 +302,10 @@ final class DataManager implements DataManagerInterface
             $this->_loggerManager?->debug(
                 'DataManager.matchRulesByField()',
                 Messages::EXPERIENCE_NOT_FOUND,
-                ($this->_mapper)([
+                LogUtils::toLoggable(($this->_mapper)([
                     'identity' => $identity,
                     'identityField' => $identityField,
-                ])
+                ]))
             );
             return null;
         }
@@ -317,10 +318,10 @@ final class DataManager implements DataManagerInterface
             $this->_loggerManager?->debug(
                 'DataManager.matchRulesByField()',
                 Messages::EXPERIENCE_ARCHIVED,
-                ($this->_mapper)([
+                LogUtils::toLoggable(($this->_mapper)([
                     'identity' => $identity,
                     'identityField' => $identityField,
-                ])
+                ]))
             );
             return null;
         }
@@ -331,10 +332,10 @@ final class DataManager implements DataManagerInterface
             $this->_loggerManager?->debug(
                 'DataManager.matchRulesByField()',
                 Messages::EXPERIENCE_ENVIRONMENT_NOT_MATCH,
-                ($this->_mapper)([
+                LogUtils::toLoggable(($this->_mapper)([
                     'identity' => $identity,
                     'identityField' => $identityField,
-                ])
+                ]))
             );
             return null;
         }
@@ -381,10 +382,10 @@ final class DataManager implements DataManagerInterface
             $this->_loggerManager?->debug(
                 'DataManager.matchRulesByField()',
                 Messages::LOCATION_NOT_MATCH,
-                json_encode(($this->_mapper)([
+                json_encode(LogUtils::toLoggable(($this->_mapper)([
                     'locationProperties' => $locationProperties,
                     isset($experience['locations']) ? 'experiences[].variations[].locations' : 'experiences[].variations[].site_area' => $experience['locations'] ?? $experience['site_area'] ?? '',
-                ]))
+                ])))
             );
             return null;
         }
@@ -480,20 +481,20 @@ final class DataManager implements DataManagerInterface
                 $this->_loggerManager?->debug(
                     'DataManager.matchRulesByField()',
                     Messages::VARIATIONS_NOT_FOUND,
-                    ($this->_mapper)([
+                    LogUtils::toLoggable(($this->_mapper)([
                         'visitorProperties' => $visitorProperties,
                         'audiences' => $audiences,
-                    ])
+                    ]))
                 );
             }
         } else {
             $this->_loggerManager?->debug(
                 'DataManager.matchRulesByField()',
                 Messages::AUDIENCE_NOT_MATCH,
-                ($this->_mapper)([
+                LogUtils::toLoggable(($this->_mapper)([
                     'visitorProperties' => $visitorProperties,
                     'audiences' => $audiences,
-                ])
+                ]))
             );
         }
         return null;
@@ -533,7 +534,7 @@ final class DataManager implements DataManagerInterface
         // Log trace information
         $this->_loggerManager?->trace(
             'DataManager._getBucketingByField()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
               'visitorId' => $visitorId,
               'identity' => $identity,
               'identityField' => $identityField,
@@ -543,7 +544,7 @@ final class DataManager implements DataManagerInterface
               'enableTracking' => $enableTracking,
               'ignoreLocationProperties' => $ignoreLocationProperties,
               'environment' => $environment,
-        ]))
+        ])))
         );
 
         // Retrieve the experience
@@ -615,11 +616,11 @@ final class DataManager implements DataManagerInterface
             );
             $this->_loggerManager?->debug(
                 'DataManager._retrieveBucketing()',
-                $this->_mapper([
+                LogUtils::toLoggable(($this->_mapper)([
                     'storeKey' => $storeKey,
                     'visitorId' => $visitorId,
                     'variationId' => $forceVariationId,
-                ])
+                ]))
             );
         }
 
@@ -642,11 +643,11 @@ final class DataManager implements DataManagerInterface
             $this->_loggerManager?->debug(
                 'DataManager._retrieveBucketing()',
                 json_encode(
-                    ($this->_mapper)([
+                    LogUtils::toLoggable(($this->_mapper)([
                     'storeKey' => $storeKey,
                     'visitorId' => $visitorId,
                     'variationId' => $variationId,
-              ])
+              ]))
                 )
             );
         } else {
@@ -686,12 +687,12 @@ final class DataManager implements DataManagerInterface
                 $this->_loggerManager?->debug(
                     'DataManager._retrieveBucketing()',
                     ErrorMessages::UNABLE_TO_SELECT_BUCKET_FOR_VISITOR,
-                    json_encode(($this->_mapper)([
+                    json_encode(LogUtils::toLoggable(($this->_mapper)([
                         'visitorId' => $visitorId,
                         'experience' => $experience,
                         'buckets' => $buckets,
                         'bucketing' => $bucketing,
-                    ]))
+                    ])))
                 );
                 return BucketingError::VariationNotDecided;
             }
@@ -721,7 +722,7 @@ final class DataManager implements DataManagerInterface
                 $this->_apiManager->enqueue($visitorId, new VisitorTrackingEvents($visitorEvent), new VisitorSegments($segments));
                 $this->_loggerManager?->trace(
                     'DataManager._retrieveBucketing()',
-                    json_encode(($this->_mapper)(['visitorEvent' => $visitorEvent]))
+                    json_encode(LogUtils::toLoggable(($this->_mapper)(['visitorEvent' => $visitorEvent])))
                 );
             }
 
@@ -905,10 +906,10 @@ final class DataManager implements DataManagerInterface
 
         $this->_loggerManager?->trace(
             'DataManager.selectLocations()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
                 'items' => $items,
                 'locationProperties' => $locationProperties,
-            ]))
+            ])))
         );
 
         // Get locations from DataStore
@@ -993,9 +994,9 @@ final class DataManager implements DataManagerInterface
 
         $this->_loggerManager?->debug(
             'DataManager.selectLocations()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
                 'matchedRecords' => $matchedRecords,
-            ]))
+            ])))
         );
 
         return $matchedRecords;
@@ -1094,10 +1095,10 @@ final class DataManager implements DataManagerInterface
             $this->_loggerManager?->debug(
                 'DataManager.convert()',
                 str_replace('#', $goalId, Messages::GOAL_FOUND),
-                json_encode(($this->_mapper)([
+                json_encode(LogUtils::toLoggable(($this->_mapper)([
                     'visitorId' => $visitorId,
                     'goalId' => $goalId,
-                ]))
+                ])))
             );
             if (!$forceMultipleTransactions) {
                 return true;
@@ -1141,7 +1142,7 @@ final class DataManager implements DataManagerInterface
         $this->_apiManager->enqueue($visitorId, new VisitorTrackingEvents($event), $segments);
         $this->_loggerManager?->trace(
             'DataManager.convert()',
-            ($this->_mapper)(['event' => $event])
+            LogUtils::toLoggable(($this->_mapper)(['event' => $event]))
         );
     }
 
@@ -1171,7 +1172,7 @@ final class DataManager implements DataManagerInterface
         $this->_apiManager->enqueue($visitorId, new VisitorTrackingEvents($event), $segments);
         $this->_loggerManager?->trace(
             'DataManager.convert()',
-            ($this->_mapper)(['event' => $event])
+            LogUtils::toLoggable(($this->_mapper)(['event' => $event]))
         );
     }
 
@@ -1194,10 +1195,10 @@ final class DataManager implements DataManagerInterface
         $this->_loggerManager?->trace(
             'DataManager.filterMatchedRecordsWithRule()',
             json_encode(
-                ($this->_mapper)([
+                LogUtils::toLoggable(($this->_mapper)([
                 'items' => $items,
                 'visitorProperties' => $visitorProperties,
-          ])
+          ]))
             )
         );
 
@@ -1225,9 +1226,9 @@ final class DataManager implements DataManagerInterface
 
         $this->_loggerManager?->debug(
             'DataManager.filterMatchedRecordsWithRule()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
                 'matchedRecords' => $matchedRecords,
-            ]))
+            ])))
         );
 
         return $matchedRecords;
@@ -1244,10 +1245,10 @@ final class DataManager implements DataManagerInterface
     {
         $this->_loggerManager?->trace(
             'DataManager.filterMatchedCustomSegments()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
                 'items' => $items,
                 'visitorId' => $visitorId,
-            ]))
+            ])))
         );
 
         // Get custom segments ID from DataStore
@@ -1268,9 +1269,9 @@ final class DataManager implements DataManagerInterface
 
         $this->_loggerManager?->debug(
             'DataManager.filterMatchedCustomSegments()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
                 'matchedRecords' => $matchedRecords,
-            ]))
+            ])))
         );
 
         return $matchedRecords;
@@ -1352,10 +1353,10 @@ final class DataManager implements DataManagerInterface
 
         $this->_loggerManager?->trace(
             'DataManager.getEntitiesList()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
                 'entityType' => $mappedEntityType,
                 'list' => $list,
-            ]))
+            ])))
         );
 
         return $list;
@@ -1393,11 +1394,11 @@ final class DataManager implements DataManagerInterface
 
         $this->_loggerManager?->trace(
             'DataManager._getEntityByField()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
                 'identity' => $identity,
                 'entityType' => $mappedEntityType,
                 'identityField' => $identityField,
-            ]))
+            ])))
         );
         $list = $this->getEntitiesList($mappedEntityType);
         if (ArrayUtils::arrayNotEmpty($list)) {
@@ -1416,12 +1417,12 @@ final class DataManager implements DataManagerInterface
             $this->_loggerManager->debug(
                 'DataManager._getEntityByField()',
                 Messages::ENTITY_LOOKUP_FAILED,
-                ($this->_mapper)([
+                LogUtils::toLoggable(($this->_mapper)([
                     'searchedFor' => $identity,
                     'entityType' => $mappedEntityType,
                     'identityField' => $identityField,
                     'availableKeys' => $availableKeys,
-                ])
+                ]))
             );
         }
 
@@ -1508,10 +1509,10 @@ final class DataManager implements DataManagerInterface
     {
         $this->_loggerManager?->trace(
             'DataManager.getItemsByIds()',
-            json_encode(($this->_mapper)([
+            json_encode(LogUtils::toLoggable(($this->_mapper)([
                 'ids' => $ids,
                 'path' => $path,
-            ]))
+            ])))
         );
 
         $items = [];
@@ -1563,13 +1564,13 @@ final class DataManager implements DataManagerInterface
             $this->_loggerManager->debug(
                 'DataManager.getSubItem()',
                 Messages::ENTITY_LOOKUP_FAILED,
-                ($this->_mapper)([
+                LogUtils::toLoggable(($this->_mapper)([
                     'entityType' => $entityType,
                     'entityIdentity' => $entityIdentity,
                     'subEntityType' => $subEntityType,
                     'subEntityIdentity' => $subEntityIdentity,
                     'parentFound' => true,
-                ])
+                ]))
             );
         }
 
