@@ -14,6 +14,7 @@ use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Utils\LogUtils;
 use Http\Discovery\Psr17FactoryDiscovery;
 use Http\Discovery\Psr18ClientDiscovery;
 use OpenAPI\Client\Config;
@@ -244,7 +245,7 @@ class ApiManager implements ApiManagerInterface
         if ($this->loggerManager && method_exists($this->loggerManager, 'trace')) {
             $this->loggerManager->trace(
                 'ApiManager.enqueue()',
-                call_user_func($this->mapper, ['eventRequest' => $eventRequest])
+                LogUtils::toLoggable(call_user_func($this->mapper, ['eventRequest' => $eventRequest]))
             );
         }
         /** @var array<string, mixed> $eventArray */
@@ -329,12 +330,12 @@ class ApiManager implements ApiManagerInterface
                 if ($statusCode >= 400 && $statusCode < 500) {
                     // Client error — do NOT retry, discard batch
                     if ($this->loggerManager && method_exists($this->loggerManager, 'warn')) {
-                        $this->loggerManager->warn('ApiManager.releaseQueue()', [
+                        $this->loggerManager->warn('ApiManager.releaseQueue()', LogUtils::toLoggable([
                             'error' => "Tracking POST returned client error HTTP {$statusCode}",
                             'statusCode' => $statusCode,
                             'endpoint' => "/track/{$this->sdkKey}",
                             'reason' => $reason,
-                        ]);
+                        ]));
                     }
                     $this->requestsQueue->reset();
                     if ($this->eventManager && method_exists($this->eventManager, 'fire')) {
@@ -376,7 +377,7 @@ class ApiManager implements ApiManagerInterface
             $logContext['statusCode'] = $lastStatusCode;
         }
         if ($this->loggerManager && method_exists($this->loggerManager, 'warn')) {
-            $this->loggerManager->warn('ApiManager.releaseQueue()', $logContext);
+            $this->loggerManager->warn('ApiManager.releaseQueue()', LogUtils::toLoggable($logContext));
         }
 
         $this->requestsQueue->reset();
