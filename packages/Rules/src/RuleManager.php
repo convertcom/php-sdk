@@ -17,6 +17,7 @@ use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Interfaces\RuleManagerInterface;
 use ConvertSdk\Utils\ArrayUtils;
 use ConvertSdk\Utils\Comparisons;
+use ConvertSdk\Utils\LogUtils;
 use ConvertSdk\Utils\ObjectUtils;
 use ConvertSdk\Utils\StringUtils;
 use OpenAPI\Client\Model\RuleElement;
@@ -54,7 +55,7 @@ final class RuleManager implements RuleManagerInterface
         private readonly ?LogManagerInterface $logManager = null,
         private readonly ?\Closure $mapper = null,
     ) {
-        $this->logManager?->trace('RuleManager()', Messages::RULE_CONSTRUCTOR, $this);
+        $this->logManager?->trace('RuleManager()', Messages::RULE_CONSTRUCTOR, LogUtils::toLoggable($this));
     }
 
     /**
@@ -112,10 +113,10 @@ final class RuleManager implements RuleManagerInterface
     public function isRuleMatched(array $data, RuleObject $ruleSet, ?string $logEntry = null): bool|RuleError
     {
         $mapperFn = $this->mapper ?? static fn (mixed $value): mixed => $value;
-        $this->logManager?->trace('RuleManager.isRuleMatched()', $mapperFn([
+        $this->logManager?->trace('RuleManager.isRuleMatched()', LogUtils::toLoggable($mapperFn([
             'data' => $data,
             'ruleSet' => $ruleSet,
-        ]));
+        ])));
         if ($logEntry) {
             $this->logManager?->info('RuleManager.isRuleMatched()', str_replace('#', $logEntry, Messages::PROCESSING_ENTITY));
         }
@@ -165,7 +166,7 @@ final class RuleManager implements RuleManagerInterface
     public function isValidRule(RuleElement $rule): bool
     {
         $mapperFn = $this->mapper ?? static fn (mixed $value): mixed => $value;
-        $this->logManager?->trace('RuleManager.isValidRule()', $mapperFn(['rule' => $rule]));
+        $this->logManager?->trace('RuleManager.isValidRule()', LogUtils::toLoggable($mapperFn(['rule' => $rule])));
         return isset($rule['matching']) && is_array($rule['matching']) &&
             isset($rule['matching']['match_type']) && is_string($rule['matching']['match_type']) &&
             isset($rule['matching']['negated']) && is_bool($rule['matching']['negated']) &&
@@ -323,10 +324,10 @@ final class RuleManager implements RuleManagerInterface
                             }
                         }
                     } else {
-                        $this->logManager?->trace('RuleManager.processRuleItem()', [
+                        $this->logManager?->trace('RuleManager.processRuleItem()', LogUtils::toLoggable([
                             'warn' => ErrorMessages::RULE_DATA_NOT_VALID,
                             'data' => $data,
-                        ]);
+                        ]));
                     }
                 } else {
                     $this->logManager?->warn(
