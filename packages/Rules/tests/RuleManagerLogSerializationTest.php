@@ -62,17 +62,29 @@ class RuleManagerLogSerializationTest extends TestCase
             $traceBlob,
             'Expected the captured trace to contain the real rule_type payload. Blob: ' . $traceBlob,
         );
+
+        // Pin LogManager's current behaviour: it concatenates all args into the message
+        // and passes an empty PSR-3 context. If this ever changes to structured context,
+        // this assertion will flag it so the data-presence assertion above can be moved
+        // to the right place.
+        foreach ($captured['messages'] as $entry) {
+            $this->assertSame(
+                [],
+                $entry['context'],
+                'LogManager currently passes [] as PSR-3 context; if this changes, rework the assertions on $traceBlob.',
+            );
+        }
     }
 
     /**
-     * @return array{logger: LoggerInterface, messages: array<int, array{level: string, message: string}>}
+     * @return array{logger: LoggerInterface, messages: array<int, array{level: string, message: string, context: array<string, mixed>}>}
      */
     private function makeCapturingLogger(): array
     {
         $messages = [];
         $logger = new class ($messages) implements LoggerInterface {
             /**
-             * @param array<int, array{level: string, message: string}> $messages
+             * @param array<int, array{level: string, message: string, context: array<string, mixed>}> $messages
              */
             public function __construct(private array &$messages)
             {
@@ -80,52 +92,55 @@ class RuleManagerLogSerializationTest extends TestCase
 
             public function emergency(string|Stringable $message, array $context = []): void
             {
-                $this->capture('emergency', $message);
+                $this->capture('emergency', $message, $context);
             }
 
             public function alert(string|Stringable $message, array $context = []): void
             {
-                $this->capture('alert', $message);
+                $this->capture('alert', $message, $context);
             }
 
             public function critical(string|Stringable $message, array $context = []): void
             {
-                $this->capture('critical', $message);
+                $this->capture('critical', $message, $context);
             }
 
             public function error(string|Stringable $message, array $context = []): void
             {
-                $this->capture('error', $message);
+                $this->capture('error', $message, $context);
             }
 
             public function warning(string|Stringable $message, array $context = []): void
             {
-                $this->capture('warning', $message);
+                $this->capture('warning', $message, $context);
             }
 
             public function notice(string|Stringable $message, array $context = []): void
             {
-                $this->capture('notice', $message);
+                $this->capture('notice', $message, $context);
             }
 
             public function info(string|Stringable $message, array $context = []): void
             {
-                $this->capture('info', $message);
+                $this->capture('info', $message, $context);
             }
 
             public function debug(string|Stringable $message, array $context = []): void
             {
-                $this->capture('debug', $message);
+                $this->capture('debug', $message, $context);
             }
 
             public function log($level, string|Stringable $message, array $context = []): void
             {
-                $this->capture((string)$level, $message);
+                $this->capture((string)$level, $message, $context);
             }
 
-            private function capture(string $level, string|Stringable $message): void
+            /**
+             * @param array<string, mixed> $context
+             */
+            private function capture(string $level, string|Stringable $message, array $context): void
             {
-                $this->messages[] = ['level' => $level, 'message' => (string)$message];
+                $this->messages[] = ['level' => $level, 'message' => (string)$message, 'context' => $context];
             }
         };
 

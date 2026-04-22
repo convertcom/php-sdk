@@ -616,7 +616,7 @@ final class DataManager implements DataManagerInterface
             );
             $this->_loggerManager?->debug(
                 'DataManager._retrieveBucketing()',
-                LogUtils::toLoggable($this->_mapper([
+                LogUtils::toLoggable(($this->_mapper)([
                     'storeKey' => $storeKey,
                     'visitorId' => $visitorId,
                     'variationId' => $forceVariationId,

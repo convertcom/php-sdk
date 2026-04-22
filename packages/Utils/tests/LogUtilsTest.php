@@ -105,6 +105,18 @@ class LogUtilsTest extends TestCase
         $this->assertSame(['a' => 1, 'b' => 2], LogUtils::toLoggable($iter));
     }
 
+    public function testTraversableContainingOpenApiModelRecurses(): void
+    {
+        $rule = $this->makeRuleElementWithRuleType('generic_text_key_value');
+        $iter = new ArrayIterator([$rule]);
+
+        $result = LogUtils::toLoggable($iter);
+
+        $this->assertIsArray($result);
+        $this->assertIsArray($result[0]);
+        $this->assertSame('generic_text_key_value', $result[0]['rule_type']);
+    }
+
     public function testNonModelJsonSerializableRecursesViaJsonSerialize(): void
     {
         $obj = new class () implements JsonSerializable {

@@ -59,16 +59,18 @@ final class LogUtils
             return $out;
         }
 
+        // JsonSerializable intent takes precedence over raw iteration for non-model objects
+        // that explicitly declare how they want to be serialised.
+        if ($value instanceof JsonSerializable) {
+            return self::toLoggable($value->jsonSerialize());
+        }
+
         if ($value instanceof Traversable) {
             $out = [];
             foreach ($value as $key => $item) {
                 $out[$key] = self::toLoggable($item);
             }
             return $out;
-        }
-
-        if ($value instanceof JsonSerializable) {
-            return self::toLoggable($value->jsonSerialize());
         }
 
         if (is_object($value)) {

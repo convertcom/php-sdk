@@ -55,7 +55,7 @@ final class RuleManager implements RuleManagerInterface
         private readonly ?LogManagerInterface $logManager = null,
         private readonly ?\Closure $mapper = null,
     ) {
-        $this->logManager?->trace('RuleManager()', Messages::RULE_CONSTRUCTOR, LogUtils::toLoggable($this));
+        $this->logManager?->trace('RuleManager()', Messages::RULE_CONSTRUCTOR, $this);
     }
 
     /**

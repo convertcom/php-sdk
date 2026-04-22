@@ -7,7 +7,6 @@ namespace ConvertSdk;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\Interfaces\BucketingManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Utils\LogUtils;
 use ConvertSdk\Utils\StringUtils;
 
 /**
@@ -32,7 +31,7 @@ final class BucketingManager implements BucketingManagerInterface
         private readonly ?LogManagerInterface $logManager = null,
     ) {
         if ($this->logManager) {
-            $this->logManager->trace('BucketingManager()', Messages::BUCKETING_CONSTRUCTOR, LogUtils::toLoggable($this));
+            $this->logManager->trace('BucketingManager()', Messages::BUCKETING_CONSTRUCTOR, $this);
         }
     }
 
