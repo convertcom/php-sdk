@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
 use ConvertSdk\Utils\Comparisons;
+use PHPUnit\Framework\TestCase;
 
 class ComparisonsTest extends TestCase
 {

@@ -2,3 +2,10 @@
 /packages/*/vendor/
 /packages/*/composer.lock
 .DS_Store
+.phpunit.result.cache
+coverage-report/
+coverage.xml
+.php-cs-fixer.cache
+node_modules/
+.pnp.*
+.yarn/

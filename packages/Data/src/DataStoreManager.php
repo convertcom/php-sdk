@@ -1,28 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk;
 
-use ConvertSdk\Interfaces\DataStoreManagerInterface;
-use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Enums\ErrorMessages;
+use ConvertSdk\Interfaces\DataStoreManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
 use OpenAPI\Client\Config;
 
-class DataStoreManager implements DataStoreManagerInterface
+/**
+ * DataStoreManager wraps a user-provided data store (any object with get/set methods)
+ * and delegates persistence operations to it.
+ */
+final class DataStoreManager implements DataStoreManagerInterface
 {
-    private $requestsQueue = [];
-    private $requestsQueueTimerID;
-    private $loggerManager;
-    private $eventManager;
-    public $batchSize;
-    public $releaseInterval;
-    private $dataStore;
-    private $mapper;
-
-    const DEFAULT_BATCH_SIZE = 1;
-    const DEFAULT_RELEASE_INTERVAL = 5000; // milliseconds
+    private ?LogManagerInterface $loggerManager;
+    private mixed $dataStore = null;
 
     /**
      * Constructor
@@ -30,31 +24,12 @@ class DataStoreManager implements DataStoreManagerInterface
      * @param Config|null $config Optional configuration object.
      * @param array $dependencies
      */
-    public function __construct(?Config $config = null, $dependencies = [])
+    public function __construct(?Config $config = null, array $dependencies = [])
     {
         $this->loggerManager = $dependencies['loggerManager'] ?? null;
-        $this->eventManager = $dependencies['eventManager'] ?? null;
-
-        // Set batch size and release interval from config if available, or use defaults.
-        $this->batchSize = $config && isset($config->getEvents()['batch_size']) 
-            ? (int)$config->getEvents()['batch_size'] 
-            : self::DEFAULT_BATCH_SIZE;
-
-        $this->releaseInterval = $config && isset($config->getEvents()['release_interval']) 
-            ? (int)$config->getEvents()['release_interval'] 
-            : self::DEFAULT_RELEASE_INTERVAL;
 
         // Use provided dataStore (invokes setDataStore())
         $this->setDataStore($dependencies['dataStore'] ?? $config->getDataStore());
-
-        // Mapper callable, defaulting to identity function.
-        $this->mapper = ($config && method_exists($config, 'getMapper') && null !== $config->getMapper()) 
-            ? $config->getMapper() 
-            : function ($value) {
-                return $value;
-            };
-
-        $this->requestsQueue = [];
     }
 
     /**
@@ -63,7 +38,7 @@ class DataStoreManager implements DataStoreManagerInterface
      * @param string $key
      * @param mixed  $data
      */
-    public function set(string $key, $data): void
+    public function set(string $key, mixed $data): void
     {
         try {
             if ($this->dataStore !== null && method_exists($this->dataStore, 'set')) {
@@ -82,7 +57,7 @@ class DataStoreManager implements DataStoreManagerInterface
      * @param string $key
      * @return mixed|null
      */
-    public function get($key)
+    public function get(string $key): mixed
     {
         try {
             if ($this->dataStore !== null && method_exists($this->dataStore, 'get')) {
@@ -97,81 +72,11 @@ class DataStoreManager implements DataStoreManagerInterface
     }
 
     /**
-     * Enqueues data and releases the queue if batch size is reached,
-     * otherwise starts a timer if this is the first item.
-     *
-     * @param string $key
-     * @param mixed  $data
-     */
-    public function enqueue(string $key, $data): void
-    {
-        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'trace')) {
-            // Call the mapper to transform data before logging.
-            $mapped = call_user_func($this->mapper, ['key' => $key, 'data' => $data]);
-            $this->loggerManager->trace('DataStoreManager.enqueue()', $mapped);
-        }
-
-        $addData = [$key => $data];
-        $this->requestsQueue = ObjectUtils::objectDeepMerge($this->requestsQueue, $addData);
-        $queueLength = count($this->requestsQueue);
-
-        if ($queueLength >= $this->batchSize) {
-            $this->releaseQueue('size');
-        } else {
-            if ($queueLength === 1) {
-                $this->startQueue();
-            }
-        }
-    }
-
-    /**
-     * Releases all enqueued data.
-     *
-     * @param string $reason Optional reason for releasing the queue.
-     */
-    public function releaseQueue($reason = '')
-    {
-        if ($this->loggerManager !== null && method_exists($this->loggerManager, 'info')) {
-            $this->loggerManager->info('DataStoreManager.releaseQueue()', ['reason' => $reason]);
-        }
-        $this->stopQueue();
-        foreach ($this->requestsQueue as $key => $value) {
-            $this->set($key, $value);
-        }
-        if ($this->eventManager !== null && method_exists($this->eventManager, 'fire')) {
-            $this->eventManager->fire(SystemEvents::DATA_STORE_QUEUE_RELEASED, ['reason' => $reason]);
-        }
-        // Clear the queue after releasing.
-        $this->requestsQueue = [];
-    }
-
-    /**
-     * Stops the current queue timer.
-     */
-    public function stopQueue(): void
-    {
-        $this->requestsQueueTimerID = null;
-    }
-
-    /**
-     * Starts a timer that will release the queue after the release interval.
-     *
-     * Note: This implementation uses a blocking sleep() call.
-     * In a real asynchronous environment, you might use an event loop.
-     */
-    public function startQueue(): void
-    {
-        $seconds = $this->releaseInterval / 1000;
-        sleep($seconds);
-        $this->releaseQueue('timeout');
-    }
-
-    /**
      * Sets the dataStore.
      *
      * @param mixed $dataStore
      */
-    public function setDataStore($dataStore)
+    public function setDataStore(mixed $dataStore): void
     {
         if ($dataStore) {
             if ($this->isValidDataStore($dataStore)) {
@@ -192,7 +97,7 @@ class DataStoreManager implements DataStoreManagerInterface
      *
      * @return mixed
      */
-    public function getDataStore()
+    public function getDataStore(): mixed
     {
         return $this->dataStore;
     }
@@ -203,7 +108,7 @@ class DataStoreManager implements DataStoreManagerInterface
      * @param mixed $dataStore
      * @return bool
      */
-    public function isValidDataStore($dataStore)
+    public function isValidDataStore(mixed $dataStore): bool
     {
         return is_object($dataStore) &&
                method_exists($dataStore, 'get') &&

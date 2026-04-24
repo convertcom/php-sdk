@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert Php SDK
  * Version 1.0.0
@@ -9,9 +11,9 @@
 namespace ConvertSdk\Interfaces;
 
 use ConvertSdk\Enums\LogLevel;
-use ConvertSdk\Interfaces\LogMethodMapInterface;
 
-interface LogManagerInterface {
+interface LogManagerInterface
+{
     /**
      * Log a message with a specified level.
      *
@@ -19,7 +21,7 @@ interface LogManagerInterface {
      * @param mixed ...$args
      * @return void
      */
-    public function log(int $level, ...$args): void;
+    public function log(LogLevel $level, mixed ...$args): void;
 
     /**
      * Log a trace message.
@@ -27,7 +29,7 @@ interface LogManagerInterface {
      * @param mixed ...$args
      * @return void
      */
-    public function trace(...$args): void;
+    public function trace(mixed ...$args): void;
 
     /**
      * Log a debug message.
@@ -35,7 +37,7 @@ interface LogManagerInterface {
      * @param mixed ...$args
      * @return void
      */
-    public function debug(...$args): void;
+    public function debug(mixed ...$args): void;
 
     /**
      * Log an info message.
@@ -43,7 +45,7 @@ interface LogManagerInterface {
      * @param mixed ...$args
      * @return void
      */
-    public function info(...$args): void;
+    public function info(mixed ...$args): void;
 
     /**
      * Log a warning message.
@@ -51,7 +53,7 @@ interface LogManagerInterface {
      * @param mixed ...$args
      * @return void
      */
-    public function warn(...$args): void;
+    public function warn(mixed ...$args): void;
 
     /**
      * Log an error message.
@@ -59,7 +61,7 @@ interface LogManagerInterface {
      * @param mixed ...$args
      * @return void
      */
-    public function error(...$args): void;
+    public function error(mixed ...$args): void;
 
     /**
      * Add a client to the logger.
@@ -69,7 +71,7 @@ interface LogManagerInterface {
      * @param LogMethodMapInterface|null $methodMap
      * @return void
      */
-    public function addClient($client = null, ?int $level = null, ?LogMethodMapInterface $methodMap = null): void;
+    public function addClient(mixed $client = null, ?LogLevel $level = null, ?LogMethodMapInterface $methodMap = null): void;
 
     /**
      * Set the log level for a given client.
@@ -78,5 +80,5 @@ interface LogManagerInterface {
      * @param mixed|null $client
      * @return void
      */
-    public function setClientLevel(int $level, $client = null): void;
+    public function setClientLevel(LogLevel $level, mixed $client = null): void;
 }

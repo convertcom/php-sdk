@@ -1,29 +1,26 @@
 <?php
-use PHPUnit\Framework\TestCase;
-use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Psr7\Response;
-use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\EventManager;
+
+declare(strict_types=1);
+
 use ConvertSdk\ApiManager;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\Cache\ArrayCache;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\Context;
+use ConvertSdk\Core;
 use ConvertSdk\DataManager;
+use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
 use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
 use ConvertSdk\SegmentsManager;
-use ConvertSdk\Core;
-use ConvertSdk\Context;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\Enums\EntityType;
-use ConvertSdk\Enums\SystemEvents;
-use ConvertSdk\Enums\ErrorMessages;
-
-
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
 
 class CoreTest extends TestCase
 {
@@ -39,28 +36,24 @@ class CoreTest extends TestCase
     private $loggerManager;
     private $segmentsManager;
     private $core;
-    private $host = 'http://localhost';
-    private $port = 8090;
-    private $releaseTimeout = 1000;
-    private $testTimeout = 1100; // releaseTimeout + 100
-    private $batchSize = 5;
+    private $accountId;
+    private $projectId;
 
     protected function setUp(): void
     {
-        // Initialize configuration
         $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
-        $defaultConfig = DefaultConfig::getDefault(); // Assume DefaultConfig exists
+        $defaultConfig = DefaultConfig::getDefault();
         $this->configuration = ObjectUtils::objectDeepMerge($testConfig, $defaultConfig, [
             'api' => [
                 'endpoint' => [
                     'config' => 'http://127.0.0.1:9501',
-                    'track' => 'http://127.0.0.1:9501'
-                ]
+                    'track' => 'http://127.0.0.1:9501',
+                ],
             ],
             'events' => [
                 'batch_size' => 5,
-                'release_interval' => 1000
-            ]
+                'release_interval' => 1000,
+            ],
         ]);
         $this->configuration['data'] = new ConfigResponseData($this->configuration['data']);
         if (isset($this->configuration['sdkKey'])) {
@@ -68,57 +61,64 @@ class CoreTest extends TestCase
         }
         $this->config = new Config($this->configuration);
 
-        // Initialize managers
-        $this->loggerManager = new LogManager($this->config);
-
-        $this->bucketingManager = new BucketingManager($this->config);
-        $this->ruleManager = new RuleManager($this->config);
-        $this->eventManager = new EventManager($this->config);
+        $this->loggerManager = new LogManager();
+        $bucketingConfig = $this->config->getBucketing();
+        $this->bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $this->ruleManager = new RuleManager();
+        $this->eventManager = new EventManager();
         $this->apiManager = new ApiManager($this->config, $this->eventManager, $this->loggerManager);
         $this->dataManager = new DataManager(
-          $this->config,
-          $this->bucketingManager,
-          $this->ruleManager,
-          $this->eventManager,
-          $this->apiManager,
-          $this->loggerManager
-      );
-        $this->experienceManager = new ExperienceManager($this->config, ['dataManager' => $this->dataManager]);
-        $this->featureManager = new FeatureManager($this->config, $this->dataManager);
+            $this->config,
+            $this->bucketingManager,
+            $this->ruleManager,
+            $this->eventManager,
+            $this->apiManager,
+            $this->loggerManager
+        );
+        $this->experienceManager = new ExperienceManager(dataManager: $this->dataManager);
+        $this->featureManager = new FeatureManager(dataManager: $this->dataManager, logManager: $this->loggerManager);
         $this->segmentsManager = new SegmentsManager($this->config, $this->dataManager, $this->ruleManager);
-        $this->core = new Core($this->config, [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => $this->apiManager
-        ]);
+
+        $this->core = new Core(
+            $this->config,
+            $this->dataManager,
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->segmentsManager,
+            $this->apiManager,
+            new ArrayCache(),
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $this->loggerManager,
+        );
 
         $this->accountId = $this->config->getData() ? $this->config->getData()->getAccountId() : '';
         $project = $this->config->getData() ? $this->config->getData()->getProject() : null;
         $this->projectId = $project ? (is_array($project) ? ($project['id'] ?? '') : ($project->getId() ?? '')) : '';
     }
 
-    /** @test */
+    #[Test]
     public function importedEntityShouldBeAConstructorOfCoreInstance()
     {
         $this->assertTrue(class_exists(Core::class));
     }
 
-    /** @test */
+    #[Test]
     public function shouldSuccessfullyCreateNewCoreInstance()
     {
         $this->assertInstanceOf(Core::class, $this->core);
     }
 
-    /** @test */
+    #[Test]
     public function shouldExposeCore()
     {
         $this->assertTrue(class_exists(Core::class));
     }
 
-    /** @test */
+    #[Test]
     public function shouldSuccessfullyCreateVisitorContext()
     {
         $visitorId = 'XXX';
@@ -126,20 +126,19 @@ class CoreTest extends TestCase
         $this->assertInstanceOf(Context::class, $visitorContext);
     }
 
-    /** @test */
+    #[Test]
     public function shouldSuccessfullyTriggerReadyEvent()
     {
         $triggered = false;
-        $this->eventManager->on(SystemEvents::READY, function ($args, $err) use (&$triggered) {
+        $this->eventManager->on(SystemEvents::Ready, function ($args, $err) use (&$triggered) {
             $this->assertNull($err);
             $triggered = true;
         });
-        // Simulate triggering the ready event (adjust based on actual Core implementation)
         $this->core->onReady();
         $this->assertTrue($triggered);
     }
 
-    /** @test */
+    #[Test]
     public function shouldSuccessfullyResolveOnReady()
     {
         try {
@@ -150,33 +149,93 @@ class CoreTest extends TestCase
         }
     }
 
-    /** @test */
-    public function shouldSuccessfullyGetConfigUsingSdkKey()
+    #[Test]
+    public function shouldReturnTrueFromIsReady()
     {
-        $mock = new MockHandler([
-            new Response(200, [], '{}')
-        ]);
-        $handlerStack = HandlerStack::create($mock);
-        $client = new Client(['handler' => $handlerStack]);
-
-        $accountId = $this->accountId;
-        $projectId = $this->projectId;
-        $config = [
-            'sdkKey' => "$accountId/$projectId",
-            'api' => $this->configuration['api'],
-            'events' => $this->configuration['events'],
-            'environment' => $this->configuration['environment']
-        ];
-
-        $core = new Core(new Config($config), [
-            'eventManager' => $this->eventManager,
-            'experienceManager' => $this->experienceManager,
-            'featureManager' => $this->featureManager,
-            'segmentsManager' => $this->segmentsManager,
-            'dataManager' => $this->dataManager,
-            'apiManager' => new ApiManager(new Config($config), $this->eventManager)
-        ]);
-
-        $this->assertInstanceOf(Core::class, $core);
+        $this->assertTrue($this->core->isReady());
     }
+
+    #[Test]
+    public function isReadyAndOnReadyShouldReturnSameValue()
+    {
+        $this->assertEquals($this->core->isReady(), $this->core->onReady());
+    }
+
+    #[Test]
+    public function coreShouldBeFinalClass()
+    {
+        $reflection = new \ReflectionClass(Core::class);
+        $this->assertTrue($reflection->isFinal());
+    }
+
+    #[Test]
+    public function flushMethodExistsAndIsPublic(): void
+    {
+        $reflection = new \ReflectionClass(Core::class);
+        $this->assertTrue($reflection->hasMethod('flush'));
+        $this->assertTrue($reflection->getMethod('flush')->isPublic());
+    }
+
+    #[Test]
+    public function flushIsNoOpWhenQueueIsEmpty(): void
+    {
+        // flush() should not throw when there are no queued events
+        $this->core->flush();
+        $this->assertTrue(true); // No exception means success
+    }
+
+    #[Test]
+    public function flushDelegatesToApiManagerReleaseQueue(): void
+    {
+        $apiManagerMock = $this->createMock(\ConvertSdk\Interfaces\ApiManagerInterface::class);
+        $apiManagerMock->expects($this->once())
+            ->method('releaseQueue')
+            ->with('flush');
+
+        $core = new Core(
+            $this->config,
+            $this->dataManager,
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->segmentsManager,
+            $apiManagerMock,
+            new ArrayCache(),
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $this->loggerManager,
+        );
+
+        $core->flush();
+    }
+
+    #[Test]
+    public function isReadyShouldReturnFalseWhenConfigDataThrows(): void
+    {
+        $dataManagerMock = $this->createMock(\ConvertSdk\Interfaces\DataManagerInterface::class);
+        $dataManagerMock->method('getConfigData')
+            ->willThrowException(new \RuntimeException('No config'));
+
+        $core = new Core(
+            $this->config,
+            $dataManagerMock,
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->segmentsManager,
+            $this->apiManager,
+            new ArrayCache(),
+            Core::DEFAULT_DATA_REFRESH_INTERVAL,
+            $this->loggerManager,
+        );
+
+        $this->assertFalse($core->isReady());
+    }
+
+    #[Test]
+    public function createContextShouldThrowWhenVisitorIdEmpty(): void
+    {
+        $this->expectException(\ConvertSdk\Exception\InvalidArgumentException::class);
+        $this->core->createContext('');
+    }
+
 }

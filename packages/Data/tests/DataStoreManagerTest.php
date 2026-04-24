@@ -1,14 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
+use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\DataStoreManager;
-use ConvertSdk\EventManager;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
+use PHPUnit\Framework\TestCase;
 
 /**
  * A simple test implementation of a DataStore with get and set methods.
@@ -55,9 +56,6 @@ class DataStoreManagerTest extends TestCase
     /** @var TestDataStore */
     private $dataStore;
 
-    /** @var EventManager */
-    private $eventManager;
-
     /** @var DataStoreManager */
     private $dataStoreManager;
 
@@ -68,11 +66,11 @@ class DataStoreManagerTest extends TestCase
     private $storeData = [
         'bucketing' => [
             'exp1' => 'var1',
-            'exp2' => 'var2'
+            'exp2' => 'var2',
         ],
         'goals' => [
             'goal1' => true,
-            'goal2' => true
+            'goal2' => true,
         ],
         'segments' => [
             'browser' => 'CH',
@@ -81,8 +79,8 @@ class DataStoreManagerTest extends TestCase
             'campaign' => 'test',
             'visitorType' => 'new',
             'country' => 'US',
-            'custom_segments' => ['seg1', 'seg2']
-        ]
+            'custom_segments' => ['seg1', 'seg2'],
+        ],
     ];
 
     /**
@@ -90,9 +88,6 @@ class DataStoreManagerTest extends TestCase
      */
     protected function setUp(): void
     {
-        $batchSize = 10;
-        $releaseInterval = 1000; // in milliseconds
-
         // Load test configuration from JSON file
         $testConfigPath = __DIR__ . '/test-config.json';
         $testConfig = file_exists($testConfigPath)
@@ -104,15 +99,8 @@ class DataStoreManagerTest extends TestCase
         // Merge configurations with overrides
         $configuration = ObjectUtils::objectDeepMerge(
             $testConfig,
-            $defaultConfig,
-            [
-                'events' => [
-                    'batch_size' => $batchSize,
-                    'release_interval' => $releaseInterval
-                ]
-            ]
+            $defaultConfig
         );
-
 
         if (isset($configuration['sdkKey'])) {
             unset($configuration['sdkKey']);
@@ -123,12 +111,10 @@ class DataStoreManagerTest extends TestCase
 
         // Create dependencies
         $this->dataStore = new TestDataStore();
-        $this->eventManager = new EventManager($config);
 
         // Instantiate DataStoreManager
         $this->dataStoreManager = new DataStoreManager($config, [
             'dataStore' => $this->dataStore,
-            'eventManager' => $this->eventManager
         ]);
     }
 
@@ -154,18 +140,6 @@ class DataStoreManagerTest extends TestCase
     public function testShouldSuccessfullySetVisitorDataImmediately(): void
     {
         $this->dataStoreManager->set($this->storeKey, $this->storeData);
-        $retrieved = $this->dataStoreManager->get($this->storeKey);
-        $this->assertEquals($this->storeData, $retrieved);
-    }
-
-    /**
-     * Tests that enqueued visitor data is released and retrievable after the interval.
-     */
-    public function testShouldSuccessfullyEnqueueVisitorData(): void
-    {
-        $this->dataStoreManager->enqueue($this->storeKey, $this->storeData);
-        // Wait slightly longer than the release interval (1000ms = 1s)
-        sleep(2); // Using sleep for simplicity; ideally, mock the timer
         $retrieved = $this->dataStoreManager->get($this->storeKey);
         $this->assertEquals($this->storeData, $retrieved);
     }

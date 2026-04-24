@@ -50,7 +50,7 @@
       }
     },
     "require": {
-        "php": ">=7.4",
+        "php": "^8.2",
         "convertcom/php-sdk-api": ">=1.0.0",
         "convertcom/php-sdk-bucketing": ">=1.0.0",
         "convertcom/php-sdk-enums": ">=1.0.0",
@@ -62,18 +62,12 @@
         "psy/psysh": "@stable"
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.0",
-        "guzzlehttp/guzzle": "^7.9",
-        "guzzlehttp/promises": "^1.5",
-        "guzzlehttp/psr7": "^2.7",
-        "phpstan/phpstan": "^1.0",
-        "phpunit/phpunit": "^9.6",
-        "squizlabs/php_codesniffer": "^3.0"
+        "php-http/mock-client": "^1.6",
+        "nyholm/psr7": "^1.8",
+        "phpunit/phpunit": "^11.0"
     },
     "scripts": {
       "test": "phpunit",
-      "lint": "vendor/bin/phpcs",
-      "lint:fix": "vendor/bin/php-cs-fixer fix",
       "coverage": "vendor/bin/phpunit --coverage-text"
     },
     "config": {

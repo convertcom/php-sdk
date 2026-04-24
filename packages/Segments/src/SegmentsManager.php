@@ -1,21 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk;
 
+use ConvertSdk\Enums\Messages;
+use ConvertSdk\Enums\RuleError;
+use ConvertSdk\Enums\SegmentsKeys;
+use ConvertSdk\Interfaces\DataManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Interfaces\RuleManagerInterface;
+use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\ConfigSegment;
-use OpenAPI\Client\Model\VisitorSegments;
 use OpenAPI\Client\Model\RuleObject;
-use OpenAPI\Client\StoreData;
-use ConvertSdk\Enums\Messages;
-use ConvertSdk\Enums\SegmentsKeys;
-use ConvertSdk\Enums\RuleError;
-use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Interfaces\DataManagerInterface;
-use ConvertSdk\Interfaces\RuleManagerInterface;
-use ConvertSdk\Interfaces\SegmentsManagerInterface;
-use ConvertSdk\Utils\ObjectUtils;
+use OpenAPI\Client\Model\VisitorSegments;
 
 /**
  * Provides segments specific logic
@@ -23,17 +23,17 @@ use ConvertSdk\Utils\ObjectUtils;
  */
 class SegmentsManager implements SegmentsManagerInterface
 {
-    /** @var ConfigResponseData */
-    private $data;
+    /** @var ?ConfigResponseData */
+    private ?ConfigResponseData $data;
 
     /** @var DataManagerInterface */
-    private $dataManager;
+    private DataManagerInterface $dataManager;
 
     /** @var RuleManagerInterface */
-    private $ruleManager;
+    private RuleManagerInterface $ruleManager;
 
     /** @var LogManagerInterface|null */
-    private $loggerManager;
+    private ?LogManagerInterface $loggerManager;
 
     /**
      * SegmentsManager constructor.
@@ -66,7 +66,7 @@ class SegmentsManager implements SegmentsManagerInterface
         $storeData = $this->dataManager->getData($visitorId) ?? [];
         $storeData = (array)$storeData;
         $segments = $this->dataManager->filterReportSegments($storeData['segments'] ?? []);
-        return new VisitorSegments($segments['segments']) ?? new VisitorSegments();
+        return new VisitorSegments($segments['segments'] ?? []);
     }
 
     /**
@@ -96,13 +96,13 @@ class SegmentsManager implements SegmentsManagerInterface
         string $visitorId,
         array $segments,
         ?array $segmentRule = null
-    ) {
+    ): VisitorSegments|RuleError|null {
         $storeData = $this->dataManager->getData($visitorId) ?? [];
-        $visitorSegments = $storeData["segments"] ?? [];
-        $customSegments = $visitorSegments["custom_segments"] ?? [];
+        $visitorSegments = $storeData['segments'] ?? [];
+        $customSegments = $visitorSegments['custom_segments'] ?? [];
         $segmentIds = [];
         $segmentsMatched = false;
-    
+
         foreach ($segments as $segment) {
             if ($segmentRule && !$segmentsMatched) {
                 $segmentsMatched = $this->ruleManager->isRuleMatched(
@@ -110,14 +110,14 @@ class SegmentsManager implements SegmentsManagerInterface
                     new RuleObject($segment['rules'] ?? []),
                     "ConfigSegment #{$segment['id']}"
                 );
-                if (in_array($segmentsMatched, RuleError::getConstants(), true)) {
+                if ($segmentsMatched instanceof RuleError) {
                     return $segmentsMatched;
                 }
             }
-    
+
             if (!$segmentRule || $segmentsMatched) {
                 $segmentId = (string)$segment['id'];
-                if (in_array($segmentId, $customSegments)) {
+                if (in_array($segmentId, $customSegments, true)) {
                     if ($this->loggerManager !== null) {
                         $this->loggerManager->warn(
                             'SegmentsManager.setCustomSegments()',
@@ -129,16 +129,16 @@ class SegmentsManager implements SegmentsManagerInterface
                 }
             }
         }
-    
+
         if (!empty($segmentIds)) {
             $segmentsData = array_merge(
                 json_decode(json_encode($visitorSegments), true),
-                [SegmentsKeys::CUSTOM_SEGMENTS => array_merge($customSegments, $segmentIds)]
+                [SegmentsKeys::CustomSegments->value => array_merge($customSegments, $segmentIds)]
             );
             $this->putSegments($visitorId, $segmentsData);
             return new VisitorSegments($segmentsData);
         }
-    
+
         return null;
     }
 
@@ -154,7 +154,7 @@ class SegmentsManager implements SegmentsManagerInterface
         string $visitorId,
         array $segmentKeys,
         ?array $segmentRule = null
-    ) {
+    ): VisitorSegments|RuleError|null {
         $segments = $this->dataManager->getEntities($segmentKeys, 'segments');
         return $this->setCustomSegments($visitorId, $segments, $segmentRule);
     }
@@ -171,7 +171,7 @@ class SegmentsManager implements SegmentsManagerInterface
         string $visitorId,
         array $segmentIds,
         ?array $segmentRule = null
-    ) {
+    ): VisitorSegments|RuleError|null {
         $segments = $this->dataManager->getEntitiesByIds($segmentIds, 'segments');
         return $this->setCustomSegments($visitorId, $segments, $segmentRule);
     }

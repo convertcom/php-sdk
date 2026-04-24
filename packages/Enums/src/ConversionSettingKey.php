@@ -1,6 +1,10 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class ConversionSettingKey {
-    const FORCE_MULTIPLE_TRANSACTIONS = 'forceMultipleTransactions';
+enum ConversionSettingKey: string
+{
+    case ForceMultipleTransactions = 'forceMultipleTransactions';
 }

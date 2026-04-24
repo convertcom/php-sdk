@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert Php SDK
  * Version 1.0.0
@@ -9,15 +11,15 @@
 namespace ConvertSdk\Interfaces;
 
 use ConvertSdk\Enums\LogLevel;
-use ConvertSdk\Interfaces\LogMethodMapInterface;
 
-interface LogClientInterface {
+interface LogClientInterface
+{
     /**
      * Get the SDK instance.
      *
      * @return mixed
      */
-    public function getSdk();
+    public function getSdk(): mixed;
 
     /**
      * Set the SDK instance.
@@ -25,7 +27,7 @@ interface LogClientInterface {
      * @param mixed $sdk
      * @return void
      */
-    public function setSdk($sdk);
+    public function setSdk(mixed $sdk): void;
 
     /**
      * Get the current log level.

@@ -1,8 +1,13 @@
 <?php
+
+declare(strict_types=1);
+
 // File: src/Enums/Messages.php
+
 namespace ConvertSdk\Enums;
 
-class Messages {
+final class Messages
+{
     public const CONFIG_DATA_UPDATED = 'Config Data updated';
     public const CORE_CONSTRUCTOR = 'Core Manager constructor has been called';
     public const CORE_INITIALIZED = 'Core Manager has been initialized';
@@ -47,4 +52,14 @@ class Messages {
     public const CUSTOM_SEGMENTS_KEY_FOUND = 'Custom segments key already set';
     public const SEND_BEACON_SUCCESS = 'The user agent successfully queued the data for transfer';
     public const RELEASING_QUEUE = 'Releasing event queue...';
+
+    // Null-return reason constants (Story 4.2)
+    public const ENTITY_LOOKUP_FAILED = 'Entity lookup failed: entity not found';
+    public const NULL_RETURN_EXPERIENCE_NOT_FOUND = 'Null return: experience key not found in config';
+    public const NULL_RETURN_FEATURE_NOT_FOUND = 'Null return: feature key not found in config';
+    public const NULL_RETURN_VISITOR_NOT_QUALIFIED = 'Null return: visitor not qualified (see DataManager logs for specific reason: audience mismatch, location mismatch, archived, or environment mismatch)';
+    public const NULL_RETURN_TRAFFIC_ALLOCATION = 'Null return: visitor outside traffic allocation';
+    public const NULL_RETURN_AUDIENCE_MISMATCH = 'Null return: visitor does not match audience rules';
+    public const NULL_RETURN_LOCATION_MISMATCH = 'Null return: visitor does not match location rules';
+    public const NULL_RETURN_EXPERIENCE_PAUSED = 'Null return: experience is paused/stopped';
 }

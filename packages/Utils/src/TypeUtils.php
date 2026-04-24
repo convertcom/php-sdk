@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Utils;
 
 /**
@@ -6,7 +9,7 @@ namespace ConvertSdk\Utils;
  */
 class TypeUtils
 {
-    public static function castType($value, string $type)
+    public static function castType(mixed $value, string $type): mixed
     {
         switch ($type) {
             case 'boolean':
@@ -35,6 +38,7 @@ class TypeUtils
                     }
                     return (string)$value;
                 }
+                // no break
             case 'string':
                 return (string)$value;
             case 'integer':

@@ -1,6 +1,9 @@
 <?php
-use PHPUnit\Framework\TestCase;
+
+declare(strict_types=1);
+
 use ConvertSdk\Utils\ObjectUtils;
+use PHPUnit\Framework\TestCase;
 
 class ObjectUtilsTest extends TestCase
 {
@@ -9,8 +12,8 @@ class ObjectUtilsTest extends TestCase
     {
         $obj = [
             'api' => [
-                'endpoint' => 'Lorem ipsum dolor sit amet'
-            ]
+                'endpoint' => 'Lorem ipsum dolor sit amet',
+            ],
         ];
 
         $res = ObjectUtils::objectDeepValue($obj, 'api.endpoint');
@@ -21,8 +24,8 @@ class ObjectUtilsTest extends TestCase
     {
         $obj = [
             'api' => [
-                'endpoint' => 'Lorem ipsum dolor sit amet'
-            ]
+                'endpoint' => 'Lorem ipsum dolor sit amet',
+            ],
         ];
 
         $defaultValue = 'default value';
@@ -34,8 +37,8 @@ class ObjectUtilsTest extends TestCase
     {
         $obj = [
             'api' => [
-                'maxResults' => 0
-            ]
+                'maxResults' => 0,
+            ],
         ];
 
         $res = ObjectUtils::objectDeepValue($obj, 'api.maxResults', 1, true);
@@ -46,8 +49,8 @@ class ObjectUtilsTest extends TestCase
     {
         $obj = [
             'api' => [
-                'hasLimit' => false
-            ]
+                'hasLimit' => false,
+            ],
         ];
 
         $res = ObjectUtils::objectDeepValue($obj, 'api.hasLimit', 0, true);
@@ -59,22 +62,22 @@ class ObjectUtilsTest extends TestCase
     {
         $obj1 = [
             'api' => [
-                'endpoint' => 'Lorem ipsum dolor sit amet'
-            ]
+                'endpoint' => 'Lorem ipsum dolor sit amet',
+            ],
         ];
         $obj2 = [
             'api' => [
-                'maxResults' => 3
+                'maxResults' => 3,
             ],
-            'test' => true
+            'test' => true,
         ];
 
         $expected = [
             'api' => [
                 'endpoint' => 'Lorem ipsum dolor sit amet',
-                'maxResults' => 3
+                'maxResults' => 3,
             ],
-            'test' => true
+            'test' => true,
         ];
 
         $res = ObjectUtils::objectDeepMerge($obj1, $obj2);
@@ -86,8 +89,8 @@ class ObjectUtilsTest extends TestCase
     {
         $obj = [
             'api' => [
-                'endpoint' => 'Lorem ipsum dolor sit amet'
-            ]
+                'endpoint' => 'Lorem ipsum dolor sit amet',
+            ],
         ];
 
         $res = ObjectUtils::objectNotEmpty($obj);
@@ -107,13 +110,13 @@ class ObjectUtilsTest extends TestCase
     {
         $obj1 = [
             'api' => [
-                'endpoint' => 'Lorem ipsum dolor sit amet'
-            ]
+                'endpoint' => 'Lorem ipsum dolor sit amet',
+            ],
         ];
         $obj2 = [
             'api' => [
-                'endpoint' => 'Lorem ipsum dolor sit amet'
-            ]
+                'endpoint' => 'Lorem ipsum dolor sit amet',
+            ],
         ];
 
         $res = ObjectUtils::objectDeepEqual($obj1, $obj2);
@@ -124,13 +127,13 @@ class ObjectUtilsTest extends TestCase
     {
         $obj1 = [
             'api' => [
-                'endpoint' => 'Lorem ipsum dolor sit amet'
-            ]
+                'endpoint' => 'Lorem ipsum dolor sit amet',
+            ],
         ];
         $obj2 = [
             'api' => [
-                'endpoint' => 'Different value'
-            ]
+                'endpoint' => 'Different value',
+            ],
         ];
 
         $res = ObjectUtils::objectDeepEqual($obj1, $obj2);
@@ -141,16 +144,108 @@ class ObjectUtilsTest extends TestCase
     {
         $obj1 = [
             'api' => [
-                'endpoint' => 'Lorem ipsum dolor sit amet'
-            ]
+                'endpoint' => 'Lorem ipsum dolor sit amet',
+            ],
         ];
         $obj2 = [
             'api' => [
-                'otherKey' => 'Different value'
-            ]
+                'otherKey' => 'Different value',
+            ],
         ];
 
         $res = ObjectUtils::objectDeepEqual($obj1, $obj2);
         $this->assertFalse($res);
+    }
+
+    public function testObjectDeepEqualShouldReturnFalseWhenOneIsNull(): void
+    {
+        $this->assertFalse(ObjectUtils::objectDeepEqual(null, ['a' => 1]));
+        $this->assertFalse(ObjectUtils::objectDeepEqual(['a' => 1], null));
+    }
+
+    public function testObjectDeepEqualShouldReturnTrueForIdenticalScalars(): void
+    {
+        $this->assertTrue(ObjectUtils::objectDeepEqual(42, 42));
+        $this->assertTrue(ObjectUtils::objectDeepEqual('hello', 'hello'));
+    }
+
+    public function testObjectDeepEqualShouldReturnFalseForDifferentSizedArrays(): void
+    {
+        $this->assertFalse(ObjectUtils::objectDeepEqual(['a' => 1], ['a' => 1, 'b' => 2]));
+    }
+
+    public function testObjectDeepMergeShouldHandleNumericArrays(): void
+    {
+        $obj1 = ['items' => [1, 2, 3]];
+        $obj2 = ['items' => [4, 5]];
+
+        // Mirrors JS SDK: [...new Set([...oVal, ...pVal])] — new values first, deduplicated
+        $result = ObjectUtils::objectDeepMerge($obj1, $obj2);
+        $this->assertSame([4, 5, 1, 2, 3], $result['items']);
+    }
+
+    public function testObjectDeepMergeShouldDeduplicateNumericArrays(): void
+    {
+        $obj1 = ['locations' => ['pricing', 'events']];
+        $obj2 = ['locations' => ['pricing', 'stats']];
+
+        $result = ObjectUtils::objectDeepMerge($obj1, $obj2);
+        $this->assertSame(['pricing', 'stats', 'events'], $result['locations']);
+    }
+
+    public function testObjectDeepMergeShouldNotGrowExponentially(): void
+    {
+        $data = ['locations' => ['loc-a']];
+
+        // Simulate repeated merges like putData() does on each runExperience call
+        for ($i = 0; $i < 20; $i++) {
+            $data = ObjectUtils::objectDeepMerge($data, ['locations' => ['loc-a']]);
+        }
+
+        // Without deduplication this would be 2^20 = 1,048,576 entries
+        $this->assertCount(1, $data['locations']);
+        $this->assertSame(['loc-a'], $data['locations']);
+    }
+
+    public function testObjectDeepMergeShouldHandleOverwritingScalarWithArray(): void
+    {
+        $obj1 = ['key' => 'scalar'];
+        $obj2 = ['key' => ['nested' => 'value']];
+
+        $result = ObjectUtils::objectDeepMerge($obj1, $obj2);
+        $this->assertSame(['nested' => 'value'], $result['key']);
+    }
+
+    public function testObjectDeepValueShouldReturnDefaultForEmptyArray(): void
+    {
+        $res = ObjectUtils::objectDeepValue([], 'any.path', 'default');
+        $this->assertSame('default', $res);
+    }
+
+    public function testObjectDeepValueShouldReturnDefaultForFalsyValueWithoutTruthy(): void
+    {
+        $obj = ['val' => 0];
+        $res = ObjectUtils::objectDeepValue($obj, 'val', 'default', false);
+        $this->assertSame('default', $res);
+    }
+
+    public function testObjectNotEmptyShouldReturnTrueForNonEmptyObject(): void
+    {
+        $obj = new \stdClass();
+        $obj->name = 'test';
+        $this->assertTrue(ObjectUtils::objectNotEmpty($obj));
+    }
+
+    public function testObjectNotEmptyShouldReturnFalseForEmptyObject(): void
+    {
+        $obj = new \stdClass();
+        $this->assertFalse(ObjectUtils::objectNotEmpty($obj));
+    }
+
+    public function testObjectNotEmptyShouldReturnFalseForNonArrayNonObject(): void
+    {
+        $this->assertFalse(ObjectUtils::objectNotEmpty('string'));
+        $this->assertFalse(ObjectUtils::objectNotEmpty(42));
+        $this->assertFalse(ObjectUtils::objectNotEmpty(null));
     }
 }

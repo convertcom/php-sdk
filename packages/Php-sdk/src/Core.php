@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -8,178 +11,172 @@
 
 namespace ConvertSdk;
 
-use ConvertSdk\Interfaces\CoreInterface;
+use ConvertSdk\Config\ConfigValidator;
+use ConvertSdk\Enums\ErrorMessages;
+use ConvertSdk\Enums\Messages;
+use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
+use ConvertSdk\Exception\ConfigFetchException;
+use ConvertSdk\Exception\ConfigValidationException;
+use ConvertSdk\Exception\InvalidArgumentException;
+use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\ContextInterface;
+use ConvertSdk\Interfaces\CoreInterface;
 use ConvertSdk\Interfaces\DataManagerInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
-use ConvertSdk\Interfaces\SegmentsManagerInterface;
-use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use GuzzleHttp\Promise\PromiseInterface;
-use GuzzleHttp\Promise\Promise;
+use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use ConvertSdk\Enums\SystemEvents;
-use ConvertSdk\Enums\Messages;
-use ConvertSdk\Enums\ErrorMessages;
-use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\Context;
+use Psr\SimpleCache\CacheInterface;
 
 /**
- * Core
- * @category Main
+ * Core SDK class that manages configuration, initialization, and visitor context creation.
+ *
  * @implements CoreInterface
  */
-class Core implements CoreInterface
+final class Core implements CoreInterface
 {
-    /** Default data refresh interval in milliseconds (5 minutes) */
-    const DEFAULT_DATA_REFRESH_INTERVAL = 300000;
-
-    /** @var DataManagerInterface */
-    private $_dataManager;
-
-    /** @var EventManagerInterface */
-    private $_eventManager;
-
-    /** @var ExperienceManagerInterface */
-    private $_experienceManager;
-
-    /** @var FeatureManagerInterface */
-    private $_featureManager;
-
-    /** @var SegmentsManagerInterface */
-    private $_segmentsManager;
-
-    /** @var ApiManagerInterface */
-    private $_apiManager;
-
-    /** @var LogManagerInterface|null */
-    private $_loggerManager;
-
-    /** @var Config */
-    private $_config;
+    /** Default data refresh interval in seconds (5 minutes) */
+    public const DEFAULT_DATA_REFRESH_INTERVAL = 300;
 
     /** @var string|null */
-    private $_environment;
+    private ?string $environment;
 
     /** @var bool */
-    private $_initialized = false;
+    private bool $initialized = false;
+
+    /** @var ConfigValidator */
+    private ConfigValidator $configValidator;
 
     /**
-     * Constructor
-     *
      * @param Config $config Configuration object
-     * @param array $dependencies Dependencies array
-     * @param DataManagerInterface $dependencies['dataManager'] Data manager instance
-     * @param EventManagerInterface $dependencies['eventManager'] Event manager instance
-     * @param ExperienceManagerInterface $dependencies['experienceManager'] Experience manager instance
-     * @param FeatureManagerInterface $dependencies['featureManager'] Feature manager instance
-     * @param SegmentsManagerInterface $dependencies['segmentsManager'] Segments manager instance
-     * @param ApiManagerInterface $dependencies['apiManager'] API manager instance
-     * @param LogManagerInterface|null $dependencies['loggerManager'] Optional logger manager instance
+     * @param DataManagerInterface $dataManager Data manager instance
+     * @param EventManagerInterface $eventManager Event manager instance
+     * @param ExperienceManagerInterface $experienceManager Experience manager instance
+     * @param FeatureManagerInterface $featureManager Feature manager instance
+     * @param SegmentsManagerInterface $segmentsManager Segments manager instance
+     * @param ApiManagerInterface $apiManager API manager instance
+     * @param CacheInterface $cache PSR-16 cache implementation
+     * @param int $dataRefreshInterval Cache TTL in seconds
+     * @param LogManagerInterface|null $loggerManager Optional logger manager instance
      */
-    public function __construct(Config $config, array $dependencies)
-    {
-        $this->_dataManager = $dependencies['dataManager'];
-        $this->_eventManager = $dependencies['eventManager'];
-        $this->_experienceManager = $dependencies['experienceManager'];
-        $this->_featureManager = $dependencies['featureManager'];
-        $this->_segmentsManager = $dependencies['segmentsManager'];
-        $this->_apiManager = $dependencies['apiManager'];
-        $this->_loggerManager = $dependencies['loggerManager'] ?? null;
-        $this->_environment = $config->getEnvironment() ?? null;
-        $this->initialize($config);
+    public function __construct(
+        private readonly Config $config,
+        private readonly DataManagerInterface $dataManager,
+        private readonly EventManagerInterface $eventManager,
+        private readonly ExperienceManagerInterface $experienceManager,
+        private readonly FeatureManagerInterface $featureManager,
+        private readonly SegmentsManagerInterface $segmentsManager,
+        private readonly ApiManagerInterface $apiManager,
+        private readonly CacheInterface $cache,
+        private readonly int $dataRefreshInterval = self::DEFAULT_DATA_REFRESH_INTERVAL,
+        private readonly ?LogManagerInterface $loggerManager = null,
+    ) {
+        $this->environment = $config->getEnvironment() ?? null;
+        $this->configValidator = new ConfigValidator();
+        $this->initialize();
     }
 
     /**
-     * Initialize credentials, configData etc..
+     * Build a PSR-16 compliant cache key for the given SDK key.
      *
-     * @param Config $config Configuration object
+     * @param string $sdkKey The SDK key to hash
+     * @return string A cache-safe key
+     */
+    private function buildCacheKey(string $sdkKey): string
+    {
+        if (preg_match('/^[A-Za-z0-9_.]+$/', $sdkKey) && strlen($sdkKey) <= 48) {
+            return 'convert_sdk.config.' . $sdkKey;
+        }
+
+        return 'convert_sdk.config.' . substr(hash('sha256', $sdkKey), 0, 16);
+    }
+
+    /**
+     * Initialize credentials, configData etc.
+     *
      * @return void
      */
-    private function initialize(Config $config): void
+    private function initialize(): void
     {
-        if (!$config) {
-            return;
-        }
-        $this->_config = $config;
-
-        if ($config->getSdkKey() && strlen($config->getSdkKey()) > 0) {
-
-            $this->fetchConfig()->then(
-                function () {
-                    $this->_eventManager->fire(SystemEvents::READY, null, null, true);
-                    $this->_loggerManager?->trace('Core.initialize()', Messages::CORE_INITIALIZED);
-                    $this->_initialized = true;
-                },
-                function ($e) {
-                    $this->_loggerManager?->error('Core.initialize()', ['error' => $e->getMessage()]);
-                    $this->_eventManager->fire(
-                        SystemEvents::READY,
-                        [],
-                        $e,
-                        true
-                    );
-                }
-            )->wait();
-        } elseif ($config->getData()) {
-            $this->_dataManager->setConfigData($config->getData());
-            $configData = $this->_dataManager->getConfigData();
-            if (!$configData->getAccountId() || !$configData->getProject()) {
-                $this->_loggerManager?->error('Core.initialize()', ['error' => 'Invalid configuration data: missing account_id or project']);
-                $this->_eventManager->fire(
-                    SystemEvents::READY,
+        if ($this->config->getSdkKey() && strlen($this->config->getSdkKey()) > 0) {
+            try {
+                $this->fetchConfig();
+                $this->eventManager->fire(SystemEvents::Ready, [], null, true);
+                $this->loggerManager?->trace('Core.initialize()', Messages::CORE_INITIALIZED);
+                $this->initialized = true;
+            } catch (\Exception $e) {
+                $this->loggerManager?->error('Core.initialize()', ['error' => $e->getMessage()]);
+                $this->eventManager->fire(
+                    SystemEvents::Ready,
                     [],
-                    new \Exception('Invalid configuration data: missing account_id or project'),
+                    $e,
                     true
                 );
-            } else {
-                $this->_eventManager->fire(SystemEvents::READY, null, null, true);
-                $this->_loggerManager?->trace('Core.initialize()', Messages::CORE_INITIALIZED);
-                $this->_initialized = true;
             }
+        } elseif ($this->config->getData()) {
+            try {
+                $this->configValidator->validate($this->config->getData());
+            } catch (ConfigValidationException $e) {
+                $this->loggerManager?->error('Core.initialize()', ['error' => $e->getMessage()]);
+                $this->eventManager->fire(
+                    SystemEvents::Ready,
+                    [],
+                    $e,
+                    true
+                );
+                return;
+            }
+
+            $this->dataManager->setConfigData($this->config->getData());
+            $this->eventManager->fire(SystemEvents::Ready, [], null, true);
+            $this->loggerManager?->trace('Core.initialize()', Messages::CORE_INITIALIZED);
+            $this->initialized = true;
         } else {
-            $this->_loggerManager?->error('Core.initialize()', ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED);
-            $this->_eventManager->fire(
-                SystemEvents::READY,
+            $this->loggerManager?->error('Core.initialize()', ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED);
+            $this->eventManager->fire(
+                SystemEvents::Ready,
                 [],
                 new \Exception(ErrorMessages::SDK_OR_DATA_OBJECT_REQUIRED),
                 true
             );
         }
     }
+
     /**
-     * Create visitor context
+     * Create a visitor context.
      *
-     * @param string $visitorId A visitor ID
-     * @param array|null $visitorAttributes An object of key-value pairs for audience/segments targeting
-     * @return ContextInterface|null
+     * @param string $visitorId A unique visitor identifier
+     * @param array<string, mixed>|null $visitorAttributes Key-value pairs for audience/segments targeting
+     * @return ContextInterface|null The visitor context, or null if SDK is not initialized
+     * @throws InvalidArgumentException If visitorId is empty
      */
     public function createContext(string $visitorId, ?array $visitorAttributes = null): ?ContextInterface
     {
-        if (!$this->_initialized) {
+        if ($visitorId === '') {
+            throw new InvalidArgumentException('Visitor ID must not be empty');
+        }
+        if (!$this->initialized) {
             return null;
         }
         return new Context(
-            $this->_config,
+            $this->config,
             $visitorId,
-            [
-                'eventManager' => $this->_eventManager,
-                'experienceManager' => $this->_experienceManager,
-                'featureManager' => $this->_featureManager,
-                'segmentsManager' => $this->_segmentsManager,
-                'apiManager' => $this->_apiManager,
-                'dataManager' => $this->_dataManager,
-                'loggerManager' => $this->_loggerManager
-            ],
+            $this->eventManager,
+            $this->experienceManager,
+            $this->featureManager,
+            $this->dataManager,
+            $this->segmentsManager,
+            $this->apiManager,
+            $this->loggerManager,
             $visitorAttributes
         );
     }
 
     /**
-     * Add event handler to event
+     * Attach an event handler to a system event.
      *
      * @param string $event Event name (SystemEvents)
      * @param callable $fn A callback function which will be fired
@@ -187,69 +184,114 @@ class Core implements CoreInterface
      */
     public function on(string $event, callable $fn): void
     {
-        $this->_eventManager->on($event, $fn);
+        $this->eventManager->on($event, $fn);
     }
 
     /**
-     * Check if the system is ready
+     * Check if the SDK is fully initialized and ready to use.
      *
-     * @return PromiseInterface
+     * @return bool True if the SDK is initialized with valid config data
      */
-
-    public function onReady(): PromiseInterface
+    public function isReady(): bool
     {
-        $promise = new Promise();
-        
-        // Check condition immediately and fulfill/reject accordingly
         try {
-            $configData = $this->_dataManager->getConfigData();
-            if ($this->_initialized && $configData->getAccountId() && $configData->getProject()) {
-                $promise->resolve(true);
-            } else {
-                $promise->reject(new \Exception("Data object missing"));
+            $configData = $this->dataManager->getConfigData();
+            if ($this->initialized && $configData->getAccountId() && $configData->getProject()) {
+                return true;
             }
+            return false;
         } catch (\Exception $e) {
-            $promise->reject($e);
+            return false;
         }
-        
-        return $promise;
     }
 
-   /**
-     * Fetch remote config data
+    /**
+     * Check if the system is ready.
      *
-     * @return PromiseInterface
+     * @deprecated Use isReady() instead
+     * @return bool
      */
-    public function fetchConfig(): PromiseInterface
+    public function onReady(): bool
     {
-        return $this->_apiManager->getConfig()->then(
-            function (ConfigResponseData $data) {
-                $this->_dataManager->setConfigData($data);
-                $configData = $this->_dataManager->getConfigData();
+        return $this->isReady();
+    }
 
-                if (!$configData->getAccountId() || !$configData->getProject()) {
-                    $this->_loggerManager?->error('Core.fetchConfig()', ['error' => 'Invalid configuration data: missing account_id or project']);
-                    throw new \Exception('Invalid configuration data: missing account_id or project');
-                }
+    /**
+     * Flush all queued tracking events immediately.
+     *
+     * @return void
+     */
+    public function flush(): void
+    {
+        $this->apiManager->releaseQueue('flush');
+    }
 
-                $this->_loggerManager?->trace('Core.fetchConfig()', ['data' => $data]);
-                $event = ($configData->getAccountId() && $configData->getProject()) ? SystemEvents::CONFIG_UPDATED : SystemEvents::READY;
-                $this->_eventManager->fire($event, null, null, true);
-                $this->_apiManager->setData($data);
+    /**
+     * Fetch remote config data, using cache when available.
+     *
+     * @return void
+     * @throws ConfigFetchException If the remote config fetch fails
+     * @throws ConfigValidationException If the fetched config is invalid
+     */
+    private function fetchConfig(): void
+    {
+        $sdkKey = $this->config->getSdkKey();
+        $cacheKey = $this->buildCacheKey($sdkKey);
 
-                if ($configData->getAccountId() && $configData->getProject()) {
-                    $this->_loggerManager?->trace('Core.fetchConfig()', Messages::CONFIG_DATA_UPDATED);
-                } else {
-                    $this->_loggerManager?->trace('Core.fetchConfig()', Messages::CORE_INITIALIZED);
-                    $this->_initialized = true;
-                }
-                // Note: Periodic refresh omitted, as PHP doesn't support long-running timers.
-                // Consider implementing via cron job or external scheduler if needed.
-            },
-            function ($error) {
-                $this->_loggerManager?->error('Core.fetchConfig()', ['error' => $error->getMessage()]);
-                throw $error;
+        $configEndpoint = $this->config->getApi() && isset($this->config->getApi()['endpoint']['config'])
+            ? $this->config->getApi()['endpoint']['config']
+            : '';
+
+        // Check cache first
+        $cachedData = $this->cache->get($cacheKey);
+
+        if ($cachedData instanceof ConfigResponseData) {
+            $this->loggerManager?->trace('Core.fetchConfig()', 'Using cached config');
+
+            try {
+                $this->configValidator->validate($cachedData);
+            } catch (ConfigValidationException $e) {
+                $this->loggerManager?->error('Core.fetchConfig()', ['error' => 'Cached config invalid, fetching fresh: ' . $e->getMessage()]);
+                $this->cache->delete($cacheKey);
+                $cachedData = null;
             }
-        );
+        } else {
+            $cachedData = null;
+        }
+
+        if ($cachedData !== null) {
+            $data = $cachedData;
+        } else {
+            // Cache miss — fetch via HTTP
+            try {
+                $data = $this->apiManager->getConfig();
+            } catch (\RuntimeException $error) {
+                $this->loggerManager?->error('Core.fetchConfig()', ['error' => $error->getMessage()]);
+                throw new ConfigFetchException(
+                    $error->getMessage(),
+                    (int) $error->getCode(),
+                    $configEndpoint,
+                    $error
+                );
+            }
+
+            // Validate fresh config
+            $this->configValidator->validate($data);
+
+            // Store in cache
+            $this->cache->set($cacheKey, $data, $this->dataRefreshInterval);
+            $this->loggerManager?->trace('Core.fetchConfig()', 'Config cached with TTL ' . $this->dataRefreshInterval . 's');
+        }
+
+        $this->dataManager->setConfigData($data);
+        $this->loggerManager?->trace('Core.fetchConfig()', ['data' => $data]);
+
+        // Only fire ConfigUpdated on subsequent refreshes, not initial load
+        if ($this->initialized) {
+            $this->eventManager->fire(SystemEvents::ConfigUpdated, [], null, true);
+        }
+
+        $this->apiManager->setData($data);
+        $this->loggerManager?->trace('Core.fetchConfig()', Messages::CONFIG_DATA_UPDATED);
     }
 }

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Utils;
 
 /**
@@ -7,7 +10,7 @@ namespace ConvertSdk\Utils;
  */
 class DataStore
 {
-    private $file;
+    private string $file;
 
     public function __construct(string $file)
     {
@@ -24,7 +27,7 @@ class DataStore
     /**
      * Get value by key
      */
-    public function get(string $key)
+    public function get(string $key): mixed
     {
         try {
             $contents = file_get_contents($this->file);
@@ -39,7 +42,7 @@ class DataStore
     /**
      * Store value by key
      */
-    public function set(string $key, $value): void
+    public function set(string $key, mixed $value): void
     {
         try {
             $contents = file_get_contents($this->file);

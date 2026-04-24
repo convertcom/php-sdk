@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -6,7 +8,7 @@
  * License Apache-2.0
  */
 
-namespace ConvertSdk\Interfaces;
+namespace ConvertSdk\Event\Interfaces;
 
 use ConvertSdk\Enums\SystemEvents;
 
@@ -24,18 +26,18 @@ interface EventManagerInterface
      * @param callable $fn A callback function that receives two parameters: $args and $err.
      * @return void
      */
-    public function on($event, callable $fn): void;
+    public function on(SystemEvents|string $event, callable $fn): void;
 
     /**
      * Fires an event, optionally with arguments and an error.
      *
      * @param SystemEvents|string $event The event name or constant.
-     * @param array $args Optional associative array of arguments.
+     * @param array<string, mixed>|mixed $args Optional arguments.
      * @param mixed $err Optional error or exception.
      * @param bool $deferred Optional flag indicating if the event should be deferred.
      * @return void
      */
-    public function fire($event, array $args = [], $err = null, bool $deferred = false): void;
+    public function fire(SystemEvents|string $event, mixed $args = null, mixed $err = null, bool $deferred = false): void;
 
     /**
      * Removes all listeners associated with the given event.
@@ -43,5 +45,5 @@ interface EventManagerInterface
      * @param string $event The event name.
      * @return void
      */
-    public function removeListeners(string $event): void;
+    public function removeListeners(SystemEvents|string $event): void;
 }

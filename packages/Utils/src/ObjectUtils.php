@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Utils;
 
 /**
@@ -6,7 +9,7 @@ namespace ConvertSdk\Utils;
  */
 class ObjectUtils
 {
-    public static function objectDeepValue(array $object, string $path, $defaultValue = null, bool $truthy = false)
+    public static function objectDeepValue(array $object, string $path, mixed $defaultValue = null, bool $truthy = false): mixed
     {
         try {
             if (!empty($object)) {
@@ -29,24 +32,24 @@ class ObjectUtils
         return $defaultValue ?? null;
     }
 
-    public static function objectDeepMerge(...$objects): array
+    public static function objectDeepMerge(array ...$objects): array
     {
-        $isAssoc = function ($arr) {
+        $isAssoc = function (array $arr): bool {
             return array_keys($arr) !== range(0, count($arr) - 1);
         };
-    
+
         $result = array_shift($objects);
         foreach ($objects as $obj) {
             foreach ($obj as $key => $oVal) {
                 $pVal = $result[$key] ?? null;
-    
+
                 if (is_array($pVal) && is_array($oVal)) {
                     // Check if both are associative arrays
                     if ($isAssoc($pVal) && $isAssoc($oVal)) {
                         $result[$key] = self::objectDeepMerge($pVal, $oVal);
                     } else {
-                        // Preserve numeric arrays without converting to associative ones
-                        $result[$key] = array_merge($pVal, $oVal);
+                        // Merge numeric arrays and deduplicate (mirrors JS SDK's Set behavior)
+                        $result[$key] = array_values(array_unique(array_merge($oVal, $pVal)));
                     }
                 } elseif (is_array($oVal)) {
                     $result[$key] = $oVal;
@@ -57,9 +60,9 @@ class ObjectUtils
         }
         return $result;
     }
-    
 
-    public static function objectNotEmpty($object): bool
+
+    public static function objectNotEmpty(mixed $object): bool
     {
         if (is_array($object)) {
             return !empty($object);
@@ -69,7 +72,7 @@ class ObjectUtils
         return false;
     }
 
-    public static function objectDeepEqual($a, $b): bool
+    public static function objectDeepEqual(mixed $a, mixed $b): bool
     {
         if ($a === $b) {
             return true;

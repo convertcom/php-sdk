@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * Convert Php SDK
  * Version 1.0.0
@@ -17,18 +19,18 @@ use ConvertSdk\Enums\LogMethod;
  * To simulate a similar "dictionary" or "map" behavior in PHP, the built-in ArrayAccess is extended
  * This requires any implementing class to define these four methods: offsetGet, offsetSet, offsetExists, and offsetUnset.
  * By doing this, any class that implements LogMethodMapInterface can be used like an array (e.g., $map[LogMethod::LOG] = 'logMethodName';)
- * and will enforce the expected behavior similar to the TypeScript interface. 
+ * and will enforce the expected behavior similar to the TypeScript interface.
  */
 
-interface LogMethodMapInterface extends \ArrayAccess {
+interface LogMethodMapInterface extends \ArrayAccess
+{
     /**
      * Retrieve the mapped method name for the given log method.
      *
      * @param LogMethod|string $offset
      * @return string|null
      */
-    #[\ReturnTypeWillChange]
-    public function offsetGet($offset);
+    public function offsetGet(mixed $offset): mixed;
 
     /**
      * Set the mapped method name for the given log method.
@@ -37,7 +39,7 @@ interface LogMethodMapInterface extends \ArrayAccess {
      * @param string|null $value
      * @return void
      */
-    public function offsetSet($offset, $value): void;
+    public function offsetSet(mixed $offset, mixed $value): void;
 
     /**
      * Check if a mapping exists for the given log method.
@@ -45,7 +47,7 @@ interface LogMethodMapInterface extends \ArrayAccess {
      * @param LogMethod|string $offset
      * @return bool
      */
-    public function offsetExists($offset): bool;
+    public function offsetExists(mixed $offset): bool;
 
     /**
      * Remove the mapping for the given log method.
@@ -53,5 +55,5 @@ interface LogMethodMapInterface extends \ArrayAccess {
      * @param LogMethod|string $offset
      * @return void
      */
-    public function offsetUnset($offset): void;
+    public function offsetUnset(mixed $offset): void;
 }

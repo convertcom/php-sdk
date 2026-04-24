@@ -1,29 +1,27 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk\Tests;
 
+use ConvertSdk\ApiManager;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\DataManager;
+use ConvertSdk\Enums\LogLevel;
+use ConvertSdk\Event\EventManager;
+use ConvertSdk\ExperienceManager;
+use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
+use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use OpenAPI\Client\BucketingAttributes;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\EventManager;
-use ConvertSdk\ApiManager;
-use ConvertSdk\LogManager;
-use ConvertSdk\DataManager;
-use ConvertSdk\ExperienceManager;
 use PHPUnit\Framework\TestCase;
-use Psr\Http\Client\ClientInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use GuzzleHttp\Psr7\Response;
 
 /**
  * Test class for ExperienceManager.
  */
-class ExperienceManagerTest extends TestCase
+class ExperienceTest extends TestCase
 {
     /** @var DataManager */
     private $dataManager;
@@ -74,7 +72,7 @@ class ExperienceManagerTest extends TestCase
         $configuration['data'] = new ConfigResponseData($configuration['data']);
         if (isset($configuration['sdkKey'])) {
             unset($configuration['sdkKey']);
-          }
+        }
         // Create Config object
         $config = new Config($configuration);
 
@@ -83,11 +81,15 @@ class ExperienceManagerTest extends TestCase
         $this->projectId = $configuration['data']['project']['id'];
 
         // Instantiate managers with dependencies
-        $bucketingManager = new BucketingManager($config);
-        $ruleManager = new RuleManager($config);
-        $eventManager = new EventManager($config);
-        $apiManager = new ApiManager($config, $eventManager);
-        $loggerManager = new LogManager($config);
+        $bucketingConfig = $config->getBucketing();
+        $bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $ruleManager = new RuleManager();
+        $eventManager = new EventManager();
+        $loggerManager = new LogManager(null, LogLevel::Trace);
+        $apiManager = new ApiManager($config, $eventManager, $loggerManager);
         $this->dataManager = new DataManager(
             $config,
             $bucketingManager,
@@ -97,7 +99,7 @@ class ExperienceManagerTest extends TestCase
             $loggerManager
         );
 
-        $this->experienceManager = new ExperienceManager($config, ['dataManager' => $this->dataManager]);
+        $this->experienceManager = new ExperienceManager(dataManager: $this->dataManager);
     }
 
     /**

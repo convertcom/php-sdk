@@ -26,15 +26,6 @@ class GoalData
     protected $value;
 
     /**
-     * Valid GoalDataKey values.
-     */
-    private const VALID_KEYS = [
-        GoalDataKey::AMOUNT,
-        GoalDataKey::PRODUCTS_COUNT,
-        GoalDataKey::TRANSACTION_ID
-    ];
-
-    /**
      * Constructor to initialize the object with data.
      *
      * @param array $data Associative array of property values
@@ -43,8 +34,8 @@ class GoalData
     public function __construct(array $data = [])
     {
         $key = $data['key'] ?? null;
-        if ($key !== null && !in_array($key, self::VALID_KEYS, true)) {
-            throw new \InvalidArgumentException("Invalid GoalData key: '$key'. Must be one of: " . implode(', ', self::VALID_KEYS));
+        if ($key !== null && GoalDataKey::tryFrom($key) === null) {
+            throw new \InvalidArgumentException("Invalid GoalData key: '$key'. Must be one of: " . implode(', ', array_column(GoalDataKey::cases(), 'value')));
         }
         $this->key = $key;
 
@@ -70,8 +61,8 @@ class GoalData
      */
     public function setKey(?string $key): self
     {
-        if ($key !== null && !in_array($key, self::VALID_KEYS, true)) {
-            throw new \InvalidArgumentException("Invalid GoalData key: '$key'. Must be one of: " . implode(', ', self::VALID_KEYS));
+        if ($key !== null && GoalDataKey::tryFrom($key) === null) {
+            throw new \InvalidArgumentException("Invalid GoalData key: '$key'. Must be one of: " . implode(', ', array_column(GoalDataKey::cases(), 'value')));
         }
         $this->key = $key;
         return $this;

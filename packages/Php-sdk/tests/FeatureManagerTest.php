@@ -1,22 +1,22 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Tests;
 
-use PHPUnit\Framework\TestCase;
-use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\EventManager;
 use ConvertSdk\ApiManager;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\DataManager;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\FeatureManager;
 use ConvertSdk\LogManager;
-use OpenAPI\Client\Model\ConfigFeature;
-use OpenAPI\Client\Model\ConfigExperience;
-use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\BucketedVariation;
+use ConvertSdk\RuleManager;
 use ConvertSdk\Utils\ObjectUtils;
-use ConvertSdk\Config\DefaultConfig;
+use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
+use PHPUnit\Framework\TestCase;
 
 class FeatureManagerTest extends TestCase
 {
@@ -44,13 +44,13 @@ class FeatureManagerTest extends TestCase
             'api' => [
                 'endpoint' => [
                     'config' => 'http://' . self::HOST . ':' . self::PORT,
-                    'track' => 'http://' . self::HOST . ':' . self::PORT
-                ]
+                    'track' => 'http://' . self::HOST . ':' . self::PORT,
+                ],
             ],
             'events' => [
                 'batch_size' => self::BATCH_SIZE,
-                'release_interval' => self::RELEASE_TIMEOUT
-            ]
+                'release_interval' => self::RELEASE_TIMEOUT,
+            ],
         ]);
 
         $configuration['data'] = new ConfigResponseData($configuration['data']);
@@ -60,10 +60,14 @@ class FeatureManagerTest extends TestCase
         // Create Config object
         $this->config = new Config($configuration);
 
-        $bucketingManager = new BucketingManager($this->config);
-        $ruleManager = new RuleManager($this->config);
-        $loggerManager = new LogManager($this->config);
-        $this->eventManager = new EventManager($this->config);
+        $bucketingConfig = $this->config->getBucketing();
+        $bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $ruleManager = new RuleManager();
+        $loggerManager = new LogManager();
+        $this->eventManager = new EventManager();
         $this->apiManager = new ApiManager($this->config, $this->eventManager);
         $this->dataManager = new DataManager(
             $this->config,
@@ -73,7 +77,7 @@ class FeatureManagerTest extends TestCase
             $this->apiManager,
             $loggerManager
         );
-        $this->featureManager = new FeatureManager($this->config, $this->dataManager);
+        $this->featureManager = new FeatureManager(dataManager: $this->dataManager);
 
         $this->accountId = $this->config->getData() ? $this->config->getData()->getAccountId() : '';
         $project = $this->config->getData() ? $this->config->getData()->getProject() : null;
@@ -177,12 +181,12 @@ class FeatureManagerTest extends TestCase
         $featureIds = ['10024', '10025'];
         $features = $this->featureManager->runFeature(self::VISITOR_ID, $featureKey, new BucketingAttributes([
             'visitorProperties' => ['varName3' => 'something'],
-            'locationProperties' => ['url' => 'https://convert.com/']
+            'locationProperties' => ['url' => 'https://convert.com/'],
         ]));
         $this->assertIsArray($features);
         $this->assertCount(2, $features);
         $selectedFeatures = array_column($features, 'id');
-        
+
         $this->assertContains($selectedFeatures[0], $featureIds);
         $this->assertContains($selectedFeatures[1], $featureIds);
     }
@@ -192,7 +196,7 @@ class FeatureManagerTest extends TestCase
         $featureKey = 'feature-1';
         $enabled = $this->featureManager->isFeatureEnabled(self::VISITOR_ID, $featureKey, new BucketingAttributes([
             'visitorProperties' => ['varName3' => 'something'],
-            'locationProperties' => ['url' => 'https://convert.com/']
+            'locationProperties' => ['url' => 'https://convert.com/'],
         ]));
 
         $this->assertTrue($enabled);
@@ -204,7 +208,7 @@ class FeatureManagerTest extends TestCase
         $featureIds = ['10024', '10025'];
         $features = $this->featureManager->runFeatureById(self::VISITOR_ID, $featureId, new BucketingAttributes([
             'visitorProperties' => ['varName3' => 'something'],
-            'locationProperties' => ['url' => 'https://convert.com/']
+            'locationProperties' => ['url' => 'https://convert.com/'],
         ]));
 
         $this->assertIsArray($features);
@@ -223,10 +227,10 @@ class FeatureManagerTest extends TestCase
             'visitorProperties' => ['varName3' => 'something'],
             'locationProperties' => ['url' => 'https://convert.com/'],
             'updateVisitorProperties' => false,
-            'typeCasting' => true
+            'typeCasting' => true,
         ]), [
             'features' => $filterByFeatures,
-            'experiences' => $filterByExperiences
+            'experiences' => $filterByExperiences,
         ]);
         $this->assertIsArray($features);
         $this->assertCount(3, $features);

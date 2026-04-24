@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -9,12 +11,11 @@
 
 namespace ConvertSdk\Interfaces;
 
-use OpenAPI\Client\Model\ConfigExperience;
-use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\BucketedVariation;
-use OpenAPI\Client\Model\ExperienceVariationConfig;
-use ConvertSdk\Enums\RuleError;
 use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\RuleError;
+use OpenAPI\Client\BucketingAttributes;
+use OpenAPI\Client\Model\ConfigExperience;
+use OpenAPI\Client\Model\ExperienceVariationConfig;
 
 /**
  * Interface for managing experiences and variations.
@@ -24,7 +25,7 @@ interface ExperienceManagerInterface
     /**
      * Get a list of all experiences.
      *
-     * @return ConfigExperience[]
+     * @return ConfigExperience[] Array of experience configurations
      */
     public function getList(): array;
 
@@ -32,7 +33,7 @@ interface ExperienceManagerInterface
      * Get an experience by its key.
      *
      * @param string $key The experience key
-     * @return ConfigExperience
+     * @return ConfigExperience|null The experience configuration, or null if not found
      */
     public function getExperience(string $key): ?ConfigExperience;
 
@@ -40,7 +41,7 @@ interface ExperienceManagerInterface
      * Get an experience by its ID.
      *
      * @param string $id The experience ID
-     * @return ConfigExperience
+     * @return ConfigExperience|null The experience configuration, or null if not found
      */
     public function getExperienceById(string $id): ?ConfigExperience;
 
@@ -48,7 +49,7 @@ interface ExperienceManagerInterface
      * Get multiple experiences by their keys.
      *
      * @param string[] $keys Array of experience keys
-     * @return ConfigExperience[]
+     * @return ConfigExperience[] Array of experience configurations
      */
     public function getExperiences(array $keys): array;
 
@@ -58,9 +59,9 @@ interface ExperienceManagerInterface
      * @param string $visitorId The visitor's ID
      * @param string $experienceKey The experience key
      * @param BucketingAttributes $attributes Bucketing attributes for variation selection
-     * @return BucketedVariation|RuleError|BucketingError
+     * @return array|RuleError|BucketingError|null The selected variation array, or an error/null
      */
-    public function selectVariation(string $visitorId, string $experienceKey, BucketingAttributes $attributes);
+    public function selectVariation(string $visitorId, string $experienceKey, BucketingAttributes $attributes): array|RuleError|BucketingError|null;
 
     /**
      * Select a variation for a visitor based on experience ID.
@@ -68,16 +69,16 @@ interface ExperienceManagerInterface
      * @param string $visitorId The visitor's ID
      * @param string $experienceId The experience ID
      * @param BucketingAttributes $attributes Bucketing attributes for variation selection
-     * @return BucketedVariation|RuleError|BucketingError
+     * @return array|RuleError|BucketingError|null The selected variation array, or an error/null
      */
-    public function selectVariationById(string $visitorId, string $experienceId, BucketingAttributes $attributes);
+    public function selectVariationById(string $visitorId, string $experienceId, BucketingAttributes $attributes): array|RuleError|BucketingError|null;
 
     /**
      * Select variations for a visitor across all experiences.
      *
      * @param string $visitorId The visitor's ID
      * @param BucketingAttributes $attributes Bucketing attributes for variation selection
-     * @return array Array of BucketedVariation|RuleError|BucketingError
+     * @return array<int, array<string, mixed>> Array of successful bucketed variation arrays
      */
     public function selectVariations(string $visitorId, BucketingAttributes $attributes): array;
 
@@ -86,7 +87,7 @@ interface ExperienceManagerInterface
      *
      * @param string $experienceKey The experience key
      * @param string $variationKey The variation key
-     * @return ExperienceVariationConfig
+     * @return ExperienceVariationConfig The variation configuration
      */
     public function getVariation(string $experienceKey, string $variationKey): ExperienceVariationConfig;
 
@@ -95,7 +96,7 @@ interface ExperienceManagerInterface
      *
      * @param string $experienceId The experience ID
      * @param string $variationId The variation ID
-     * @return ExperienceVariationConfig
+     * @return ExperienceVariationConfig The variation configuration
      */
     public function getVariationById(string $experienceId, string $variationId): ExperienceVariationConfig;
 }

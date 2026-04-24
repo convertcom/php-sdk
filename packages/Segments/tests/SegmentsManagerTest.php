@@ -1,20 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace ConvertSdk\Tests;
 
-use ConvertSdk\BucketingManager;
-use ConvertSdk\RuleManager;
-use ConvertSdk\EventManager;
 use ConvertSdk\ApiManager;
+use ConvertSdk\BucketingManager;
+use ConvertSdk\Config\DefaultConfig;
 use ConvertSdk\DataManager;
-use ConvertSdk\SegmentsManager;
+use ConvertSdk\Event\EventManager;
 use ConvertSdk\LogManager;
+use ConvertSdk\RuleManager;
+use ConvertSdk\SegmentsManager;
+use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
 use OpenAPI\Client\Model\VisitorSegments;
 use PHPUnit\Framework\TestCase;
-use ConvertSdk\Config\DefaultConfig;
-use ConvertSdk\Utils\ObjectUtils;
 
 class SegmentsManagerTest extends TestCase
 {
@@ -74,11 +76,15 @@ class SegmentsManagerTest extends TestCase
         $config = new Config(self::$configuration);
 
         // Initialize all manager instances with dependencies
-        $bucketingManager = new BucketingManager($config);
-        $ruleManager = new RuleManager($config);
-        $eventManager = new EventManager($config);
+        $bucketingConfig = $config->getBucketing();
+        $bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $ruleManager = new RuleManager();
+        $eventManager = new EventManager();
         $apiManager = new ApiManager($config, $eventManager);
-        $loggerManager = new LogManager($config);
+        $loggerManager = new LogManager();
         self::$dataManager = new DataManager(
             $config,
             $bucketingManager,
@@ -126,7 +132,7 @@ class SegmentsManagerTest extends TestCase
         $segments = ['country' => 'US'];
         self::$segmentsManager->putSegments($this->visitorId, $segments);
         $localSegments = self::$dataManager->getData($this->visitorId);
-        $this->assertEquals($segments['country'], $localSegments["segments"]["country"] ?? null);
+        $this->assertEquals($segments['country'], $localSegments['segments']['country'] ?? null);
     }
 
     public function testUpdateCustomSegments(): void

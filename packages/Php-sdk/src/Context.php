@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * Convert PHP SDK
  * Version 1.0.0
@@ -8,384 +11,388 @@
 
 namespace ConvertSdk;
 
+use ConvertSdk\DTO\BucketedFeature;
+use ConvertSdk\DTO\BucketedVariation;
+use ConvertSdk\DTO\ConversionAttributes;
+use ConvertSdk\DTO\GoalData;
+use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\EntityType;
+use ConvertSdk\Enums\ErrorMessages;
+use ConvertSdk\Enums\FeatureStatus;
+use ConvertSdk\Enums\RuleError;
+use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
+use ConvertSdk\Exception\InvalidArgumentException;
+use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\ContextInterface;
-use ConvertSdk\Interfaces\EventManagerInterface;
+use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
-use ConvertSdk\Interfaces\DataManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;
-use ConvertSdk\Interfaces\ApiManagerInterface;
-use OpenAPI\Client\Config;
-use OpenAPI\Client\BucketedVariation;
-use OpenAPI\Client\BucketingAttributes;
-use OpenAPI\Client\Model\VisitorSegments;
-use OpenAPI\Client\Entity;
-use OpenAPI\Client\Model\ConfigExperience;
-use OpenAPI\Client\Model\ExperienceVariationConfig;
-use OpenAPI\Client\StoreData;
-use ConvertSdk\Enums\BucketingError;
-use ConvertSdk\Enums\ErrorMessages;
-use ConvertSdk\Enums\EntityType;
-use ConvertSdk\Enums\RuleError;
-use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Utils\ObjectUtils;
-use GuzzleHttp\Promise\PromiseInterface;
-use GuzzleHttp\Promise\Promise;
+use OpenAPI\Client\BucketingAttributes;
+use OpenAPI\Client\Config;
 
 /**
- * Provides visitor context
- * @category Main
+ * Provides visitor context for running experiences, features, and tracking conversions.
  */
-class Context implements ContextInterface
+final class Context implements ContextInterface
 {
-    private EventManagerInterface $_eventManager;
-    private ExperienceManagerInterface $_experienceManager;
-    private FeatureManagerInterface $_featureManager;
-    private DataManagerInterface $_dataManager;
-    private SegmentsManagerInterface $_segmentsManager;
-    private ApiManagerInterface $_apiManager;
-    private ?LogManagerInterface $_loggerManager;
-    private Config $_config;
-    private ?string $_visitorId;
-    private ?array $_visitorProperties = null;
-    private ?string $_environment = null;
+    /** @var ?string */
+    private ?string $environment;
 
+    /** @var ?array<string, mixed> */
+    private ?array $visitorProperties = null;
+
+    /**
+     * @param Config $config SDK configuration
+     * @param string $visitorId Unique visitor identifier
+     * @param EventManagerInterface $eventManager Event manager instance
+     * @param ExperienceManagerInterface $experienceManager Experience manager instance
+     * @param FeatureManagerInterface $featureManager Feature manager instance
+     * @param DataManagerInterface $dataManager Data manager instance
+     * @param SegmentsManagerInterface $segmentsManager Segments manager instance
+     * @param ApiManagerInterface $apiManager API manager instance
+     * @param LogManagerInterface|null $loggerManager Optional logger manager instance
+     * @param array<string, mixed>|null $visitorAttributes Initial visitor attributes for targeting
+     *
+     * @throws InvalidArgumentException If visitorId is empty
+     */
     public function __construct(
-        Config $config,
-        ?string $visitorId,
-        array $dependencies,
-        ?array $visitorProperties = null
+        private readonly Config $config,
+        private readonly string $visitorId,
+        private readonly EventManagerInterface $eventManager,
+        private readonly ExperienceManagerInterface $experienceManager,
+        private readonly FeatureManagerInterface $featureManager,
+        private readonly DataManagerInterface $dataManager,
+        private readonly SegmentsManagerInterface $segmentsManager,
+        private readonly ApiManagerInterface $apiManager,
+        private readonly ?LogManagerInterface $loggerManager = null,
+        ?array $visitorAttributes = null,
     ) {
-        $this->_environment = $config->getEnvironment() ?? null;
-        $this->_visitorId = $visitorId;
+        if ($visitorId === '') {
+            throw new InvalidArgumentException('Visitor ID must not be empty');
+        }
 
-        $this->_config = $config;
-        $this->_eventManager = $dependencies['eventManager'];
-        $this->_experienceManager = $dependencies['experienceManager'];
-        $this->_featureManager = $dependencies['featureManager'];
-        $this->_dataManager = $dependencies['dataManager'];
-        $this->_segmentsManager = $dependencies['segmentsManager'];
-        $this->_apiManager = $dependencies['apiManager'];
-        $this->_loggerManager = $dependencies['loggerManager'] ?? null;
+        $this->environment = $config->getEnvironment() ?? null;
 
-        if (!empty($visitorProperties)) {
-            $filtered = $this->_dataManager->filterReportSegments($visitorProperties);
+        if (!empty($visitorAttributes)) {
+            $filtered = $this->dataManager->filterReportSegments($visitorAttributes);
             if (isset($filtered['properties'])) {
-                $this->_visitorProperties = $filtered['properties'];
+                $this->visitorProperties = $filtered['properties'];
             }
-            $this->_segmentsManager->putSegments($visitorId, $visitorProperties);
+            $this->segmentsManager->putSegments($visitorId, $visitorAttributes);
         }
     }
 
     /**
-     * Get variation from specific experience
+     * Get variation from specific experience.
      *
      * @param string $experienceKey An experience's key that should be activated
-     * @param BucketingAttributes|null $attributes An object that specifies attributes for the visitor
-     * @return BucketedVariation|RuleError|BucketingError|null
+     * @param BucketingAttributes|null $attributes Attributes for the visitor
+     * @return BucketedVariation|null The bucketed variation DTO, or null for all non-success paths
      */
-    public function runExperience(string $experienceKey, ?BucketingAttributes $attributes = null)
+    public function runExperience(string $experienceKey, ?BucketingAttributes $attributes = null): ?BucketedVariation
     {
-        // Check if visitor ID is present
-        if (empty($this->_visitorId)) {
-            $this->_loggerManager?->error(
+        if (empty($this->visitorId)) {
+            $this->loggerManager?->error(
                 'Context.runExperience()',
                 ErrorMessages::VISITOR_ID_REQUIRED
             );
-            return null; // Early return if visitor ID is missing
+            return null;
         }
 
-        // Get visitor properties, defaulting to null if not provided
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
-        // Select variation using experience manager
-        $bucketedVariation = $this->_experienceManager->selectVariation(
-            $this->_visitorId,
+        $result = $this->experienceManager->selectVariation(
+            $this->visitorId,
             $experienceKey,
             new BucketingAttributes([
-                'visitorProperties' => $visitorProperties, // Represents audiences
-                'locationProperties' => $attributes?->getLocationProperties(), // Represents site_area/locations
-                'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(), // Optional flag
-                'environment' => $attributes?->getEnvironment() ?? $this->_environment // Fallback to default environment
+                'visitorProperties' => $visitorProperties,
+                'locationProperties' => $attributes?->getLocationProperties(),
+                'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
+                'environment' => $attributes?->getEnvironment() ?? $this->environment,
             ])
         );
 
-
-        // Check if the result is a RuleError
-        if (in_array($bucketedVariation, RuleError::getConstants(), true)) {
-            return $bucketedVariation;
+        if ($result === null
+            || $result instanceof RuleError
+            || $result === BucketingError::VariationNotDecided
+        ) {
+            return null;
         }
 
-        // Check if the result is a BucketingError
-        if (in_array($bucketedVariation, [BucketingError::VARIATION_NOT_DECIDED], true)) {
-            return $bucketedVariation;
-        }
+        $this->eventManager->fire(
+            SystemEvents::Bucketing,
+            [
+                'visitorId' => $this->visitorId,
+                'experienceKey' => $experienceKey,
+                'variationKey' => $result['key'] ?? null,
+            ],
+            null,
+            true
+        );
 
-        // If a valid variation is returned, fire a bucketing event
-        if ($bucketedVariation) {
-            $this->_eventManager->fire(
-                SystemEvents::BUCKETING,
-                [
-                    'visitorId' => $this->_visitorId,
-                    'experienceKey' => $experienceKey,
-                    'variationKey' => $bucketedVariation['key'] ?? null // Safely access variation key
-                ],
-                null,
-                true
-            );
-        }
-
-        return $bucketedVariation; // Return the bucketed variation
+        return $this->mapToBucketedVariationDto($result);
     }
 
     /**
-     * Get variations across all experiences
+     * Get variations across all experiences.
      *
-     * @param BucketingAttributes|null $attributes An object that specifies attributes for the visitor
-     * @return array An array of BucketedVariation, RuleError, or BucketingError instances
+     * @param BucketingAttributes|null $attributes Attributes for the visitor
+     * @return BucketedVariation[] Array of bucketed variation DTOs
      */
     public function runExperiences(?BucketingAttributes $attributes = null): array
     {
-        // Check if visitor ID is present
-        if (empty($this->_visitorId)) {
-            $this->_loggerManager?->error(
+        if (empty($this->visitorId)) {
+            $this->loggerManager?->error(
                 'Context.runExperiences()',
                 ErrorMessages::VISITOR_ID_REQUIRED
             );
-            return []; // Early return with empty array if visitor ID is missing
+            return [];
         }
 
-        // Get visitor properties, defaulting to null if not provided
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
 
-        // Select variations using experience manager
-        $bucketedVariations = $this->_experienceManager->selectVariations(
-            $this->_visitorId,
+        $bucketedVariations = $this->experienceManager->selectVariations(
+            $this->visitorId,
             new BucketingAttributes([
-                'visitorProperties' => $visitorProperties, // Represents audiences
-                'locationProperties' => $attributes?->getLocationProperties(), // Represents site_area/locations
-                'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(), // Optional flag
-                'environment' => $attributes?->getEnvironment() ?? $this->_environment // Fallback to default environment
+                'visitorProperties' => $visitorProperties,
+                'locationProperties' => $attributes?->getLocationProperties(),
+                'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
+                'environment' => $attributes?->getEnvironment() ?? $this->environment,
             ])
         );
 
-        // Filter for rule errors
-        $matchedRuleErrors = array_filter($bucketedVariations, function ($match) {
-            return in_array($match, RuleError::getConstants(), true);
-        });
-        if (!empty($matchedRuleErrors)) {
-            return array_values($matchedRuleErrors); // Return rule errors if present
-        }
-
-        // Filter for bucketing errors
-        $matchedBucketingErrors = array_filter($bucketedVariations, function ($match) {
-            return in_array($match, [BucketingError::VARIATION_NOT_DECIDED], true);
-        });
-        if (!empty($matchedBucketingErrors)) {
-            return array_values($matchedBucketingErrors); // Return bucketing errors if present
-        }
-
-        // Fire events for each bucketed variation
+        $dtos = [];
         foreach ($bucketedVariations as $variation) {
-            $this->_eventManager->fire(
-                SystemEvents::BUCKETING,
+            if (!is_array($variation)) {
+                continue;
+            }
+            $this->eventManager->fire(
+                SystemEvents::Bucketing,
                 [
-                    'visitorId' => $this->_visitorId,
-                    'experienceKey' => $variation['experienceKey'] ?? null, // Safely access experience key
-                    'variationKey' => $variation['key'] ?? null // Safely access variation key
+                    'visitorId' => $this->visitorId,
+                    'experienceKey' => $variation['experienceKey'] ?? null,
+                    'variationKey' => $variation['key'] ?? null,
                 ],
                 null,
                 true
             );
+            $dtos[] = $this->mapToBucketedVariationDto($variation);
         }
 
-        return $bucketedVariations; // Return all bucketed variations
+        return $dtos;
     }
 
     /**
-     * Get feature and its status
+     * Get feature and its status.
+     *
      * @param string $key A feature key
-     * @param BucketingAttributes|null $attributes An object that specifies attributes for the visitor
-     * @return BucketedFeature|RuleError|array|null
+     * @param BucketingAttributes|null $attributes Attributes for the visitor
+     * @return BucketedFeature|null The bucketed feature DTO, or null for not-found/error paths
      */
-    public function runFeature(string $key, ?BucketingAttributes $attributes = null)
+    public function runFeature(string $key, ?BucketingAttributes $attributes = null): ?BucketedFeature
     {
-        // Check if visitor ID is missing
-        if (empty($this->_visitorId)) {
-            $this->_loggerManager?->error(
+        if (empty($this->visitorId)) {
+            $this->loggerManager?->error(
                 'Context.runFeature()',
                 ErrorMessages::VISITOR_ID_REQUIRED
             );
-            return null; // Early return if no visitor ID
+            return null;
         }
 
-        // Get visitor properties, handling null attributes
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
 
-        // Run the feature through the feature manager
-        $bucketedFeature = $this->_featureManager->runFeature(
-            $this->_visitorId,
+        $result = $this->featureManager->runFeature(
+            $this->visitorId,
             $key,
             new BucketingAttributes([
                 'visitorProperties' => $visitorProperties,
                 'locationProperties' => $attributes?->getLocationProperties(),
                 'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-                'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting') 
-                    ? $attributes->getTypeCasting() 
-                    : true, // Default to true if not specified
-                'environment' => $attributes?->getEnvironment() ?? $this->_environment
+                'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
+                    ? $attributes->getTypeCasting()
+                    : true,
+                'environment' => $attributes?->getEnvironment() ?? $this->environment,
             ]),
             $attributes?->getExperienceKeys()
         );
 
-        // Handle array of bucketed features or errors
-        if (is_array($bucketedFeature)) {
-            // Filter for rule errors
-            $matchedErrors = array_filter($bucketedFeature, function ($match) {
-                return in_array($match, RuleError::getConstants(), true);
-            });
-            if (!empty($matchedErrors)) {
-                return array_values($matchedErrors); // Return errors if present
+        // Determine if result is a single feature array or array of feature arrays
+        // Single feature: has 'status' key directly; multi: indexed array of feature arrays
+        if (isset($result['status'])) {
+            // Feature not declared (no 'id') → return null per consumer contract
+            if (!isset($result['id'])) {
+                return null;
             }
 
-            // Fire events for each bucketed feature
-            foreach ($bucketedFeature as $feature) {
-                $this->_eventManager->fire(
-                    SystemEvents::BUCKETING,
+            $dto = $this->mapToBucketedFeatureDto($result);
+
+            // Fire event only for enabled features
+            if ($dto->status === FeatureStatus::Enabled) {
+                $this->eventManager->fire(
+                    SystemEvents::Bucketing,
                     [
-                        'visitorId' => $this->_visitorId,
+                        'visitorId' => $this->visitorId,
+                        'experienceKey' => $result['experienceKey'] ?? null,
+                        'featureKey' => $key,
+                        'status' => $result['status'] ?? null,
+                    ],
+                    null,
+                    true
+                );
+            }
+
+            return $dto;
+        }
+
+        // Array of feature arrays (multi-experience) — return first enabled one
+        foreach ($result as $feature) {
+            if (!is_array($feature)) {
+                continue;
+            }
+            $dto = $this->mapToBucketedFeatureDto($feature);
+            if ($dto->status === FeatureStatus::Enabled) {
+                $this->eventManager->fire(
+                    SystemEvents::Bucketing,
+                    [
+                        'visitorId' => $this->visitorId,
                         'experienceKey' => $feature['experienceKey'] ?? null,
                         'featureKey' => $key,
-                        'status' => $feature['status'] ?? null
+                        'status' => $feature['status'] ?? null,
                     ],
                     null,
                     true
                 );
-            }
-        } else {
-            // Handle single RuleError or BucketedFeature
-            if (in_array($bucketedFeature, RuleError::getConstants(), true)) {
-                return $bucketedFeature; // Return RuleError
-            }
-
-            if ($bucketedFeature) {
-                $this->_eventManager->fire(
-                    SystemEvents::BUCKETING,
-                    [
-                        'visitorId' => $this->_visitorId,
-                        'experienceKey' => $bucketedFeature['experienceKey'] ?? null,
-                        'featureKey' => $key,
-                        'status' => $bucketedFeature['status'] ?? null
-                    ],
-                    null,
-                    true
-                );
+                return $dto;
             }
         }
 
-        return $bucketedFeature; // Return the result
+        // No enabled features found — return first feature as disabled DTO
+        $firstFeature = $result[0] ?? null;
+        if (is_array($firstFeature)) {
+            return $this->mapToBucketedFeatureDto($firstFeature);
+        }
+
+        return null;
     }
 
     /**
-     * Get features and their statuses
-     * @param BucketingAttributes|null $attributes An object that specifies attributes for the visitor
-     * @return array An array of BucketedFeature or RuleError instances
+     * Get features and their statuses.
+     *
+     * @param BucketingAttributes|null $attributes Attributes for the visitor
+     * @return BucketedFeature[] Array of bucketed feature DTOs
      */
     public function runFeatures(?BucketingAttributes $attributes = null): array
     {
-        // Check if visitor ID is missing
-        if (empty($this->_visitorId)) {
-            $this->_loggerManager?->error(
+        if (empty($this->visitorId)) {
+            $this->loggerManager?->error(
                 'Context.runFeatures()',
                 ErrorMessages::VISITOR_ID_REQUIRED
             );
-            return []; // Early return with empty array
+            return [];
         }
 
-        // Get visitor properties
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
 
-        // Retrieve all bucketed features
-        $bucketedFeatures = $this->_featureManager->runFeatures($this->_visitorId, new BucketingAttributes([
+        $bucketedFeatures = $this->featureManager->runFeatures($this->visitorId, new BucketingAttributes([
             'visitorProperties' => $visitorProperties,
             'locationProperties' => $attributes?->getLocationProperties(),
             'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-            'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting') 
-                ? $attributes->getTypeCasting() 
-                : true, // Default to true
-            'environment' => $attributes?->getEnvironment() ?? $this->_environment
+            'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
+                ? $attributes->getTypeCasting()
+                : true,
+            'environment' => $attributes?->getEnvironment() ?? $this->environment,
         ]));
 
-        // Filter for rule errors
+        // Filter out RuleError results
         $matchedErrors = array_filter($bucketedFeatures, function ($match) {
-            return in_array($match, RuleError::getConstants(), true);
+            return $match instanceof RuleError;
         });
         if (!empty($matchedErrors)) {
-            return array_values($matchedErrors); // Return errors if present
+            return [];
         }
 
-        // Fire events for each bucketed feature
+        $dtos = [];
         foreach ($bucketedFeatures as $feature) {
-            $this->_eventManager->fire(
-                SystemEvents::BUCKETING,
-                [
-                    'visitorId' => $this->_visitorId,
-                    'experienceKey' => $feature['experienceKey'] ?? null,
-                    'featureKey' => $feature['key'] ?? null,
-                    'status' => $feature['status'] ?? null
-                ],
-                null,
-                true
-            );
+            if (!is_array($feature)) {
+                continue;
+            }
+
+            $dto = $this->mapToBucketedFeatureDto($feature);
+
+            // Fire event only for enabled features
+            if ($dto->status === FeatureStatus::Enabled) {
+                $this->eventManager->fire(
+                    SystemEvents::Bucketing,
+                    [
+                        'visitorId' => $this->visitorId,
+                        'experienceKey' => $feature['experienceKey'] ?? null,
+                        'featureKey' => $feature['key'] ?? null,
+                        'status' => $feature['status'] ?? null,
+                    ],
+                    null,
+                    true
+                );
+            }
+
+            $dtos[] = $dto;
         }
 
-        return $bucketedFeatures; // Return all features
+        return $dtos;
     }
 
     /**
-     * Trigger Conversion
+     * Trigger conversion tracking.
+     *
      * @param string $goalKey A goal key
-     * @param ConversionAttributes|null $attributes An object that specifies attributes for the visitor
-     * @return RuleError
+     * @param ConversionAttributes|null $attributes Conversion attributes
+     * @return RuleError|bool|null RuleError on rule mismatch, false if goal not found or rule failed, null on success
      */
-    public function trackConversion(string $goalKey, ?array $attributes): ?RuleError
+    public function trackConversion(string $goalKey, ?ConversionAttributes $attributes = null): RuleError|bool|null
     {
-        if (empty($this->_visitorId)) {
-            $this->_loggerManager?->error(
+        if (empty($this->visitorId)) {
+            $this->loggerManager?->error(
                 'Context.trackConversion()',
                 ErrorMessages::VISITOR_ID_REQUIRED
             );
-            return null;
-        }
-        $goalRule = $attributes['ruleData'] ?? [];
-        $goalData = $attributes['conversionData'] ?? [];
-        if ($goalData !== null && !is_array($goalData)) {
-            $this->_loggerManager?->error(
-                'Context.trackConversion()',
-                ErrorMessages::GOAL_DATA_NOT_VALID
-            );
-            return null;
+            return false;
         }
 
-        $segments = $this->_segmentsManager->getSegments($this->_visitorId);
-        $triggered = $this->_dataManager->convert(
-            $this->_visitorId,
+        // Map DTO GoalData objects to plain arrays for DataManager serialization
+        $conversionData = $attributes?->conversionData;
+        if ($conversionData !== null) {
+            $conversionData = array_map(
+                fn ($item) => $item instanceof GoalData
+                    ? ['key' => $item->key->value, 'value' => $item->value]
+                    : $item,
+                $conversionData
+            );
+        }
+
+        $segments = $this->segmentsManager->getSegments($this->visitorId);
+        $triggered = $this->dataManager->convert(
+            $this->visitorId,
             $goalKey,
-            $goalRule,
-            $goalData,
+            $attributes?->ruleData,
+            $conversionData,
             $segments,
-            $attributes['conversionData'] ?? []
+            $attributes?->conversionSetting
         );
 
-        if (in_array($triggered, RuleError::getConstants(), true)) {
+        if ($triggered instanceof RuleError) {
             return $triggered;
         }
+        if ($triggered === false) {
+            return false;
+        }
         if ($triggered) {
-            $this->_eventManager->fire(
-                SystemEvents::CONVERSION,
+            $this->eventManager->fire(
+                SystemEvents::Conversion,
                 [
-                    'visitorId' => $this->_visitorId,
-                    'goalKey' => $goalKey
+                    'visitorId' => $this->visitorId,
+                    'goalKey' => $goalKey,
                 ],
                 null,
                 true
@@ -396,71 +403,125 @@ class Context implements ContextInterface
     }
 
     /**
-    * Set default segments for reports
-    * @param VisitorSegments $segments A segment key
-    */
+     * Set default segments for reports.
+     *
+     * @param array<string, mixed> $segments Segment data
+     * @return void
+     */
     public function setDefaultSegments(array $segments): void
     {
-        $this->_segmentsManager->putSegments($this->_visitorId, $segments);
+        $this->segmentsManager->putSegments($this->visitorId, $segments);
     }
 
     /**
-     * To be deprecated
-     * @param array $segmentKeys A list of segment keys
-     * @param SegmentsAttributes|null $attributes An object that specifies attributes for the visitor
-     * @return RuleError|null
+     * To be deprecated.
+     *
+     * @param array<int, string> $segmentKeys A list of segment keys
+     * @param array<string, mixed>|null $attributes Segment attributes
+     * @return array<int, mixed>|null
      */
-    public function setCustomSegments(array $segmentKeys, ?SegmentsAttributes $attributes = null): ?RuleError
+    public function setCustomSegments(array $segmentKeys, ?array $attributes = null): ?array
     {
         return $this->runCustomSegments($segmentKeys, $attributes);
     }
 
     /**
-    * Match Custom segments
-    * @param array $segmentKeys A list of segment keys
-    * @param SegmentsAttributes|null $attributes An object that specifies attributes for the visitor
-    * @return RuleError|null
-    */
-    public function runCustomSegments(array $segmentKeys, array $attributes = null): ?array
+     * Match custom segments.
+     *
+     * @param array<int, string> $segmentKeys A list of segment keys
+     * @param array<string, mixed>|null $attributes Segment attributes
+     * @return array<int, mixed>|null
+     */
+    public function runCustomSegments(array $segmentKeys, ?array $attributes = null): ?array
     {
-        if (empty($this->_visitorId)) {
-            $this->_loggerManager?->error(
+        if (empty($this->visitorId)) {
+            $this->loggerManager?->error(
                 'Context.runCustomSegments()',
                 ErrorMessages::VISITOR_ID_REQUIRED
             );
             return null;
         }
-        $segmentsRule = $this->getVisitorProperties($attributes["ruleData"]);
-        $error = $this->_segmentsManager->selectCustomSegments(
-            $this->_visitorId,
+        $segmentsRule = $this->getVisitorProperties($attributes['ruleData'] ?? null);
+        $result = $this->segmentsManager->selectCustomSegments(
+            $this->visitorId,
             $segmentKeys,
             $segmentsRule
         );
-        return $error->getCustomSegments() ? $error->getCustomSegments() : null;
+        if ($result === null || $result instanceof RuleError) {
+            return null;
+        }
+        return $result->getCustomSegments() ?: null;
     }
 
     /**
-     * Update visitor properties in memory
-     * @param string $visitorId
-     * @param array $visitorProperties
+     * Update visitor properties in memory.
+     *
+     * @param string $visitorId The visitor ID
+     * @param array<string, mixed> $visitorProperties Key-value pairs of visitor properties
+     * @return void
      */
     public function updateVisitorProperties(string $visitorId, array $visitorProperties): void
     {
-        $this->_dataManager->putData($visitorId, ['segments' => $visitorProperties]);
+        $this->dataManager->putData($visitorId, ['segments' => $visitorProperties]);
     }
 
     /**
-     * Get Config Entity
-     * @param string $key
-     * @param EntityType $entityType
-     * @return Entity|null
+     * Set a single visitor attribute.
+     *
+     * @param string $key The attribute key
+     * @param mixed $value The attribute value
+     * @return void
+     */
+    public function setAttribute(string $key, mixed $value): void
+    {
+        $this->visitorProperties = $this->visitorProperties ?? [];
+        $this->visitorProperties[$key] = $value;
+    }
+
+    /**
+     * Set multiple visitor attributes at once (merges with existing).
+     *
+     * @param array<string, mixed> $attributes Key-value pairs of attributes
+     * @return void
+     */
+    public function setAttributes(array $attributes): void
+    {
+        $this->visitorProperties = array_merge($this->visitorProperties ?? [], $attributes);
+    }
+
+    /**
+     * Get all current visitor attributes.
+     *
+     * @return array<string, mixed> The current visitor attributes
+     */
+    public function getAttributes(): array
+    {
+        return $this->visitorProperties ?? [];
+    }
+
+    /**
+     * Get the visitor ID for this context.
+     *
+     * @return string The visitor ID
+     */
+    public function getVisitorId(): string
+    {
+        return $this->visitorId;
+    }
+
+    /**
+     * Get config entity by key.
+     *
+     * @param string $key Entity key
+     * @param string $entityType Entity type (EntityType value)
+     * @return array<string, mixed> The entity data
      */
     public function getConfigEntity(string $key, string $entityType): array
     {
-        if ($entityType === EntityType::VARIATION) {
-            $experiences = $this->_dataManager->getEntitiesList(EntityType::EXPERIENCE);
+        if ($entityType === EntityType::Variation->value) {
+            $experiences = $this->dataManager->getEntitiesList(EntityType::Experience->value);
             foreach ($experiences as $experience) {
-                $variation = $this->_dataManager->getSubItem(
+                $variation = $this->dataManager->getSubItem(
                     'experiences',
                     $experience['key'],
                     'variations',
@@ -473,21 +534,22 @@ class Context implements ContextInterface
                 }
             }
         }
-        return $this->_dataManager->getEntity($key, $entityType);
+        return $this->dataManager->getEntity($key, $entityType);
     }
 
     /**
-     * Get Config Entity by ID
-     * @param string $id
-     * @param EntityType $entityType
-     * @return Entity|null
+     * Get config entity by ID.
+     *
+     * @param string $id Entity ID
+     * @param string $entityType Entity type (EntityType value)
+     * @return array<string, mixed> The entity data
      */
     public function getConfigEntityById(string $id, string $entityType): array
     {
-        if ($entityType === EntityType::VARIATION) {
-            $experiences = $this->_dataManager->getEntitiesList(EntityType::EXPERIENCE);
+        if ($entityType === EntityType::Variation->value) {
+            $experiences = $this->dataManager->getEntitiesList(EntityType::Experience->value);
             foreach ($experiences as $experience) {
-                $variation = $this->_dataManager->getSubItem(
+                $variation = $this->dataManager->getSubItem(
                     'experiences',
                     $experience['id'],
                     'variations',
@@ -500,45 +562,77 @@ class Context implements ContextInterface
                 }
             }
         }
-        return $this->_dataManager->getEntityById($id, $entityType);
+        return $this->dataManager->getEntityById($id, $entityType);
     }
 
     /**
-     * Get visitor data
-     * @return array
+     * Get visitor data.
+     *
+     * @return array<string, mixed> The visitor's stored data
      */
     public function getVisitorData(): array
     {
-        return $this->_dataManager->getData($this->_visitorId) ?? [];
+        return $this->dataManager->getData($this->visitorId) ?? [];
     }
 
     /**
-     * Send pending API/DataStore queues to server
-     * @param string|null $reason
-     * @return PromiseInterface
+     * Send pending API queue to server.
+     *
+     * @param string|null $reason Optional reason for releasing queues
+     * @return void
      */
-    public function releaseQueues(?string $reason = null): PromiseInterface
+    public function releaseQueues(?string $reason = null): void
     {
-        if ($this->_dataManager->getDataStoreManager()) {
-            $this->_dataManager->getDataStoreManager()->releaseQueue($reason);
-        }
-        return $this->_apiManager->releaseQueue($reason);
+        $this->apiManager->releaseQueue($reason);
     }
 
     /**
-     * Get visitor properties
-     * @param array|null $attributes An object of key-value pairs that are used for audience targeting
-     * @return array
+     * Get visitor properties merged with stored segments.
+     *
+     * @param array<string, mixed>|null $attributes Visitor attributes to merge
+     * @return array<string, mixed> Merged visitor properties
      */
-
     private function getVisitorProperties(?array $attributes = null): array
     {
-        $data = $this->_dataManager->getData($this->_visitorId);
-        $segments = $data && $data["segments"] ? $data["segments"] : [];
+        $data = $this->dataManager->getData($this->visitorId);
+        $segments = $data && $data['segments'] ? $data['segments'] : [];
         $segments = $segments ? $segments : [];
         $visitorProperties = $attributes
-            ? ObjectUtils::objectDeepMerge($this->_visitorProperties ?? [], $attributes)
-            : $this->_visitorProperties;
+            ? ObjectUtils::objectDeepMerge($this->visitorProperties ?? [], $attributes)
+            : $this->visitorProperties;
         return ObjectUtils::objectDeepMerge($segments, $visitorProperties ?? []);
+    }
+
+    /**
+     * Map internal bucketed feature array to consumer-facing readonly DTO.
+     *
+     * @param array<string, mixed> $feature The internal bucketed feature array from FeatureManager
+     * @return BucketedFeature The readonly consumer DTO
+     */
+    private function mapToBucketedFeatureDto(array $feature): BucketedFeature
+    {
+        return new BucketedFeature(
+            featureId: (string) ($feature['id'] ?? ''),
+            featureKey: (string) ($feature['key'] ?? ''),
+            status: FeatureStatus::tryFrom($feature['status'] ?? 'disabled') ?? FeatureStatus::Disabled,
+            variables: (array) ($feature['variables'] ?? []),
+        );
+    }
+
+    /**
+     * Map internal bucketed variation array to consumer-facing readonly DTO.
+     *
+     * @param array<string, mixed> $variation The internal bucketed variation array from DataManager
+     * @return BucketedVariation The readonly consumer DTO
+     */
+    private function mapToBucketedVariationDto(array $variation): BucketedVariation
+    {
+        return new BucketedVariation(
+            experienceId: (string) ($variation['experienceId'] ?? ''),
+            experienceKey: (string) ($variation['experienceKey'] ?? ''),
+            variationId: (string) ($variation['id'] ?? ''),
+            variationKey: (string) ($variation['key'] ?? ''),
+            changes: (array) ($variation['changes'] ?? []),
+        );
     }
 }

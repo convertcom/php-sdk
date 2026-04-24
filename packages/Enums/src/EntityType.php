@@ -1,12 +1,16 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class EntityType {
-    const AUDIENCE = 'audience';
-    const LOCATION = 'location';
-    const SEGMENT = 'segment';
-    const FEATURE = 'feature';
-    const GOAL = 'goal';
-    const EXPERIENCE = 'experience';
-    const VARIATION = 'variation';
+enum EntityType: string
+{
+    case Audience = 'audience';
+    case Location = 'location';
+    case Segment = 'segment';
+    case Feature = 'feature';
+    case Goal = 'goal';
+    case Experience = 'experience';
+    case Variation = 'variation';
 }

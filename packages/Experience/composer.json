@@ -55,8 +55,7 @@
     }
   },
   "require": {
-    "php": ">=7.4",
-    "guzzlehttp/guzzle": "^7.0",
+    "php": "^8.2",
     "convertcom/php-sdk-api": ">=1.0.0",
     "convertcom/php-sdk-enums": ">=1.0.0",
     "convertcom/php-sdk-event": ">=1.0.0",
@@ -68,20 +67,12 @@
     "convertcom/php-sdk-utils": ">=1.0.0"
   },
   "require-dev": {
-    "phpunit/phpunit": "^9.6",
-    "phpstan/phpstan": "^1.0",
-    "squizlabs/php_codesniffer": "^3.6",
+    "phpunit/phpunit": "^11.0",
     "mockery/mockery": "^1.4"
   },
   "scripts": {
     "test": "phpunit --config phpunit.xml",
-    "lint": "phpcs --standard=PSR12 src/ tests/",
-    "lint:fix": "phpcbf --standard=PSR12 src/ tests/",
-    "clean": "rm -rf vendor/ composer.lock",
-    "post-install-cmd": [
-      "php -r \"copy('https://getcomposer.org/installer', 'composer-setup.php');\"",
-      "php composer-setup.php --install-dir=/usr/local/bin --filename=composer"
-    ]
+    "clean": "rm -rf vendor/ composer.lock"
   },
   "version": "1.0.0",
   "minimum-stability": "stable",

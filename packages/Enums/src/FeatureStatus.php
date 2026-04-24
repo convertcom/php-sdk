@@ -1,7 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 namespace ConvertSdk\Enums;
 
-class FeatureStatus {
-    const ENABLED = 'enabled';
-    const DISABLED = 'disabled';
+enum FeatureStatus: string
+{
+    case Enabled = 'enabled';
+    case Disabled = 'disabled';
 }
