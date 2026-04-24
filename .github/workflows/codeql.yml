@@ -1,5 +1,7 @@
 # PHP is not supported by CodeQL, so this workflow runs PHPStan and uploads
 # its findings as SARIF to GitHub Code Scanning (Security > Code scanning).
+# It is the single PHPStan gate for the repo: findings are uploaded to the
+# Security tab AND fail the workflow (and thus block the PR).
 #
 # Scanner:  PHPStan 2.x (reuses the repo's phpstan.neon)
 # Formatter: jbelien/phpstan-sarif-formatter (installed CI-only, not committed)
@@ -62,6 +64,7 @@ jobs:
           NEON
 
       - name: Run PHPStan (SARIF output)
+        id: phpstan
         continue-on-error: true
         run: |
           vendor/bin/phpstan analyse \
@@ -72,7 +75,14 @@ jobs:
             > phpstan.sarif
 
       - name: Upload SARIF to GitHub Code Scanning
+        if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: phpstan.sarif
           category: phpstan
+
+      - name: Fail workflow if PHPStan reported findings
+        if: steps.phpstan.outcome == 'failure'
+        run: |
+          echo "PHPStan reported findings — see Security → Code scanning for details."
+          exit 1
