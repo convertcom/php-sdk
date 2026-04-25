@@ -1,0 +1,122 @@
+parameters:
+    level: 6
+    paths:
+        - packages/Api/src
+        - packages/Bucketing/src
+        - packages/Data/src
+        - packages/Enums/src
+        - packages/Event/src
+        - packages/Experience/src
+        - packages/Logger/src
+        - packages/Php-sdk/src
+        - packages/Rules/src
+        - packages/Segments/src
+        - packages/Utils/src
+    excludePaths:
+        - packages/Types/lib
+    scanDirectories:
+        - packages/Types/lib
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        # ---------------------------------------------------------------
+        # OpenAPI model namespace mismatch
+        # Types package declares "OpenApi\Client" but autoloader maps "OpenAPI\Client".
+        # Generated files cannot be modified.
+        # ---------------------------------------------------------------
+        - identifier: class.nameCase
+
+        # ---------------------------------------------------------------
+        # OpenAPI models implement ArrayAccess but PHPStan doesn't track
+        # dynamic offsets. At runtime, models are often hydrated from raw
+        # arrays and accessed via bracket notation (JS SDK parity).
+        # ---------------------------------------------------------------
+        - identifier: offsetAccess.notFound
+        - identifier: offsetAssign.dimType
+        - identifier: isset.offset
+        - identifier: empty.offset
+
+        # ---------------------------------------------------------------
+        # PHPDoc type gaps — SDK ported from JS, many array returns lack
+        # value-type annotations. Fixing incrementally; suppress globally
+        # until full PHPDoc coverage is achieved.
+        # ---------------------------------------------------------------
+        - identifier: missingType.iterableValue
+        - identifier: missingType.parameter
+        - identifier: missingType.generics
+        - identifier: return.phpDocType
+        - identifier: parameter.phpDocType
+        - identifier: phpDoc.parseError
+
+        # ---------------------------------------------------------------
+        # Defensive runtime checks
+        # PHPStan proves these are redundant at the type level, but they
+        # exist as runtime safety for data that arrives as untyped arrays
+        # from the API. Keeping them is intentional (JS SDK parity).
+        # ---------------------------------------------------------------
+        - identifier: nullsafe.neverNull
+        - identifier: function.alreadyNarrowedType
+        - identifier: function.impossibleType
+        - identifier: instanceof.alwaysTrue
+        - identifier: instanceof.alwaysFalse
+        - identifier: booleanAnd.alwaysFalse
+        - identifier: booleanAnd.leftAlwaysFalse
+        - identifier: booleanAnd.leftAlwaysTrue
+        - identifier: booleanOr.alwaysFalse
+        - identifier: booleanOr.alwaysTrue
+        - identifier: identical.alwaysFalse
+        - identifier: identical.alwaysTrue
+        - identifier: notIdentical.alwaysFalse
+        - identifier: ternary.alwaysTrue
+        - identifier: if.alwaysTrue
+        - identifier: greater.alwaysTrue
+        - identifier: empty.variable
+
+        # ---------------------------------------------------------------
+        # Properties / dead code
+        # Some properties are stored for future use or API compatibility.
+        # Some code paths are unreachable per PHPStan but kept for safety.
+        # ---------------------------------------------------------------
+        - identifier: property.onlyWritten
+        - identifier: property.unusedType
+        - identifier: property.nonObject
+        - identifier: deadCode.unreachable
+        - identifier: nullCoalesce.offset
+        - identifier: nullCoalesce.expr
+        - identifier: nullCoalesce.variable
+        - identifier: foreach.nonIterable
+        - identifier: foreach.emptyArray
+        - identifier: return.unusedType
+        - identifier: method.unused
+
+        # ---------------------------------------------------------------
+        # Scoped suppressions for known legacy issues
+        # These identifiers catch real bugs, so they are path-restricted
+        # rather than globally suppressed.
+        # ---------------------------------------------------------------
+
+        # RuleAnd/RuleOrWhen constructors expect typed params but receive
+        # ArrayAccess objects; get_class_methods called on array (custom interface)
+        -
+            identifier: argument.type
+            paths:
+                - packages/Rules/src/RuleManager.php
+                - packages/Php-sdk/src/Context.php
+                - packages/Data/src/DataManager.php
+
+        # PHPDoc references StoreData, GoalData, Entity from Types namespace
+        # that resolve under the wrong case (OpenApi vs OpenAPI)
+        -
+            identifier: class.notFound
+            paths:
+                - packages/Data/src/DataManager.php
+                - packages/Data/src/Interfaces/DataManagerInterface.php
+
+        # DataManager._mapper() — closure stored as property, invoked as method
+        -
+            identifier: method.notFound
+            path: packages/Data/src/DataManager.php
+
+        # FeatureManager.runFeatureById return type shape mismatch
+        -
+            identifier: return.type
+            path: packages/Php-sdk/src/FeatureManager.php

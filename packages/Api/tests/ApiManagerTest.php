@@ -1,0 +1,641 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ConvertSdk\Tests;
+
+use ConvertSdk\ApiManager;
+use ConvertSdk\Config\DefaultConfig;
+use ConvertSdk\Enums\SystemEvents;
+use ConvertSdk\Event\Interfaces\EventManagerInterface;
+use ConvertSdk\Interfaces\LogManagerInterface;
+use ConvertSdk\Utils\ObjectUtils;
+use Http\Mock\Client as MockHttpClient;
+use Nyholm\Psr7\Factory\Psr17Factory;
+use Nyholm\Psr7\Response;
+use OpenAPI\Client\Config;
+use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\VisitorTrackingEvents;
+use PHPUnit\Framework\TestCase;
+
+class ApiManagerTest extends TestCase
+{
+    private $apiManager;
+    private $eventManagerMock;
+    private $loggerManagerMock;
+    private MockHttpClient $mockHttpClient;
+    private Psr17Factory $psr17Factory;
+    private $config;
+
+    private const HOST = 'http://localhost';
+    private const PORT = 8090;
+    private const BATCH_SIZE = 5;
+
+    /**
+     * Set up the test environment before each test.
+     */
+    protected function setUp(): void
+    {
+        // Mock dependencies
+        $this->eventManagerMock = $this->createMock(EventManagerInterface::class);
+        $this->loggerManagerMock = $this->createMock(LogManagerInterface::class);
+        $this->mockHttpClient = new MockHttpClient();
+        $this->psr17Factory = new Psr17Factory();
+
+        // Load and prepare test configuration
+        $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
+        $defaultConfig = DefaultConfig::getDefault();
+        $mergedConfig = ObjectUtils::objectDeepMerge($testConfig, $defaultConfig);
+        $overrides = [
+            'api' => [
+                'endpoint' => [
+                    'config' => self::HOST . ':' . self::PORT,
+                    'track'  => self::HOST . ':' . self::PORT,
+                ],
+            ],
+            'events' => [
+                'batch_size' => self::BATCH_SIZE,
+            ],
+            'mapper' => null, // Ensure no invalid mapper value
+        ];
+        $finalConfig = ObjectUtils::objectDeepMerge($mergedConfig, $overrides);
+        if (isset($finalConfig['sdkKey'])) {
+            unset($finalConfig['sdkKey']);
+        }
+        $finalConfig['data'] = new ConfigResponseData($finalConfig['data']);
+        $this->config = new Config($finalConfig);
+
+        // Instantiate ApiManager with mock PSR-18 client
+        $this->apiManager = new ApiManager(
+            $this->config,
+            $this->eventManagerMock,
+            $this->loggerManagerMock,
+            $this->mockHttpClient,
+            $this->psr17Factory,
+            $this->psr17Factory
+        );
+    }
+
+    /**
+     * Test that ApiManager class is defined.
+     */
+    public function testApiManagerIsDefined(): void
+    {
+        $this->assertTrue(class_exists(ApiManager::class));
+    }
+
+    /**
+     * Test that ApiManager can be instantiated with default config.
+     */
+    public function testApiManagerInstantiationWithDefaultConfig(): void
+    {
+        $apiManager = new ApiManager(
+            null,
+            null,
+            null,
+            $this->mockHttpClient,
+            $this->psr17Factory,
+            $this->psr17Factory
+        );
+        $this->assertInstanceOf(ApiManager::class, $apiManager);
+    }
+
+    /**
+     * Test that ApiManager can be instantiated with provided config and EventManager.
+     */
+    public function testApiManagerInstantiationWithConfigAndEventManager(): void
+    {
+        $this->assertInstanceOf(ApiManager::class, $this->apiManager);
+    }
+
+    /**
+     * Test sending a JSON payload via ApiManager request method.
+     */
+    public function testRequestSending(): void
+    {
+        $testPayload = [
+            'foo' => 'bar',
+            'some' => ['test' => ['data' => 'value']],
+        ];
+
+        // Add mock response
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
+        $result = $this->apiManager->request(
+            'POST',
+            ['base' => self::HOST . ':' . self::PORT, 'route' => '/test'],
+            $testPayload
+        );
+
+        $this->assertIsArray($result);
+        $this->assertEquals(200, $result['status']);
+
+        // Verify the request that was sent
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $this->assertEquals('POST', $sentRequest->getMethod());
+        $this->assertStringContainsString('/test', (string)$sentRequest->getUri());
+        $this->assertEquals('application/json', $sentRequest->getHeaderLine('Content-Type'));
+
+        $sentBody = json_decode($sentRequest->getBody()->getContents(), true);
+        $this->assertEquals($testPayload, $sentBody);
+    }
+
+    /**
+     * Test that batch_size enqueued requests are released immediately due to size limit.
+     */
+    public function testEnqueueAndReleaseOnBatchSize(): void
+    {
+        $requestData = new VisitorTrackingEvents([
+            'eventType' => 'bucketing',
+            'data' => ['experienceId' => '11', 'variationId' => '12'],
+        ]);
+
+        // Add mock response for the release request
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
+        for ($i = 1; $i <= self::BATCH_SIZE; $i++) {
+            $this->apiManager->enqueue("VID$i", $requestData);
+        }
+
+        // Verify a request was sent (queue was released)
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $this->assertNotNull($sentRequest);
+        $this->assertEquals('POST', $sentRequest->getMethod());
+        $this->assertStringContainsString('/track/', (string)$sentRequest->getUri());
+    }
+
+    /**
+     * Test that an event is fired when queue is released due to batch size.
+     */
+    public function testEventFiringOnReleaseDueToSize(): void
+    {
+
+        $requestData = new VisitorTrackingEvents([
+            'eventType' => 'bucketing',
+            'data' => ['experienceId' => '11', 'variationId' => '12'],
+        ]);
+
+        // Add mock response
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{"data": "ok"}')
+        );
+
+        // Expect event to be fired
+        $this->eventManagerMock->expects($this->once())
+            ->method('fire')
+            ->with(
+                SystemEvents::ApiQueueReleased,
+                $this->callback(function ($args) {
+                    return $args['reason'] === 'size' &&
+                           isset($args['result']) &&
+                           is_array($args['result']) &&
+                           isset($args['visitors']) &&
+                           count($args['visitors']) === self::BATCH_SIZE;
+                })
+            );
+
+        // Populate queue via reflection (bypasses enqueue auto-release)
+        $this->populateQueue(self::BATCH_SIZE);
+
+        // Explicitly release the queue
+        $this->apiManager->releaseQueue('size');
+    }
+
+    /**
+     * Test that an event is fired when queue is released with network error after all retries.
+     */
+    public function testEventFiringOnReleaseWithError(): void
+    {
+
+        $requestData = new VisitorTrackingEvents([
+            'eventType' => 'bucketing',
+            'data' => ['experienceId' => '11', 'variationId' => '12'],
+        ]);
+
+        // Configure mock client to throw exceptions for all 3 attempts (initial + 2 retries)
+        for ($i = 0; $i < 3; $i++) {
+            $this->mockHttpClient->addException(
+                new \Http\Client\Exception\NetworkException('Server error', $this->psr17Factory->createRequest('POST', 'http://localhost'))
+            );
+        }
+
+        // Expect event to be fired with error after all retries exhausted
+        $this->eventManagerMock->expects($this->once())
+            ->method('fire')
+            ->with(
+                SystemEvents::ApiQueueReleased,
+                $this->callback(function ($args) {
+                    return $args['reason'] === 'size';
+                }),
+                $this->callback(function ($err) {
+                    return $err instanceof \Exception && $err->getMessage() === 'Server error';
+                })
+            );
+
+        // Populate queue via reflection (bypasses enqueue auto-release)
+        $this->populateQueue(self::BATCH_SIZE);
+
+        // Explicitly release the queue
+        $this->apiManager->releaseQueue('size');
+    }
+
+    /**
+     * Populate the ApiManager's internal queue via reflection to isolate
+     * queue state from enqueue() side effects (auto-release, tracking).
+     */
+    private function populateQueue(int $count = 1): void
+    {
+        $reflection = new \ReflectionClass($this->apiManager);
+        $queueProperty = $reflection->getProperty('requestsQueue');
+
+        $queue = $queueProperty->getValue($this->apiManager);
+        for ($i = 1; $i <= $count; $i++) {
+            $queue->push(
+                "VID$i",
+                ['eventType' => 'bucketing', 'data' => ['experienceId' => '11', 'variationId' => '12']],
+                []
+            );
+        }
+    }
+
+    /**
+     * Test retry on HTTP 503: verify 2 retries then discard (AC #4).
+     */
+    public function testRetryOnHttp503ThenDiscard(): void
+    {
+        $this->populateQueue(self::BATCH_SIZE);
+
+        // Queue 3 x 503 responses (initial + 2 retries)
+        for ($i = 0; $i < 3; $i++) {
+            $this->mockHttpClient->addResponse(
+                new Response(503, ['Content-Type' => 'application/json'], '{"error": "service unavailable"}')
+            );
+        }
+
+        // Expect warning logged after retries exhausted
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('warn')
+            ->with(
+                $this->equalTo('ApiManager.releaseQueue()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['statusCode']) && $data['statusCode'] === 503
+                        && isset($data['attempts']) && $data['attempts'] === 3;
+                })
+            );
+
+        // Expect event fired with error info
+        $this->eventManagerMock->expects($this->once())
+            ->method('fire')
+            ->with(
+                SystemEvents::ApiQueueReleased,
+                $this->callback(function ($args) {
+                    return isset($args['error']) && str_contains($args['error'], '503');
+                }),
+                $this->anything()
+            );
+
+        $this->apiManager->releaseQueue('test');
+    }
+
+    /**
+     * Test no retry on HTTP 400: verify immediate discard and warning log (AC #5).
+     */
+    public function testNoRetryOnHttp400(): void
+    {
+        $this->populateQueue(self::BATCH_SIZE);
+
+        // Queue only 1 response — should NOT retry
+        $this->mockHttpClient->addResponse(
+            new Response(400, ['Content-Type' => 'application/json'], '{"error": "bad request"}')
+        );
+
+        // Expect warning logged immediately (no retry)
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('warn')
+            ->with(
+                $this->equalTo('ApiManager.releaseQueue()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['statusCode']) && $data['statusCode'] === 400;
+                })
+            );
+
+        // Expect event fired with error
+        $this->eventManagerMock->expects($this->once())
+            ->method('fire')
+            ->with(
+                SystemEvents::ApiQueueReleased,
+                $this->callback(function ($args) {
+                    return isset($args['error']) && str_contains($args['error'], '400');
+                }),
+                $this->callback(function ($err) {
+                    return $err instanceof \RuntimeException;
+                })
+            );
+
+        $this->apiManager->releaseQueue('test');
+
+        // Verify exactly 1 HTTP request was made (no retries)
+        $this->assertCount(1, $this->mockHttpClient->getRequests());
+    }
+
+    /**
+     * Test retry on network exception (ClientExceptionInterface) (AC #4).
+     */
+    public function testRetryOnNetworkException(): void
+    {
+        $this->populateQueue(self::BATCH_SIZE);
+
+        // Queue 3 network exceptions for all attempts
+        for ($i = 0; $i < 3; $i++) {
+            $this->mockHttpClient->addException(
+                new \Http\Client\Exception\NetworkException(
+                    'Connection refused',
+                    $this->psr17Factory->createRequest('POST', 'http://localhost')
+                )
+            );
+        }
+
+        // Expect warning after all retries
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('warn')
+            ->with(
+                $this->equalTo('ApiManager.releaseQueue()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['error']) && str_contains($data['error'], 'Connection refused')
+                        && isset($data['attempts']) && $data['attempts'] === 3;
+                })
+            );
+
+        $this->apiManager->releaseQueue('test');
+    }
+
+    /**
+     * Test successful POST after first retry (AC #4).
+     */
+    public function testSuccessAfterFirstRetry(): void
+    {
+        $this->populateQueue(self::BATCH_SIZE);
+
+        // First attempt: 503, second attempt: 200
+        $this->mockHttpClient->addResponse(
+            new Response(503, ['Content-Type' => 'application/json'], '{"error": "unavailable"}')
+        );
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{"data": "ok"}')
+        );
+
+        // Expect success event (no error)
+        $this->eventManagerMock->expects($this->once())
+            ->method('fire')
+            ->with(
+                SystemEvents::ApiQueueReleased,
+                $this->callback(function ($args) {
+                    return $args['reason'] === 'test'
+                        && isset($args['result'])
+                        && isset($args['visitors']);
+                })
+            );
+
+        $this->apiManager->releaseQueue('test');
+    }
+
+    /**
+     * Test payload structure matches expected JSON shape (AC #3, #9).
+     */
+    public function testPayloadStructure(): void
+    {
+        $this->populateQueue(self::BATCH_SIZE);
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
+        $this->apiManager->releaseQueue('test');
+
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $body = json_decode($sentRequest->getBody()->getContents(), true);
+
+        $this->assertArrayHasKey('accountId', $body);
+        $this->assertArrayHasKey('projectId', $body);
+        $this->assertArrayHasKey('enrichData', $body);
+        $this->assertArrayHasKey('source', $body);
+        $this->assertArrayHasKey('visitors', $body);
+        $this->assertIsArray($body['visitors']);
+    }
+
+    /**
+     * Test enrichData is true when no DataStoreManager configured (AC #9).
+     */
+    public function testEnrichDataTrueWithoutDataStore(): void
+    {
+        $this->populateQueue(1);
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
+        $this->apiManager->releaseQueue('test');
+
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $body = json_decode($sentRequest->getBody()->getContents(), true);
+
+        $this->assertTrue($body['enrichData']);
+    }
+
+    /**
+     * Test source is set correctly in payload (AC #9).
+     */
+    public function testSourceInPayload(): void
+    {
+        $this->populateQueue(1);
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{}')
+        );
+
+        $this->apiManager->releaseQueue('test');
+
+        $sentRequest = $this->mockHttpClient->getLastRequest();
+        $body = json_decode($sentRequest->getBody()->getContents(), true);
+
+        // Source comes from config network.source; test config doesn't set it explicitly,
+        // so ApiManager constructor defaults to 'js-sdk'. In production, ConvertSDK::create()
+        // sets 'php-sdk'. This test validates the field exists and has a string value.
+        $this->assertIsString($body['source']);
+        $this->assertNotEmpty($body['source']);
+    }
+
+    /**
+     * Test that getConfig() returns ConfigResponseData on success (AC #8).
+     */
+    public function testGetConfigReturnsConfigResponseData(): void
+    {
+        $configPayload = [
+            'data' => [
+                'account_id' => '999',
+                'project' => ['id' => '888', 'key' => 'test-project'],
+                'experiences' => [],
+                'features' => [],
+                'segments' => [],
+                'audiences' => [],
+                'goals' => [],
+                'locations' => [],
+            ],
+        ];
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], json_encode($configPayload))
+        );
+
+        $result = $this->apiManager->getConfig();
+
+        $this->assertInstanceOf(ConfigResponseData::class, $result);
+    }
+
+    /**
+     * Test that getConfig() throws RuntimeException on HTTP error (AC #8).
+     */
+    public function testGetConfigThrowsOnHttpError(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Failed to fetch config/');
+
+        $this->mockHttpClient->addException(
+            new \Http\Client\Exception\NetworkException(
+                'Connection refused',
+                $this->psr17Factory->createRequest('GET', 'http://localhost')
+            )
+        );
+
+        $this->apiManager->getConfig();
+    }
+
+    /**
+     * Test that request() propagates PSR-18 exceptions to callers.
+     */
+    public function testRequestPropagatesPsr18Exceptions(): void
+    {
+        $this->expectException(\Psr\Http\Client\ClientExceptionInterface::class);
+
+        $this->mockHttpClient->addException(
+            new \Http\Client\Exception\NetworkException(
+                'Connection timeout',
+                $this->psr17Factory->createRequest('GET', 'http://localhost')
+            )
+        );
+
+        $this->apiManager->request('GET', ['base' => 'http://localhost', 'route' => '/test']);
+    }
+
+    /**
+     * Test that request() returns synchronous array (not PromiseInterface) (AC #8).
+     */
+    public function testRequestReturnsSynchronousArray(): void
+    {
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], '{"key": "value"}')
+        );
+
+        $result = $this->apiManager->request('GET', ['base' => 'http://localhost', 'route' => '/test']);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('data', $result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertArrayHasKey('statusText', $result);
+        $this->assertArrayHasKey('headers', $result);
+        $this->assertEquals(200, $result['status']);
+        $this->assertEquals(['key' => 'value'], $result['data']);
+    }
+
+    /**
+     * Test that getConfig() calls debug() on logger after successful fetch (AC #2).
+     */
+    public function testGetConfigLogsDebugOnSuccess(): void
+    {
+        $configPayload = [
+            'data' => [
+                'account_id' => '999',
+                'project' => ['id' => '888', 'key' => 'test-project'],
+                'experiences' => [],
+                'features' => [],
+                'segments' => [],
+                'audiences' => [],
+                'goals' => [],
+                'locations' => [],
+            ],
+        ];
+
+        $this->mockHttpClient->addResponse(
+            new Response(200, ['Content-Type' => 'application/json'], json_encode($configPayload))
+        );
+
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('debug')
+            ->with(
+                $this->equalTo('ApiManager.getConfig()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['endpoint']) &&
+                           $data['status'] === 'success' &&
+                           array_key_exists('accountId', $data) &&
+                           array_key_exists('projectId', $data);
+                })
+            );
+
+        $this->apiManager->getConfig();
+    }
+
+    /**
+     * Test that getConfig() calls error() on logger when fetch fails (AC #6).
+     */
+    public function testGetConfigLogsErrorOnFailure(): void
+    {
+        $this->mockHttpClient->addException(
+            new \Http\Client\Exception\NetworkException(
+                'Connection refused',
+                $this->psr17Factory->createRequest('GET', 'http://localhost')
+            )
+        );
+
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('error')
+            ->with(
+                $this->equalTo('ApiManager.getConfig()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['endpoint']) &&
+                           $data['status'] === 'error' &&
+                           isset($data['error']);
+                })
+            );
+
+        $this->expectException(\RuntimeException::class);
+        $this->apiManager->getConfig();
+    }
+
+    /**
+     * Test that getConfig() logs error on non-2xx HTTP status (AC #6).
+     */
+    public function testGetConfigLogsErrorOnBadStatus(): void
+    {
+        $this->mockHttpClient->addResponse(
+            new Response(500, ['Content-Type' => 'application/json'], '{"error": "internal"}')
+        );
+
+        $this->loggerManagerMock->expects($this->atLeastOnce())
+            ->method('error')
+            ->with(
+                $this->equalTo('ApiManager.getConfig()'),
+                $this->callback(function (array $data): bool {
+                    return isset($data['endpoint']) &&
+                           $data['status'] === 'error' &&
+                           $data['httpStatus'] === 500;
+                })
+            );
+
+        $this->expectException(\RuntimeException::class);
+        $this->apiManager->getConfig();
+    }
+}

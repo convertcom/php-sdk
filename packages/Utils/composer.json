@@ -1,0 +1,44 @@
+{
+    "name": "convertcom/php-sdk-utils",
+    "description": "Convert Insights PHP SDK Utils",
+    "type": "library",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+        "name": "Convert Insights, Inc",
+        "homepage": "https://www.convert.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+        "ConvertSdk\\Utils\\": "src/",
+        "ConvertSdk\\Tests\\": "tests/"
+        }
+    },
+    "repositories": {
+        "Enums": {
+        "type": "path",
+        "url": "../Enums"
+      },
+        "Types": {
+        "type": "path",
+        "url": "../Types"
+      }
+    },
+    "require": {
+        "php": "^8.2",
+        "convertcom/php-sdk-enums": ">=1.0.0",
+        "convertcom/php-sdk-types": ">=1.0.0",
+        "lastguest/murmurhash": "^2.1"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "version": "1.0.0"
+
+}

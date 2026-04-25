@@ -1,0 +1,88 @@
+# PHP is not supported by CodeQL, so this workflow runs PHPStan and uploads
+# its findings as SARIF to GitHub Code Scanning (Security > Code scanning).
+# It is the single PHPStan gate for the repo: findings are uploaded to the
+# Security tab AND fail the workflow (and thus block the PR).
+#
+# Scanner:  PHPStan 2.x (reuses the repo's phpstan.neon)
+# Formatter: jbelien/phpstan-sarif-formatter (installed CI-only, not committed)
+# Upload:   github/codeql-action/upload-sarif@v4
+#
+# Docs: https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/uploading-a-sarif-file-to-github
+name: "Code Scanning (PHP)"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '15 9 * * 4'
+
+jobs:
+  phpstan-sarif:
+    name: PHPStan → SARIF
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('composer.json') }}
+          restore-keys: composer-
+
+      - name: Install project dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Install PHPStan SARIF formatter (CI-only)
+        run: composer require --dev --no-interaction --no-progress --no-scripts jbelien/phpstan-sarif-formatter
+
+      - name: Generate SARIF PHPStan config
+        run: |
+          cat > phpstan-sarif.neon <<'NEON'
+          includes:
+              - phpstan.neon
+          services:
+              errorFormatter.sarif:
+                  class: PHPStanSarifErrorFormatter\SarifErrorFormatter
+                  arguments:
+                      relativePathHelper: @simpleRelativePathHelper
+                      currentWorkingDirectory: %currentWorkingDirectory%
+                      pretty: true
+          NEON
+
+      - name: Run PHPStan (SARIF output)
+        id: phpstan
+        continue-on-error: true
+        run: |
+          vendor/bin/phpstan analyse \
+            --configuration=phpstan-sarif.neon \
+            --error-format=sarif \
+            --memory-limit=512M \
+            --no-progress \
+            > phpstan.sarif
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: phpstan.sarif
+          category: phpstan
+
+      - name: Fail workflow if PHPStan reported findings
+        if: steps.phpstan.outcome == 'failure'
+        run: |
+          echo "PHPStan reported findings — see Security → Code scanning for details."
+          exit 1

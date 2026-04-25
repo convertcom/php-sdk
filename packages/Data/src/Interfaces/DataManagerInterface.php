@@ -1,0 +1,246 @@
+<?php
+
+declare(strict_types=1);
+/**
+ * Convert JS SDK
+ * Version 1.0.0
+ * Copyright(c) 2020 Convert Insights, Inc
+ * License Apache-2.0
+ */
+
+namespace ConvertSdk\Interfaces;
+
+use ConvertSdk\Enums\BucketingError;
+use ConvertSdk\Enums\RuleError;
+use OpenAPI\Client\BucketingAttributes;
+use OpenAPI\Client\LocationAttributes;
+use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\VisitorSegments;
+
+interface DataManagerInterface
+{
+    /**
+     * Get the configuration data.
+     *
+     * @return ConfigResponseData
+     */
+    public function getConfigData(): ConfigResponseData;
+
+    public function getData(string $visitorId): ?array;
+
+    /**
+     * Set the configuration data.
+     *
+     * @param ConfigResponseData $data
+     * @return void
+     */
+    public function setConfigData(ConfigResponseData $data): void;
+
+    /**
+     * Get the data store manager.
+     *
+     * @return DataStoreManagerInterface
+     */
+    public function getDataStoreManager(): ?DataStoreManagerInterface;
+
+    /**
+     * Set the data store manager.
+     *
+     * @param DataStoreManagerInterface $dataStoreManager
+     * @return void
+     */
+    public function setDataStoreManager(DataStoreManagerInterface $dataStoreManager): void;
+
+    /**
+     * Reset the data manager state.
+     *
+     * @return void
+     */
+    public function reset(): void;
+
+    /**
+     * Store data for a given key.
+     *
+     * @param string $storeKey
+     * @param StoreData $storeData
+     * @return void
+     */
+    public function putData(string $storeKey, ?array $storeData): void;
+
+    /**
+     * Generate a store key from a visitor ID.
+     *
+     * @param string $visitorId
+     * @return string
+     */
+    public function getStoreKey(string $visitorId): string;
+
+    /**
+     * Select locations based on attributes.
+     *
+     * @param string $visitorId
+     * @param array $items Array of items with string keys and any values
+     * @param LocationAttributes $attributes
+     * @return array Array of items (associative arrays) or RuleError instances
+     */
+    public function selectLocations(string $visitorId, array $items, LocationAttributes $attributes): array;
+
+    /**
+     * Match rules by field for bucketing.
+     *
+     * @param string $visitorId
+     * @param string $identity
+     * @param string $identityField IdentityField constant (id or key)
+     * @param BucketingAttributes $attributes
+     * @return array|RuleError|null Experience data array, RuleError, or null if not found
+     */
+    public function matchRulesByField(string $visitorId, string $identity, string $identityField, BucketingAttributes $attributes): array|RuleError|null;
+
+    /**
+     * Get bucketing information by experience key.
+     *
+     * @param string $visitorId
+     * @param string $experienceKey
+     * @param BucketingAttributes $attributes
+     * @return array|RuleError|BucketingError|null Bucketed variation data, RuleError, BucketingError, or null
+     */
+    public function getBucketing(string $visitorId, string $experienceKey, BucketingAttributes $attributes): array|RuleError|BucketingError|null;
+
+    /**
+     * Get bucketing information by experience ID.
+     *
+     * @param string $visitorId
+     * @param string $experienceId
+     * @param BucketingAttributes $attributes
+     * @return array|RuleError|BucketingError|null Bucketed variation data, RuleError, BucketingError, or null
+     */
+    public function getBucketingById(string $visitorId, string $experienceId, BucketingAttributes $attributes): array|RuleError|BucketingError|null;
+
+    /**
+     * Record a conversion event.
+     *
+     * @param string $visitorId
+     * @param string $goalId
+     * @param array|null $goalRule Associative array of goal rules (optional)
+     * @param GoalData[]|null $goalData Array of GoalData objects (optional)
+     * @param VisitorSegments|null $segments (optional)
+     * @param array|null $conversionSetting Associative array with ConversionSettingKey keys (optional)
+     * @return RuleError|bool
+     */
+    public function convert(string $visitorId, string $goalId, ?array $goalRule = null, ?array $goalData = null, ?VisitorSegments $segments = null, ?array $conversionSetting = null): bool|RuleError;
+
+    /**
+     * Get a list of entities by type.
+     *
+     * @param string $entityType
+     * @return array Array of Entity objects or strings
+     */
+    public function getEntitiesList(string $entityType): array;
+
+    /**
+     * Get entities as an object keyed by a field.
+     *
+     * @param string $entityType
+     * @param string|null $field IdentityField constant (id or key) (optional)
+     * @return array Associative array of Entity objects
+     */
+    public function getEntitiesListObject(string $entityType, string $field): array;
+
+    /**
+     * Get a single entity by key.
+     *
+     * @param string $key
+     * @param string $entityType
+     * @return Entity
+     */
+    public function getEntity(string $key, string $entityType): ?array;
+
+    /**
+     * Get multiple entities by keys.
+     *
+     * @param string[] $keys
+     * @param string $entityType
+     * @return array Array of Entity objects
+     */
+    public function getEntities(array $keys, string $entityType): array;
+
+    /**
+     * Get a single entity by ID.
+     *
+     * @param string $id
+     * @param string $entityType
+     * @return Entity
+     */
+    public function getEntityById(string $id, string $entityType): ?array;
+
+    /**
+     * Get multiple entities by IDs.
+     *
+     * @param string[] $ids
+     * @param string $entityType
+     * @return array Array of Entity objects
+     */
+    public function getEntitiesByIds(array $ids, string $entityType): array;
+
+    /**
+     * Get items by keys from a specific path.
+     *
+     * @param string[] $keys
+     * @param string $path
+     * @return array Array of items with string keys and any values
+     */
+    public function getItemsByKeys(array $keys, string $path): array;
+
+    /**
+     * Get items by IDs from a specific path.
+     *
+     * @param string[] $ids
+     * @param string $path
+     * @return array Array of items with string keys and any values
+     */
+    public function getItemsByIds(array $ids, string $path): array;
+
+    /**
+     * Get a sub-item from an entity.
+     *
+     * @param string $entityType
+     * @param string $entityIdentity
+     * @param string $subEntityType
+     * @param string $subEntityIdentity
+     * @param string $identityField IdentityField constant (id or key)
+     * @param string $subIdentityField IdentityField constant (id or key)
+     * @return array Associative array of any key-value pairs
+     */
+    public function getSubItem(
+        string $entityType,
+        string $entityIdentity,
+        string $subEntityType,
+        string $subEntityIdentity,
+        string $identityField,
+        string $subIdentityField
+    ): ?array;
+
+    /**
+     * Filter report segments based on visitor properties.
+     *
+     * @param array $visitorProperties Associative array of visitor properties
+     * @return array Filtered associative array
+     */
+    public function filterReportSegments(?array $visitorProperties): array;
+
+    /**
+     * Validate configuration data.
+     *
+     * @param ConfigResponseData $data
+     * @return bool
+     */
+    public function isValidConfigData(ConfigResponseData $data): bool;
+
+    /**
+     * Set the data store.
+     *
+     * @param mixed $dataStore
+     * @return void
+     */
+    public function setDataStore(mixed $dataStore): void;
+}

@@ -1,0 +1,103 @@
+name: Quality Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Code Style
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('composer.json') }}
+          restore-keys: composer-
+      - run: composer install --no-interaction --no-progress
+      - run: composer cs-check
+
+  validate:
+    name: Monorepo Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('composer.json') }}
+          restore-keys: composer-
+      - run: composer install --no-interaction --no-progress
+      - run: composer build:validate
+
+  test:
+    name: Tests (PHP ${{ matrix.php-version }}, ${{ matrix.dependency-preference }})
+    runs-on: ubuntu-latest
+    env:
+      CONVERT_STAGING_SDK_KEY: ${{ secrets.CONVERT_STAGING_SDK_KEY }}
+      CONVERT_STAGING_SDK_KEY2: ${{ secrets.CONVERT_STAGING_SDK_KEY2 }}
+      CONVERT_STAGING_SDK_KEY2_SECRET: ${{ secrets.CONVERT_STAGING_SDK_KEY2_SECRET }}
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.2', '8.3', '8.4']
+        dependency-preference: ['prefer-lowest', 'prefer-stable']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: composer:v2
+          coverage: pcov
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-php${{ matrix.php-version }}-${{ matrix.dependency-preference }}-${{ hashFiles('composer.json') }}
+          restore-keys: |
+            composer-php${{ matrix.php-version }}-${{ matrix.dependency-preference }}-
+            composer-php${{ matrix.php-version }}-
+      - name: Install dependencies
+        run: composer update --${{ matrix.dependency-preference }} --prefer-stable --no-interaction --no-progress
+      - name: Run tests with coverage
+        if: matrix.php-version == '8.4' && matrix.dependency-preference == 'prefer-stable'
+        run: composer test:coverage:ci
+      - name: Enforce 85% coverage threshold
+        if: matrix.php-version == '8.4' && matrix.dependency-preference == 'prefer-stable'
+        run: |
+          php -r "
+            \$x = new SimpleXMLElement(file_get_contents('coverage.xml'));
+            \$m = \$x->project->metrics;
+            \$statements = (int)\$m['statements'];
+            if (\$statements === 0) { echo 'Error: zero statements in coverage report'; exit(1); }
+            \$pct = round(((int)\$m['coveredstatements'] / \$statements) * 100, 2);
+            echo \"Code coverage: {\$pct}%\n\";
+            exit(\$pct >= 85.0 ? 0 : 1);
+          "
+      - name: Upload coverage report
+        if: matrix.php-version == '8.4' && matrix.dependency-preference == 'prefer-stable'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
+      - name: Run tests without coverage
+        if: matrix.php-version != '8.4' || matrix.dependency-preference != 'prefer-stable'
+        run: composer test
+      - name: Run cross-SDK parity tests
+        run: composer test:cross-sdk

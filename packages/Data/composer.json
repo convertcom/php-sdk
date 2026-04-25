@@ -1,0 +1,77 @@
+{
+    "name": "convertcom/php-sdk-data",
+    "description": "PHP SDK Data package for Convert Insights, Inc.",
+    "type": "library",
+    "license": "Apache-2.0",
+    "version": "1.0.0",
+    "authors": [
+      {
+        "name": "Convert Insights, Inc"
+      }
+    ],
+    "autoload": {
+      "psr-4": {
+          "ConvertSdk\\": "src/",
+          "ConvertSdk\\Config\\": "../Php-sdk/src/Config/"
+      }
+    },
+    "repositories": {
+      "Enums": {
+        "type": "path",
+        "url": "../Enums"
+      },
+      "Api": {
+        "type": "path",
+        "url": "../Api"
+      },
+      "Logger": {
+        "type": "path",
+        "url": "../Logger"
+      },
+      "Utils": {
+        "type": "path",
+        "url": "../Utils"
+      },
+      "Event": {
+        "type": "path",
+        "url": "../Event"
+      },
+      "Bucketing": {
+        "type": "path",
+        "url": "../Bucketing"
+      },
+      "Rules": {
+        "type": "path",
+        "url": "../Rules"
+      },
+      "Types": {
+        "type": "path",
+        "url": "../Types"
+      }
+    },
+    "require": {
+        "php": "^8.2",
+        "convertcom/php-sdk-api": ">=1.0.0",
+        "convertcom/php-sdk-bucketing": ">=1.0.0",
+        "convertcom/php-sdk-enums": ">=1.0.0",
+        "convertcom/php-sdk-event": ">=1.0.0",
+        "convertcom/php-sdk-logger": ">=1.0.0",
+        "convertcom/php-sdk-rules": ">=1.0.0",
+        "convertcom/php-sdk-types": ">=1.0.0",
+        "convertcom/php-sdk-utils": ">=1.0.0",
+        "psy/psysh": "@stable"
+    },
+    "require-dev": {
+        "php-http/mock-client": "^1.6",
+        "nyholm/psr7": "^1.8",
+        "phpunit/phpunit": "^11.0"
+    },
+    "scripts": {
+      "test": "phpunit",
+      "coverage": "vendor/bin/phpunit --coverage-text"
+    },
+    "config": {
+      "optimize-autoloader": true,
+      "sort-packages": true
+    }
+  }

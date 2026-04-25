@@ -1,0 +1,189 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ConvertSdk;
+
+use ConvertSdk\Cache\ArrayCache;
+use ConvertSdk\Config\Config;
+use ConvertSdk\Enums\LogLevel;
+use ConvertSdk\Event\EventManager;
+use ConvertSdk\Exception\InvalidArgumentException;
+use ConvertSdk\Utils\Comparisons;
+use OpenAPI\Client\Config as OpenApiConfig;
+use OpenAPI\Client\Model\ConfigResponseData;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Psr\SimpleCache\CacheInterface;
+
+/**
+ * SDK entry point and factory.
+ *
+ * ConvertSDK is a static factory class that creates and returns a fully
+ * initialized {@see Core} instance. It is not directly instantiable.
+ *
+ * Usage:
+ *   $sdk = ConvertSDK::create(['sdkKey' => 'your-sdk-key']);
+ *   $context = $sdk->createContext('visitor-123', ['country' => 'US']);
+ */
+final class ConvertSDK
+{
+    /**
+     * Prevent direct instantiation — use {@see create()} instead.
+     */
+    private function __construct()
+    {
+    }
+
+    /**
+     * Create and initialize the SDK.
+     *
+     * Resolves all dependencies, creates managers in the correct order,
+     * and returns a fully initialized Core instance.
+     *
+     * @param array{
+     *     sdkKey?: string,
+     *     data?: array<string, mixed>|ConfigResponseData,
+     *     logger?: array{logLevel?: LogLevel, customLoggers?: array<LoggerInterface|array{logger: LoggerInterface, logLevel?: LogLevel}>},
+     *     cache?: CacheInterface,
+     *     dataStore?: object,
+     *     dataRefreshInterval?: int,
+     *     environment?: string,
+     *     network?: array<string, mixed>,
+     *     api?: array<string, mixed>,
+     * } $config SDK configuration options
+     *
+     * @return Core A fully initialized Core instance
+     *
+     * @throws InvalidArgumentException If both sdkKey and data are missing
+     */
+    public static function create(array $config = []): Core
+    {
+        // 1. Validate: at least one of sdkKey or data must be provided
+        if (empty($config['sdkKey']) && empty($config['data'])) {
+            throw new InvalidArgumentException('Either sdkKey or data must be provided');
+        }
+
+        // 2. Merge defaults
+        $configuration = Config::create($config);
+        // Allow VERSION env var to override network.source (for CI/release builds)
+        $version = getenv('VERSION');
+        if ($version !== false && $version !== '') {
+            $configuration['network']['source'] = $version;
+        }
+
+        // Remove empty sdkKey so OpenAPI\Client\Config processes 'data' correctly
+        // (its constructor uses isset() and elseif, so an empty sdkKey blocks data)
+        if (isset($configuration['sdkKey']) && $configuration['sdkKey'] === '') {
+            unset($configuration['sdkKey']);
+        }
+
+        // 3. Resolve logger (mirrors JS SDK: logger.logLevel + logger.customLoggers[])
+        $loggerConfig = is_array($configuration['logger'] ?? null) ? $configuration['logger'] : [];
+        $logLevel = $loggerConfig['logLevel'] ?? LogLevel::Warn;
+        $logManager = new LogManager(new NullLogger(), $logLevel);
+
+        // Add custom loggers — each entry is either a PSR-3 LoggerInterface
+        // or an array {logger: LoggerInterface, logLevel?: LogLevel}
+        $customLoggers = $loggerConfig['customLoggers'] ?? [];
+        foreach ($customLoggers as $entry) {
+            if ($entry instanceof LoggerInterface) {
+                $logManager->addClient($entry, $logLevel);
+            } elseif (is_array($entry) && isset($entry['logger']) && $entry['logger'] instanceof LoggerInterface) {
+                $logManager->addClient($entry['logger'], $entry['logLevel'] ?? $logLevel);
+            }
+        }
+
+        // 4. Resolve PSR-16 cache
+        $cache = (isset($configuration['cache']) && $configuration['cache'] instanceof CacheInterface)
+            ? $configuration['cache']
+            : new ArrayCache();
+
+        // Resolve dataRefreshInterval: DefaultConfig stores milliseconds, PSR-16 cache uses seconds
+        $dataRefreshIntervalMs = (int) ($configuration['dataRefreshInterval'] ?? 300000);
+        $dataRefreshInterval = max(1, (int) ($dataRefreshIntervalMs / 1000));
+
+        // 5. Wrap data in ConfigResponseData if raw array provided
+        if (!empty($configuration['data']) && is_array($configuration['data'])) {
+            $configuration['data'] = new ConfigResponseData($configuration['data']);
+        }
+
+        // 6. Create OpenApiConfig wrapper
+        $openApiConfig = new OpenApiConfig($configuration);
+
+        // 7. Instantiate managers in dependency order
+        $mapper = $openApiConfig->getMapper();
+        $eventManager = new EventManager(
+            loggerManager: $logManager,
+            mapper: is_callable($mapper) ? $mapper : null,
+        );
+
+        try {
+            $apiManager = new ApiManager($openApiConfig, $eventManager, $logManager);
+        } catch (\Http\Discovery\Exception\NotFoundException $e) {
+            throw new \RuntimeException(
+                'No PSR-18 HTTP client found. Install one (e.g., guzzlehttp/guzzle ^7) or pass an explicit httpClient.',
+                0,
+                $e
+            );
+        }
+
+        $bucketingConfig = $openApiConfig->getBucketing();
+        $bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+            logManager: $logManager,
+        );
+        $rulesConfig = $openApiConfig->getRules() ?? [];
+        $ruleManager = new RuleManager(
+            comparisonProcessor: $rulesConfig['comparisonProcessor'] ?? Comparisons::class,
+            negation: isset($rulesConfig['negation']) ? (string) $rulesConfig['negation'] : '!',
+            keysCaseSensitive: $rulesConfig['keys_case_sensitive'] ?? true,
+            logManager: $logManager,
+            mapper: is_callable($mapper) ? \Closure::fromCallable($mapper) : null,
+        );
+
+        $dataManager = new DataManager(
+            $openApiConfig,
+            $bucketingManager,
+            $ruleManager,
+            $eventManager,
+            $apiManager,
+            $logManager
+        );
+
+        // 7b. Wire PSR-16 cache as the visitor data store (enables cross-request persistence)
+        $dataStore = $configuration['dataStore'] ?? $cache;
+        $dataManager->setDataStore($dataStore);
+
+        $experienceManager = new ExperienceManager(
+            dataManager: $dataManager,
+            logManager: $logManager,
+        );
+
+        $featureManager = new FeatureManager(dataManager: $dataManager, logManager: $logManager);
+        $segmentsManager = new SegmentsManager($openApiConfig, $dataManager, $ruleManager, $logManager);
+
+        // 8. Register shutdown function for FPM auto-flush
+        register_shutdown_function(static function () use ($apiManager): void {
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+            $apiManager->releaseQueue('shutdown');
+        });
+
+        // 9. Construct and return Core
+        return new Core(
+            $openApiConfig,
+            $dataManager,
+            $eventManager,
+            $experienceManager,
+            $featureManager,
+            $segmentsManager,
+            $apiManager,
+            $cache,
+            $dataRefreshInterval,
+            $logManager
+        );
+    }
+}

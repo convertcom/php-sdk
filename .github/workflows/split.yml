@@ -1,0 +1,50 @@
+name: Split Monorepo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  split:
+    name: Split ${{ matrix.package.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - { name: 'Api', local_path: 'packages/Api', split_repository: 'php-sdk-api' }
+          - { name: 'Bucketing', local_path: 'packages/Bucketing', split_repository: 'php-sdk-bucketing' }
+          - { name: 'Data', local_path: 'packages/Data', split_repository: 'php-sdk-data' }
+          - { name: 'Enums', local_path: 'packages/Enums', split_repository: 'php-sdk-enums' }
+          - { name: 'Event', local_path: 'packages/Event', split_repository: 'php-sdk-event' }
+          - { name: 'Experience', local_path: 'packages/Experience', split_repository: 'php-sdk-experience' }
+          - { name: 'Logger', local_path: 'packages/Logger', split_repository: 'php-sdk-logger' }
+          - { name: 'Php-sdk', local_path: 'packages/Php-sdk', split_repository: 'php-sdk' }
+          - { name: 'Rules', local_path: 'packages/Rules', split_repository: 'php-sdk-rules' }
+          - { name: 'Segments', local_path: 'packages/Segments', split_repository: 'php-sdk-segments' }
+          - { name: 'Types', local_path: 'packages/Types', split_repository: 'php-sdk-types' }
+          - { name: 'Utils', local_path: 'packages/Utils', split_repository: 'php-sdk-utils' }
+    env:
+      GITHUB_TOKEN: ${{ secrets.SPLIT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: danharrin/monorepo-split-github-action@v2.4.4
+        with:
+          package_directory: ${{ matrix.package.local_path }}
+          repository_organization: 'convertcom'
+          repository_name: ${{ matrix.package.split_repository }}
+          user_name: 'convert-ci-bot'
+          user_email: 'ci@convert.com'
+
+      - if: "startsWith(github.ref, 'refs/tags/')"
+        uses: danharrin/monorepo-split-github-action@v2.4.4
+        with:
+          tag: ${{ github.ref_name }}
+          package_directory: ${{ matrix.package.local_path }}
+          repository_organization: 'convertcom'
+          repository_name: ${{ matrix.package.split_repository }}
+          user_name: 'convert-ci-bot'
+          user_email: 'ci@convert.com'

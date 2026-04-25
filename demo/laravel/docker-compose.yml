@@ -1,0 +1,11 @@
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: demo/laravel/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - CONVERT_SDK_KEY=${CONVERT_SDK_KEY:-10035569/10034190}
+    volumes:
+      - ./storage:/app/storage
