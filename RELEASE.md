@@ -14,8 +14,8 @@ PR merged to main
       -> Commit version bumps + CHANGELOG
       -> Create git tag (v1.x.y)
       -> Push tag to monorepo
-    -> Packagist webhook on the monorepo detects new tag
-      -> Auto-publishes new version of convertcom/php-sdk
+    -> Release workflow POSTs to Packagist's update-package API
+      -> Packagist re-fetches the repo and publishes the new tag
 ```
 
 ## Versioning Scheme
@@ -58,7 +58,7 @@ When a PR merges to `main`:
    - Runs `monorepo-builder bump-interdependency` and `monorepo-builder release` to sync all internal package versions (internal version sync is preserved for future split reactivation)
    - Commits changes with `[skip ci]` to prevent infinite loops
    - Creates and pushes a git tag (e.g., `v1.1.0`)
-5. **Packagist webhook** on the monorepo detects the new tag and auto-publishes `convertcom/php-sdk`
+5. **Release workflow** notifies Packagist via its `/api/update-package` endpoint after the tag push; Packagist re-fetches the repo and publishes the new version of `convertcom/php-sdk`
 
 ## Environment Requirements
 
@@ -82,11 +82,13 @@ If you see `Cannot find module '<some preset>'` errors from semantic-release plu
 
 One-time setup for the monorepo:
 
-1. Go to [packagist.org](https://packagist.org) > Submit > enter the monorepo GitHub URL
-2. Enable the **GitHub Service Hook** on the monorepo, or manually configure a webhook:
-   - URL: `https://packagist.org/api/github?username=PACKAGIST_USERNAME`
-   - Add the Packagist API token as a secret in the GitHub repo settings
-3. Alternative: use Packagist's **auto-update** feature (polls GitHub periodically)
+1. Go to [packagist.org](https://packagist.org) > Submit > enter the monorepo GitHub URL.
+2. Generate a Packagist API token from your Packagist profile (Profile > Show API Token).
+3. In the monorepo's GitHub Settings > Secrets and variables > Actions, add:
+   - `PACKAGIST_USERNAME` — the Packagist account that owns the package
+   - `PACKAGIST_API_TOKEN` — the API token from step 2
+
+The release workflow calls Packagist's `/api/update-package` endpoint after each tag push, so no GitHub OAuth grant ("connect your user account") and no repo-level webhook is required. This keeps Packagist sync tied to a shared, company-owned Packagist account rather than any individual contributor's GitHub identity.
 
 ## Manual Release
 
@@ -108,7 +110,8 @@ The `--branches` override lets semantic-release treat the current branch as a re
 
 One-time setup items required before the automated pipeline works:
 
-- [ ] **Monorepo registered on Packagist** pointing at the monorepo GitHub URL, with the GitHub webhook configured (see Packagist Setup above)
+- [ ] **Monorepo registered on Packagist** pointing at the monorepo GitHub URL
+- [ ] **`PACKAGIST_USERNAME` and `PACKAGIST_API_TOKEN` secrets** configured on the monorepo (see Packagist Setup above)
 - [ ] `yarn install` run once to generate `yarn.lock` (committed to repo)
 
 ## First Release
