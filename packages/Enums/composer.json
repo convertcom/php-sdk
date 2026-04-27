@@ -1,22 +1,22 @@
 {
-  "name": "convertcom/php-sdk-enums",
-  "description": "PHP implementation of Convert JS SDK enums",
-  "type": "library",
-  "license": "Apache-2.0",
-  "authors": [
-    {
-      "name": "Convert Insights, Inc"
-    }
-  ],
-  "autoload": {
-    "psr-4": {
-      "ConvertSdk\\Enums\\": "src/"
-    }
-  },
-  "require": {
-    "php": "^8.2"
-  },
-  "minimum-stability": "stable",
-  "prefer-stable": true,
-  "version": "1.0.0"
+    "name": "convertcom/php-sdk-enums",
+    "description": "PHP implementation of Convert JS SDK enums",
+    "type": "library",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "Convert Insights, Inc"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "ConvertSdk\\Enums\\": "src/"
+        }
+    },
+    "require": {
+        "php": "^8.2"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "version": "1.0.0"
 }
