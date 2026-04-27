@@ -2,7 +2,7 @@ name: Release
 
 on:
   workflow_run:
-    workflows: ['CI']
+    workflows: ['Quality Checks']
     types: [completed]
     branches: [main]
 
@@ -41,3 +41,18 @@ jobs:
         run: yarn release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Packagist of new release
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_API_TOKEN: ${{ secrets.PACKAGIST_API_TOKEN }}
+        run: |
+          if ! tag=$(git describe --tags --exact-match HEAD 2>/dev/null); then
+            echo "No new tag at HEAD; skipping Packagist update."
+            exit 0
+          fi
+          echo "Notifying Packagist of release $tag"
+          curl -fsSL -X POST \
+            -H 'Content-Type: application/json' \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_API_TOKEN}" \
+            -d "{\"repository\":{\"url\":\"https://github.com/${GITHUB_REPOSITORY}\"}}"
