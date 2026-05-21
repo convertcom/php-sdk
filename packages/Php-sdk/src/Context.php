@@ -104,15 +104,13 @@ final class Context implements ContextInterface
         }
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
+        $forwardedData = $attributes ? get_object_vars($attributes) : [];
+        $forwardedData['visitorProperties'] = $visitorProperties;
+        $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
         $result = $this->experienceManager->selectVariation(
             $this->visitorId,
             $experienceKey,
-            new BucketingAttributes([
-                'visitorProperties' => $visitorProperties,
-                'locationProperties' => $attributes?->getLocationProperties(),
-                'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-                'environment' => $attributes?->getEnvironment() ?? $this->environment,
-            ])
+            new BucketingAttributes($forwardedData)
         );
 
         if ($result === null
@@ -153,15 +151,13 @@ final class Context implements ContextInterface
         }
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
+        $forwardedData = $attributes ? get_object_vars($attributes) : [];
+        $forwardedData['visitorProperties'] = $visitorProperties;
+        $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
 
         $bucketedVariations = $this->experienceManager->selectVariations(
             $this->visitorId,
-            new BucketingAttributes([
-                'visitorProperties' => $visitorProperties,
-                'locationProperties' => $attributes?->getLocationProperties(),
-                'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-                'environment' => $attributes?->getEnvironment() ?? $this->environment,
-            ])
+            new BucketingAttributes($forwardedData)
         );
 
         $dtos = [];
