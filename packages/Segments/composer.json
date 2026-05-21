@@ -49,15 +49,15 @@
     },
     "require": {
         "php": "^8.2",
-        "convertcom/php-sdk-data": ">=1.0.0",
-        "convertcom/php-sdk-enums": ">=1.0.0",
-        "convertcom/php-sdk-bucketing": ">=1.0.0",
-        "convertcom/php-sdk-event": ">=1.0.0",
-        "convertcom/php-sdk-logger": ">=1.0.0",
-        "convertcom/php-sdk-rules": ">=1.0.0",
-        "convertcom/php-sdk-types": ">=1.0.0",
-        "convertcom/php-sdk-api": ">=1.0.0",
-        "convertcom/php-sdk-utils": ">=1.0.0"
+        "convertcom/php-sdk-data": "^1.0.0",
+        "convertcom/php-sdk-enums": "^1.0.0",
+        "convertcom/php-sdk-bucketing": "^1.0.0",
+        "convertcom/php-sdk-event": "^1.0.0",
+        "convertcom/php-sdk-logger": "^1.0.0",
+        "convertcom/php-sdk-rules": "^1.0.0",
+        "convertcom/php-sdk-types": "^1.0.0",
+        "convertcom/php-sdk-api": "^1.0.0",
+        "convertcom/php-sdk-utils": "^1.0.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^11.0"
