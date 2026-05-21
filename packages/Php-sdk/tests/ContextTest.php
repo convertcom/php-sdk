@@ -133,6 +133,88 @@ class ContextTest extends TestCase
         }
     }
 
+    public function testRunExperienceForwardsAllBucketingAttributes(): void
+    {
+        $realManager = $this->experienceManager;
+        $captured = null;
+
+        $spy = $this->createMock(\ConvertSdk\Interfaces\ExperienceManagerInterface::class);
+        $spy->method('selectVariation')->willReturnCallback(
+            function (string $visitorId, string $experienceKey, BucketingAttributes $attributes) use ($realManager, &$captured) {
+                $captured = $attributes;
+                return $realManager->selectVariation($visitorId, $experienceKey, $attributes);
+            }
+        );
+
+        $context = new Context(
+            $this->config,
+            $this->visitorId,
+            $this->eventManager,
+            $spy,
+            $this->featureManager,
+            $this->dataManager,
+            $this->segmentsManager,
+            $this->apiManager,
+        );
+
+        $context->runExperience('test-experience-ab-fullstack-2', new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something'],
+            'enableTracking' => false,
+            'forceVariationId' => '100299461',
+            'ignoreLocationProperties' => true,
+            'updateVisitorProperties' => true,
+        ]));
+
+        $this->assertNotNull($captured);
+        $this->assertFalse($captured->enableTracking);
+        $this->assertSame('100299461', $captured->forceVariationId);
+        $this->assertTrue($captured->ignoreLocationProperties);
+        $this->assertTrue($captured->updateVisitorProperties);
+        $this->assertSame(['url' => 'https://convert.com/'], $captured->locationProperties);
+    }
+
+    public function testRunExperiencesForwardsAllBucketingAttributes(): void
+    {
+        $realManager = $this->experienceManager;
+        $captured = null;
+
+        $spy = $this->createMock(\ConvertSdk\Interfaces\ExperienceManagerInterface::class);
+        $spy->method('selectVariations')->willReturnCallback(
+            function (string $visitorId, BucketingAttributes $attributes) use ($realManager, &$captured) {
+                $captured = $attributes;
+                return $realManager->selectVariations($visitorId, $attributes);
+            }
+        );
+
+        $context = new Context(
+            $this->config,
+            $this->visitorId,
+            $this->eventManager,
+            $spy,
+            $this->featureManager,
+            $this->dataManager,
+            $this->segmentsManager,
+            $this->apiManager,
+        );
+
+        $context->runExperiences(new BucketingAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something'],
+            'enableTracking' => false,
+            'forceVariationId' => '100299461',
+            'ignoreLocationProperties' => true,
+            'updateVisitorProperties' => true,
+        ]));
+
+        $this->assertNotNull($captured);
+        $this->assertFalse($captured->enableTracking);
+        $this->assertSame('100299461', $captured->forceVariationId);
+        $this->assertTrue($captured->ignoreLocationProperties);
+        $this->assertTrue($captured->updateVisitorProperties);
+        $this->assertSame(['url' => 'https://convert.com/'], $captured->locationProperties);
+    }
+
     public function testGetSingleFeatureWithStatus(): void
     {
         $featureKey = 'feature-2';
