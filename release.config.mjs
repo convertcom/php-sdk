@@ -29,12 +29,18 @@ export default {
     // 3. Write CHANGELOG.md
     '@semantic-release/changelog',
 
-    // 4. Sync all 12 package versions via monorepo-builder
+    // 4. Sync inter-package version constraints via monorepo-builder.
+    //    NOTE: do NOT chain `monorepo-builder release "<version>"` here.
+    //    That command creates its own commit + tag + push, which races
+    //    @semantic-release/git and produces an orphan "prepare release"
+    //    commit (the tag points to a commit that is never merged into main,
+    //    leaving v* tags unreachable from main's history and breaking the
+    //    "last release" lookup on every subsequent run).
     [
       '@semantic-release/exec',
       {
         prepareCmd:
-          'composer exec monorepo-builder bump-interdependency "^${nextRelease.version}" && composer exec monorepo-builder release "${nextRelease.version}"',
+          'composer exec monorepo-builder bump-interdependency "^${nextRelease.version}"',
       },
     ],
 
