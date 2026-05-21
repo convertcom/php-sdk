@@ -4,19 +4,19 @@
 
 ```
 PR merged to main
-  -> CI workflow runs (lint, analyze, test)
-  -> Release workflow triggers (after CI passes)
-    -> semantic-release analyzes commits since last tag
+  -> Quality Checks workflow runs (lint, analyze, test)
+  -> Release workflow triggers (after Quality Checks passes)
+    -> semantic-release analyzes commits since last v* tag
     -> If feat:/fix:/refactor: found:
       -> Calculate next version (custom rollover logic)
-      -> Generate/update CHANGELOG.md
-      -> Run monorepo-builder bump-interdependency to sync all package versions
-      -> Commit version bumps + CHANGELOG
-      -> Create git tag (v1.x.y)
-      -> Push tag to monorepo
+      -> Generate release notes from conventional commits
+      -> Create + push git tag (v1.x.y) at the current main HEAD
+      -> Publish a GitHub Release on that tag with the generated notes
     -> Release workflow POSTs to Packagist's update-package API
       -> Packagist re-fetches the repo and publishes the new tag
 ```
+
+The pipeline is **tag-only** — it does not push any commits to `main`. The release tag is created at the HEAD of `main` produced by the triggering PR merge, which is also the tree Packagist clones when it publishes the version. Release notes live on the GitHub Release for that tag (no `CHANGELOG.md` is committed to the repo).
 
 ## Versioning Scheme
 
@@ -37,7 +37,7 @@ Major bumps happen either directly via `BREAKING CHANGE` commits (standard semve
 
 Only conventional commits trigger releases:
 
-| Commit Type | Release Type | In CHANGELOG |
+| Commit Type | Release Type | In Release Notes |
 |-------------|-------------|-------------|
 | `fix:` | patch | Yes (Bug Fixes) |
 | `feat:` | patch | Yes (Features) |
@@ -49,16 +49,17 @@ Only conventional commits trigger releases:
 
 When a PR merges to `main`:
 
-1. **CI workflow** runs lint, static analysis, monorepo validation, and tests (6-job matrix)
-2. **Release workflow** triggers after CI passes (via `workflow_run`)
-3. **semantic-release** analyzes commits since the last tag
+1. **Quality Checks workflow** runs lint, static analysis, monorepo validation, and tests (6-job matrix).
+2. **Release workflow** triggers after Quality Checks passes (via `workflow_run`).
+3. **semantic-release** analyzes commits since the last `v*` tag.
 4. If releasable commits exist, it:
-   - Calculates the next version using the rollover plugin
-   - Updates `CHANGELOG.md`
-   - Runs `monorepo-builder bump-interdependency` and `monorepo-builder release` to sync all internal package versions (internal version sync is preserved for future split reactivation)
-   - Commits changes with `[skip ci]` to prevent infinite loops
-   - Creates and pushes a git tag (e.g., `v1.1.0`)
-5. **Release workflow** notifies Packagist via its `/api/update-package` endpoint after the tag push; Packagist re-fetches the repo and publishes the new version of `convertcom/php-sdk`
+   - Calculates the next version using the rollover plugin.
+   - Generates release notes from the conventional-commit history.
+   - Creates and pushes the git tag (e.g. `v1.1.0`) at main's current HEAD.
+   - Publishes a GitHub Release on the new tag with the generated notes.
+5. **Release workflow** notifies Packagist via its `/api/update-package` endpoint after the tag push; Packagist re-fetches the repo and publishes the new version of `convertcom/php-sdk`.
+
+The pipeline never pushes commits to `main` — only tags and a GitHub Release object. This means it works with branch-protection rulesets on `main` (PR-required, code-scanning, etc.) without needing a GitHub App or PAT bypass: tag refs (`refs/tags/*`) and the Releases REST API are not gated by branch rules.
 
 ## Environment Requirements
 
@@ -118,13 +119,11 @@ One-time setup items required before the automated pipeline works:
 
 The first release is produced automatically by the pipeline -- no manual tagging is required. On the first merge to `main` after the release workflow is configured, semantic-release observes that no prior `v*` tag exists, so it:
 
-1. Treats every releasable commit in history (all `fix:` / `feat:` / `refactor:` since project inception) as part of the first release
-2. Emits `v1.0.0` as the version (semantic-release's fixed first-release default, regardless of the rollover logic's bump type)
-3. Generates a correspondingly long `CHANGELOG.md` entry covering the full history, grouped by commit type
-4. Commits `CHANGELOG.md` + bumped `composer.json` files and pushes tag `v1.0.0`
-5. Packagist (once registered) picks up `v1.0.0` on the tag push and publishes
-
-The one-time long CHANGELOG is expected on the first release. Every subsequent release analyzes only the commits since the previous tag and will produce a small, focused CHANGELOG entry.
+1. Treats every releasable commit in history (all `fix:` / `feat:` / `refactor:` since project inception) as part of the first release.
+2. Emits `v1.0.0` as the version (semantic-release's fixed first-release default, regardless of the rollover logic's bump type).
+3. Generates a correspondingly long release-notes block covering the full history, grouped by commit type.
+4. Creates and pushes the tag `v1.0.0` at main's current HEAD and publishes a GitHub Release on that tag.
+5. Packagist (once registered) picks up `v1.0.0` on the tag push and publishes.
 
 Do not create a `v1.0.0` tag manually before or after the first merge -- the pipeline owns this, and a pre-existing tag will either be raced or block the automated tag push.
 
@@ -141,11 +140,6 @@ Do not create a `v1.0.0` tag manually before or after the first merge -- the pip
 - Review the rollover truth table in the versioning scheme section
 - Check `scripts/rollover-version-plugin.mjs` for the translation logic
 - The plugin logs its analysis: `logical=<type>, lastVersion=<ver>, effective=<type>`
-
-### CI re-runs after release commit
-
-- The release commit message includes `[skip ci]` -- this should prevent it
-- If CI still runs, verify the CI workflow respects `[skip ci]` in its trigger conditions
 
 ### `Cannot find module '<preset>'` from a semantic-release plugin
 
