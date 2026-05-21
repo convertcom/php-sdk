@@ -1,80 +1,79 @@
 {
-  "name": "convertcom/php-sdk-experience",
-  "description": "PHP SDK for Convert Experience Management",
-  "type": "library",
-  "license": "Apache-2.0",
-  "authors": [
-    {
-      "name": "Convert Insights, Inc",
-      "email": "support@convert.com"
-    }
-  ],
-  "autoload": {
-    "psr-4": {
-      "ConvertSdk\\": "src/",
-      "ConvertSdk\\Config\\": "../Php-sdk/src/Config/"
-
-    }
-  },
-  "repositories": {
-    "Enums": {
-      "type": "path",
-      "url": "../Enums"
+    "name": "convertcom/php-sdk-experience",
+    "description": "PHP SDK for Convert Experience Management",
+    "type": "library",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "Convert Insights, Inc",
+            "email": "support@convert.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "ConvertSdk\\": "src/",
+            "ConvertSdk\\Config\\": "../Php-sdk/src/Config/"
+        }
     },
-    "Api": {
-      "type": "path",
-      "url": "../Api"
+    "repositories": {
+        "Enums": {
+            "type": "path",
+            "url": "../Enums"
+        },
+        "Api": {
+            "type": "path",
+            "url": "../Api"
+        },
+        "Logger": {
+            "type": "path",
+            "url": "../Logger"
+        },
+        "Event": {
+            "type": "path",
+            "url": "../Event"
+        },
+        "Rules": {
+            "type": "path",
+            "url": "../Rules"
+        },
+        "Types": {
+            "type": "path",
+            "url": "../Types"
+        },
+        "Utils": {
+            "type": "path",
+            "url": "../Utils"
+        },
+        "Data": {
+            "type": "path",
+            "url": "../Data"
+        },
+        "Bucketing": {
+            "type": "path",
+            "url": "../Bucketing"
+        }
     },
-    "Logger": {
-      "type": "path",
-      "url": "../Logger"
+    "require": {
+        "php": "^8.2",
+        "convertcom/php-sdk-api": "^1.0.0",
+        "convertcom/php-sdk-enums": "^1.0.0",
+        "convertcom/php-sdk-event": "^1.0.0",
+        "convertcom/php-sdk-logger": "^1.0.0",
+        "convertcom/php-sdk-rules": "^1.0.0",
+        "convertcom/php-sdk-data": "^1.0.0",
+        "convertcom/php-sdk-bucketing": "^1.0.0",
+        "convertcom/php-sdk-types": "^1.0.0",
+        "convertcom/php-sdk-utils": "^1.0.0"
     },
-    "Event": {
-      "type": "path",
-      "url": "../Event"
+    "require-dev": {
+        "phpunit/phpunit": "^11.0",
+        "mockery/mockery": "^1.4"
     },
-    "Rules": {
-      "type": "path",
-      "url": "../Rules"
+    "scripts": {
+        "test": "phpunit --config phpunit.xml",
+        "clean": "rm -rf vendor/ composer.lock"
     },
-    "Types": {
-      "type": "path",
-      "url": "../Types"
-    },
-    "Utils": {
-      "type": "path",
-      "url": "../Utils"
-    },
-    "Data": {
-      "type": "path",
-      "url": "../Data"
-    },
-    "Bucketing": {
-      "type": "path",
-      "url": "../Bucketing"
-    }
-  },
-  "require": {
-    "php": "^8.2",
-    "convertcom/php-sdk-api": ">=1.0.0",
-    "convertcom/php-sdk-enums": ">=1.0.0",
-    "convertcom/php-sdk-event": ">=1.0.0",
-    "convertcom/php-sdk-logger": ">=1.0.0",
-    "convertcom/php-sdk-rules": ">=1.0.0",
-    "convertcom/php-sdk-data": ">=1.0.0",
-    "convertcom/php-sdk-bucketing": ">=1.0.0",
-    "convertcom/php-sdk-types": ">=1.0.0",
-    "convertcom/php-sdk-utils": ">=1.0.0"
-  },
-  "require-dev": {
-    "phpunit/phpunit": "^11.0",
-    "mockery/mockery": "^1.4"
-  },
-  "scripts": {
-    "test": "phpunit --config phpunit.xml",
-    "clean": "rm -rf vendor/ composer.lock"
-  },
-  "version": "1.0.0",
-  "minimum-stability": "stable",
-  "prefer-stable": true
+    "version": "1.0.0",
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }

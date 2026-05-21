@@ -5,30 +5,30 @@
     "license": "Apache-2.0",
     "authors": [
         {
-        "name": "Convert Insights, Inc",
-        "homepage": "https://www.convert.com"
+            "name": "Convert Insights, Inc",
+            "homepage": "https://www.convert.com"
         }
     ],
     "autoload": {
         "psr-4": {
-        "ConvertSdk\\Utils\\": "src/",
-        "ConvertSdk\\Tests\\": "tests/"
+            "ConvertSdk\\Utils\\": "src/",
+            "ConvertSdk\\Tests\\": "tests/"
         }
     },
     "repositories": {
         "Enums": {
-        "type": "path",
-        "url": "../Enums"
-      },
+            "type": "path",
+            "url": "../Enums"
+        },
         "Types": {
-        "type": "path",
-        "url": "../Types"
-      }
+            "type": "path",
+            "url": "../Types"
+        }
     },
     "require": {
         "php": "^8.2",
-        "convertcom/php-sdk-enums": ">=1.0.0",
-        "convertcom/php-sdk-types": ">=1.0.0",
+        "convertcom/php-sdk-enums": "^1.0.0",
+        "convertcom/php-sdk-types": "^1.0.0",
         "lastguest/murmurhash": "^2.1"
     },
     "require-dev": {
@@ -40,5 +40,4 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "version": "1.0.0"
-
 }

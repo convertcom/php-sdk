@@ -5,14 +5,14 @@
     "license": "Apache-2.0",
     "version": "1.0.0",
     "authors": [
-      {
-        "name": "Convert Insights, Inc"
-      }
+        {
+            "name": "Convert Insights, Inc"
+        }
     ],
     "autoload": {
-      "psr-4": {
-        "ConvertSdk\\Event\\": "src/"
-      }
+        "psr-4": {
+            "ConvertSdk\\Event\\": "src/"
+        }
     },
     "repositories": {
         "Enums": {
@@ -25,18 +25,17 @@
         }
     },
     "require": {
-      "php": "^8.2",
-      "convertcom/php-sdk-enums": ">=1.0.0",
-      "convertcom/php-sdk-logger": ">=1.0.0"
+        "php": "^8.2",
+        "convertcom/php-sdk-enums": "^1.0.0",
+        "convertcom/php-sdk-logger": "^1.0.0"
     },
     "require-dev": {
-      "phpunit/phpunit": "^11.0",
-      "vlucas/phpdotenv": "^5.5"
+        "phpunit/phpunit": "^11.0",
+        "vlucas/phpdotenv": "^5.5"
     },
     "scripts": {
-      "test": "phpunit"
+        "test": "phpunit"
     },
     "minimum-stability": "dev",
     "prefer-stable": true
-  }
-  
+}
