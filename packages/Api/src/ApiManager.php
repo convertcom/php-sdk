@@ -216,6 +216,12 @@ class ApiManager implements ApiManagerInterface
             $request = $request->withBody($body);
         }
 
+        // Always announce as Convert SDK traffic so the metrics-endpoint
+        // bot filter recognises us via its `isConvertAgentUA` bypass. Set
+        // after the header merge so neither $headers nor $defaultHeaders
+        // can override — the announcement is an SDK invariant.
+        $request = $request->withHeader('User-Agent', 'ConvertAgent/1.0');
+
         $response = $this->httpClient->sendRequest($request);
 
         $rawBody = $response->getBody()->getContents();
