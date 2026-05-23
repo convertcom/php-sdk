@@ -56,6 +56,13 @@ class ApiManager implements ApiManagerInterface
      */
     private const DEFAULT_TRACK_ENDPOINT = '';
 
+    /**
+     * User-Agent advertised by the SDK so the metrics-endpoint bot
+     * filter recognises Convert traffic via its `isConvertAgentUA`
+     * bypass.
+     */
+    private const CONVERT_AGENT_USER_AGENT = 'ConvertAgent/1.0';
+
     /** @var VisitorsQueue Queue for tracking visitor requests */
     private VisitorsQueue $requestsQueue;
 
@@ -215,6 +222,12 @@ class ApiManager implements ApiManagerInterface
             $body = $this->streamFactory->createStream(json_encode($data, JSON_THROW_ON_ERROR));
             $request = $request->withBody($body);
         }
+
+        // Always announce as Convert SDK traffic so the metrics-endpoint
+        // bot filter recognises us via its `isConvertAgentUA` bypass. Set
+        // after the header merge so neither $headers nor $defaultHeaders
+        // can override — the announcement is an SDK invariant.
+        $request = $request->withHeader('User-Agent', self::CONVERT_AGENT_USER_AGENT);
 
         $response = $this->httpClient->sendRequest($request);
 
