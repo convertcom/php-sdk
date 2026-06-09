@@ -124,6 +124,29 @@
         { "value": "111222", "testAgainst": "\\d+", "negation": true, "expected": false, "note": "negated digits" },
         { "value": "USER-42", "testAgainst": "^user-[0-9]+$", "negation": false, "expected": true, "note": "case-insensitive regex" }
       ]
+    },
+    {
+      "category": "exists",
+      "method": "exists",
+      "cases": [
+        { "value": "US", "testAgainst": null, "negation": false, "expected": true, "note": "present value exists" },
+        { "value": null, "testAgainst": null, "negation": false, "expected": false, "note": "null does not exist" },
+        { "value": "", "testAgainst": null, "negation": false, "expected": false, "note": "empty string does not exist" },
+        { "value": "US", "testAgainst": null, "negation": true, "expected": false, "note": "negated present" },
+        { "value": null, "testAgainst": null, "negation": true, "expected": true, "note": "negated null" },
+        { "value": 0, "testAgainst": null, "negation": false, "expected": true, "note": "zero exists (strict)" }
+      ]
+    },
+    {
+      "category": "not_exists",
+      "method": "not_exists",
+      "cases": [
+        { "value": null, "testAgainst": null, "negation": false, "expected": true, "note": "null is not-exists" },
+        { "value": "", "testAgainst": null, "negation": false, "expected": true, "note": "empty string is not-exists" },
+        { "value": "US", "testAgainst": null, "negation": false, "expected": false, "note": "present value is not not-exists" },
+        { "value": null, "testAgainst": null, "negation": true, "expected": false, "note": "negated null" },
+        { "value": "US", "testAgainst": null, "negation": true, "expected": true, "note": "negated present" }
+      ]
     }
   ],
   "rule_evaluation": [

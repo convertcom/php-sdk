@@ -389,7 +389,7 @@ class ContextTest extends TestCase
     public function testCreateContextWithAttributes(): void
     {
         // Note: filterReportSegments() splits attributes:
-        // - Segment keys (browser, devices, source, campaign, visitor_type, country, customSegments) → stored via putSegments()
+        // - Segment keys (browser, devices, source, campaign, visitorType, country, customSegments) → stored via putSegments()
         // - Other keys → stored as visitorProperties (accessible via getAttributes())
         $attributes = ['plan' => 'premium', 'country' => 'DE'];
         $context = new Context(
