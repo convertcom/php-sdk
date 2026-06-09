@@ -124,7 +124,7 @@ class RuleParityTest extends TestCase
     public function testAllComparisonCategoriesPresent(): void
     {
         $categories = array_column(self::$vectors['comparison_operators'], 'category');
-        $required = ['equals', 'equalsNumber', 'matches', 'less', 'lessEqual', 'contains', 'isIn', 'startsWith', 'endsWith', 'regexMatches'];
+        $required = ['equals', 'equalsNumber', 'matches', 'less', 'lessEqual', 'contains', 'isIn', 'startsWith', 'endsWith', 'regexMatches', 'exists', 'not_exists'];
 
         foreach ($required as $category) {
             $this->assertContains($category, $categories, "Missing comparison category: $category");
@@ -154,6 +154,15 @@ class RuleParityTest extends TestCase
     public function testRuleEvaluationVectorMinimumCount(): void
     {
         $this->assertGreaterThanOrEqual(10, count(self::$vectors['rule_evaluation']));
+    }
+
+    public function testVisitorTypeSegmentKeySerializesAsVisitorType(): void
+    {
+        $this->assertSame('visitorType', \ConvertSdk\Enums\SegmentsKeys::VisitorType->value);
+
+        // Round-trip: a visitorType segment survives VisitorSegments construction.
+        $segments = new \OpenAPI\Client\Model\VisitorSegments(['visitorType' => 'new']);
+        $this->assertSame('new', $segments->getVisitorType());
     }
 
     // ---- Discriminator-enum crash-class sweep (qs-13 / qs-12 regression) ----

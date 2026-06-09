@@ -233,6 +233,53 @@ class Comparisons
     }
 
     /**
+     * Check that a value exists (is not null and not an empty string).
+     *
+     * Mirrors JS Comparisons.exists: true when value is NOT undefined/null/empty-string.
+     * testAgainst is accepted for dispatch-signature parity but unused.
+     *
+     * @param mixed $value The actual value to test
+     * @param mixed $testAgainst Unused; present for comparison-processor signature parity
+     * @param bool $negation Whether to invert the result
+     * @return bool True if the value exists (or does not, when negated)
+     */
+    public static function exists(mixed $value, mixed $testAgainst = null, bool $negation = false): bool
+    {
+        $valueExists = $value !== null && $value !== '';
+        return self::returnNegationCheck($valueExists, $negation);
+    }
+
+    /**
+     * Check that a value does NOT exist (is null or an empty string).
+     *
+     * Mirrors JS Comparisons.not_exists. Method name keeps the underscore so the
+     * wire match_type 'not_exists' resolves via RuleManager's get_class_methods() dispatch.
+     *
+     * @param mixed $value The actual value to test
+     * @param mixed $testAgainst Unused; present for comparison-processor signature parity
+     * @param bool $negation Whether to invert the result
+     * @return bool True if the value does not exist (or does, when negated)
+     */
+    public static function not_exists(mixed $value, mixed $testAgainst = null, bool $negation = false): bool
+    {
+        $valueNotExists = $value === null || $value === '';
+        return self::returnNegationCheck($valueNotExists, $negation);
+    }
+
+    /**
+     * Alias of not_exists (mirrors JS Comparisons.doesNotExist = not_exists).
+     *
+     * @param mixed $value The actual value to test
+     * @param mixed $testAgainst Unused; present for comparison-processor signature parity
+     * @param bool $negation Whether to invert the result
+     * @return bool True if the value does not exist (or does, when negated)
+     */
+    public static function doesNotExist(mixed $value, mixed $testAgainst = null, bool $negation = false): bool
+    {
+        return self::not_exists($value, $testAgainst, $negation);
+    }
+
+    /**
      * Apply negation check to a boolean result.
      *
      * @param bool $value The comparison result
