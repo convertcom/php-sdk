@@ -1253,7 +1253,7 @@ final class DataManager implements DataManagerInterface
 
         // Get custom segments ID from DataStore
         $data = $this->getData($visitorId) ?? [];
-        $customSegments = $data['segments']['custom_segments'] ?? [];
+        $customSegments = $data['segments']['customSegments'] ?? [];
 
         $matchedRecords = [];
         if (ArrayUtils::arrayNotEmpty($items)) {
@@ -1293,7 +1293,7 @@ final class DataManager implements DataManagerInterface
             'campaign',
             'visitor_type',
             'country',
-            'custom_segments',
+            'customSegments',
         ];
 
         $segments = [];

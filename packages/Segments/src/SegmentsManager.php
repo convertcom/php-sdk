@@ -99,7 +99,7 @@ class SegmentsManager implements SegmentsManagerInterface
     ): VisitorSegments|RuleError|null {
         $storeData = $this->dataManager->getData($visitorId) ?? [];
         $visitorSegments = $storeData['segments'] ?? [];
-        $customSegments = $visitorSegments['custom_segments'] ?? [];
+        $customSegments = $visitorSegments['customSegments'] ?? [];
         $segmentIds = [];
         $segmentsMatched = false;
 
