@@ -348,7 +348,7 @@ class ContextTest extends TestCase
         $segmentId = '200299434';
         $this->context->runCustomSegments([$segmentKey], ['ruleData' => ['enabled' => true]]);
         $data = $this->dataManager->getData($this->visitorId);
-        $this->assertEquals([$segmentId], $data['segments']['custom_segments']);
+        $this->assertEquals([$segmentId], $data['segments']['customSegments']);
     }
 
     public function testUpdateVisitorProperties(): void
@@ -389,7 +389,7 @@ class ContextTest extends TestCase
     public function testCreateContextWithAttributes(): void
     {
         // Note: filterReportSegments() splits attributes:
-        // - Segment keys (browser, devices, source, campaign, visitor_type, country, custom_segments) → stored via putSegments()
+        // - Segment keys (browser, devices, source, campaign, visitor_type, country, customSegments) → stored via putSegments()
         // - Other keys → stored as visitorProperties (accessible via getAttributes())
         $attributes = ['plan' => 'premium', 'country' => 'DE'];
         $context = new Context(

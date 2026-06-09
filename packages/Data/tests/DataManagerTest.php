@@ -85,7 +85,7 @@ class DataManagerTest extends TestCase
         'campaign' => 'test',
         'visitor_type' => 'new',
         'country' => 'US',
-        'custom_segments' => ['seg1', 'seg2'],
+        'customSegments' => ['seg1', 'seg2'],
     ];
 
     protected function setUp(): void

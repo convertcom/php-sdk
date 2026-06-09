@@ -276,7 +276,7 @@ class DataManagerCoverageTest extends TestCase
         // Store custom segments for the visitor
         $this->dataManager->putData($this->visitorId, [
             'segments' => [
-                'custom_segments' => ['seg-100', 'seg-200'],
+                'customSegments' => ['seg-100', 'seg-200'],
             ],
         ]);
 
@@ -305,7 +305,7 @@ class DataManagerCoverageTest extends TestCase
     public function testFilterMatchedCustomSegmentsShouldSkipItemsWithNoId(): void
     {
         $this->dataManager->putData($this->visitorId, [
-            'segments' => ['custom_segments' => ['seg-100']],
+            'segments' => ['customSegments' => ['seg-100']],
         ]);
 
         $items = [
