@@ -12,5 +12,5 @@ enum SegmentsKeys: string
     case Source = 'source';
     case Campaign = 'campaign';
     case VisitorType = 'visitor_type';
-    case CustomSegments = 'custom_segments';
+    case CustomSegments = 'customSegments';
 }
