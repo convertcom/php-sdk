@@ -83,7 +83,7 @@ class DataManagerTest extends TestCase
         'devices' => 'ALLPH',
         'source' => 'test',
         'campaign' => 'test',
-        'visitor_type' => 'new',
+        'visitorType' => 'new',
         'country' => 'US',
         'customSegments' => ['seg1', 'seg2'],
     ];

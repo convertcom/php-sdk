@@ -25,6 +25,18 @@ use Traversable;
  * Note: OpenAPI-generated models are tree-shaped by construction (no cycles in spec schemas),
  * so no visited-set guard is required. If a future schema introduces a cycle, wrap $value in
  * a SplObjectStorage visited-set before calling this method.
+ *
+ * Belt-and-braces status (qs-13): this helper is STILL load-bearing today. On the current
+ * generated types the discriminator bases (RuleElement::rule_type, RuleElementNoUrl::rule_type)
+ * are still narrowed to single-value enums, so bypassing ObjectSerializer here is what prevents
+ * the "Invalid value for enum" crash when logging real-world rule_type values. It becomes
+ * redundant FOR THE CRASH only once the backend regenerates the discriminator bases to `string`
+ * (qs-13 Option-A root-cause fix in backend PR #6340: the dist-php post-process retypes every
+ * discriminator-base property to `string`, which lands them in ObjectSerializer's scalar
+ * allowlist and makes the enum-validation throw structurally unreachable). Even after that, this
+ * helper is retained as belt-and-braces: it keeps log serialization safe against any future
+ * re-narrowing or newly-introduced discriminator enum, and yields plain-array log payloads that
+ * never depend on the serializer's enum validation. Do not remove it.
  */
 final class LogUtils
 {

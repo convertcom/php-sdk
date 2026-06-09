@@ -1291,7 +1291,7 @@ final class DataManager implements DataManagerInterface
             'devices',
             'source',
             'campaign',
-            'visitor_type',
+            'visitorType',
             'country',
             'customSegments',
         ];
