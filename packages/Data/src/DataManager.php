@@ -577,6 +577,79 @@ final class DataManager implements DataManagerInterface
     }
 
     /**
+     * Build buckets where key is variation id and value is traffic distribution
+     * (existing packed layout, experience version <= 11, missing, or non-numeric;
+     * byte-for-byte unchanged). Version 11 is the version stamped on every experience
+     * currently served in production (backend CURRENT_EXPERIENCE_VERSION), so this is
+     * the active path for all currently-running experiments.
+     *
+     * @param array<int, array<string, mixed>> $variations
+     * @return array<string, float|int>
+     * @private
+     */
+    private function buildPackedBuckets(array $variations): array
+    {
+        return array_reduce(
+            array_filter(
+                $variations,
+                fn ($variation) =>
+                  (isset($variation['status']) ? $variation['status'] === VariationStatuses::RUNNING : true) &&
+                  (array_key_exists('traffic_allocation', $variation) ?
+                      ($variation['traffic_allocation'] > 0 || !is_numeric($variation['traffic_allocation'])) :
+                      true)
+            ),
+            function ($carry, $variation) {
+                if (!empty($variation['id'])) {
+                    $carry[$variation['id']] = $variation['traffic_allocation'] ?? 100.0;
+                }
+                return $carry;
+            },
+            []
+        );
+    }
+
+    /**
+     * Build variation allocations for the anchored layout (qs-01, contract v12).
+     * Activates only once the served experience version is > 11 (i.e. >= 12, once the
+     * backend bumps CURRENT_EXPERIENCE_VERSION past its current value of 11).
+     * Inactive arms (stopped, or explicit zero traffic_allocation) keep their weight for
+     * anchor stability but are marked inactive so BucketingManager::getBucketRanges()
+     * gives them zero width. Mirrors the SAME active predicate as buildPackedBuckets()
+     * so both layouts agree on activeness. See qs-01-anchored-bucketing-layout.md
+     * "The contract (normative)".
+     *
+     * @param array<int, array<string, mixed>> $variations
+     * @return array<int, array{id: string, allocation: float, active: bool}>
+     * @private
+     */
+    private function buildVariationAllocations(array $variations): array
+    {
+        $allocations = [];
+
+        foreach ($variations as $variation) {
+            if (empty($variation['id'])) {
+                continue;
+            }
+
+            $trafficAllocation = array_key_exists('traffic_allocation', $variation)
+                ? $variation['traffic_allocation']
+                : null;
+
+            $allocations[] = [
+                'id' => (string)$variation['id'],
+                'allocation' => is_numeric($trafficAllocation) ? (float)$trafficAllocation : 100.0,
+                'active' =>
+                    (isset($variation['status']) ? $variation['status'] === VariationStatuses::RUNNING : true) &&
+                    (array_key_exists('traffic_allocation', $variation) ?
+                        ($variation['traffic_allocation'] > 0 || !is_numeric($variation['traffic_allocation'])) :
+                        true),
+            ];
+        }
+
+        return $allocations;
+    }
+
+    /**
      * Retrieve variation for visitor
      *
      * @param string $visitorId
@@ -651,33 +724,35 @@ final class DataManager implements DataManagerInterface
                 )
             );
         } else {
-            // Build buckets from variations
-            $buckets = array_reduce(
-                array_filter(
-                    $experience->getVariations(),
-                    fn ($variation) =>
-                      (isset($variation['status']) ? $variation['status'] === VariationStatuses::RUNNING : true) &&
-                      (array_key_exists('traffic_allocation', $variation) ?
-                          ($variation['traffic_allocation'] > 0 || !is_numeric($variation['traffic_allocation'])) :
-                          true)
-                ),
-                function ($carry, $variation) {
-                    if (!empty($variation['id'])) {
-                        $carry[$variation['id']] = $variation['traffic_allocation'] ?? 100.0;
-                    }
-                    return $carry;
-                },
-                []
-            );
+            // qs-01: anchored-vs-packed GATE. `experience.version > 11` runs the anchored
+            // layout (contract v12); version <= 11, missing, or non-numeric keeps the
+            // existing packed cumulative walk unchanged -- this is every currently-served
+            // production experience (backend CURRENT_EXPERIENCE_VERSION = 11). The SDK
+            // must never infer the layout from anything but this field. See
+            // qs-01-anchored-bucketing-layout.md "The contract (normative)".
+            $version = $experience->getVersion();
+            $isAnchoredLayout = is_numeric($version) && (float)$version > 11;
+
             // Determine bucket for visitor
             $bucketingParams = $this->_config->bucketing->excludeExperienceIdHash ?? false
                 ? null
                 : ['experienceId' => (string)$experience->getId()];
-            $bucketing = $this->_bucketingManager->getBucketForVisitor(
-                $buckets,
-                $visitorId,
-                $bucketingParams
-            );
+
+            if ($isAnchoredLayout) {
+                $buckets = $this->buildVariationAllocations($experience->getVariations());
+                $bucketing = $this->_bucketingManager->getBucketForVisitorAnchored(
+                    $buckets,
+                    $visitorId,
+                    $bucketingParams
+                );
+            } else {
+                $buckets = $this->buildPackedBuckets($experience->getVariations());
+                $bucketing = $this->_bucketingManager->getBucketForVisitor(
+                    $buckets,
+                    $visitorId,
+                    $bucketingParams
+                );
+            }
 
             $variationId = $variationId ?? $bucketing['variationId'] ?? null;
             $bucketingAllocation = $bucketing['bucketingAllocation'] ?? null;
