@@ -577,6 +577,21 @@ final class DataManager implements DataManagerInterface
     }
 
     /**
+     * Shared "running + non-zero-traffic" active predicate used by BOTH the packed
+     * (buildPackedBuckets) and anchored (buildVariationAllocations) layout builders,
+     * so both layouts agree on activeness.
+     *
+     * @param array<string, mixed> $variation
+     */
+    private function isVariationActive(array $variation): bool
+    {
+        return (isset($variation['status']) ? $variation['status'] === VariationStatuses::RUNNING : true) &&
+            (array_key_exists('traffic_allocation', $variation) ?
+                ($variation['traffic_allocation'] > 0 || !is_numeric($variation['traffic_allocation'])) :
+                true);
+    }
+
+    /**
      * Build buckets where key is variation id and value is traffic distribution
      * (existing packed layout, experience version <= 11, missing, or non-numeric;
      * byte-for-byte unchanged). Version 11 is the version stamped on every experience
@@ -592,11 +607,7 @@ final class DataManager implements DataManagerInterface
         return array_reduce(
             array_filter(
                 $variations,
-                fn ($variation) =>
-                  (isset($variation['status']) ? $variation['status'] === VariationStatuses::RUNNING : true) &&
-                  (array_key_exists('traffic_allocation', $variation) ?
-                      ($variation['traffic_allocation'] > 0 || !is_numeric($variation['traffic_allocation'])) :
-                      true)
+                fn ($variation) => $this->isVariationActive($variation)
             ),
             function ($carry, $variation) {
                 if (!empty($variation['id'])) {
@@ -614,9 +625,9 @@ final class DataManager implements DataManagerInterface
      * backend bumps CURRENT_EXPERIENCE_VERSION past its current value of 11).
      * Inactive arms (stopped, or explicit zero traffic_allocation) keep their weight for
      * anchor stability but are marked inactive so BucketingManager::getBucketRanges()
-     * gives them zero width. Mirrors the SAME active predicate as buildPackedBuckets()
-     * so both layouts agree on activeness. See qs-01-anchored-bucketing-layout.md
-     * "The contract (normative)".
+     * gives them zero width. Uses the shared isVariationActive() predicate, also used
+     * by buildPackedBuckets(), so both layouts agree on activeness. See
+     * qs-01-anchored-bucketing-layout.md "The contract (normative)".
      *
      * @param array<int, array<string, mixed>> $variations
      * @return array<int, array{id: string, allocation: float, active: bool}>
@@ -638,11 +649,7 @@ final class DataManager implements DataManagerInterface
             $allocations[] = [
                 'id' => (string)$variation['id'],
                 'allocation' => is_numeric($trafficAllocation) ? (float)$trafficAllocation : 100.0,
-                'active' =>
-                    (isset($variation['status']) ? $variation['status'] === VariationStatuses::RUNNING : true) &&
-                    (array_key_exists('traffic_allocation', $variation) ?
-                        ($variation['traffic_allocation'] > 0 || !is_numeric($variation['traffic_allocation'])) :
-                        true),
+                'active' => $this->isVariationActive($variation),
             ];
         }
 
