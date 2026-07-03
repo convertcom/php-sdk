@@ -101,6 +101,46 @@ class AnchoredBucketingLayoutTest extends TestCase
         $this->assertSame(BucketingError::VariationNotDecided, $result, $message);
     }
 
+    /**
+     * Three equal-share running arms (O/V1/V2), each carrying $trafficAllocation. Covers
+     * both the 15% (5/5/5) and 25% (8.333.../each) configs used throughout the AC2/AC3/AC6/
+     * AC8 tests — only the per-arm share differs between call sites.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function thirds(float $trafficAllocation): array
+    {
+        return [
+            ['id' => 'O', 'traffic_allocation' => $trafficAllocation, 'status' => 'running'],
+            ['id' => 'V1', 'traffic_allocation' => $trafficAllocation, 'status' => 'running'],
+            ['id' => 'V2', 'traffic_allocation' => $trafficAllocation, 'status' => 'running'],
+        ];
+    }
+
+    /**
+     * The O=10/V1=80/V2=10 config used across AC4/AC5/AC9. $statusOverrides maps a
+     * variation id to a status override (e.g. ['V1' => 'stopped']); any id not present
+     * defaults to 'running'.
+     *
+     * @param array<string, string> $statusOverrides
+     * @return array<int, array<string, mixed>>
+     */
+    private function tenEightyTen(array $statusOverrides = []): array
+    {
+        $allocations = ['O' => 10, 'V1' => 80, 'V2' => 10];
+
+        $variations = [];
+        foreach ($allocations as $id => $trafficAllocation) {
+            $variations[] = [
+                'id' => $id,
+                'traffic_allocation' => $trafficAllocation,
+                'status' => $statusOverrides[$id] ?? 'running',
+            ];
+        }
+
+        return $variations;
+    }
+
     // --- AC1: gate branching ----------------------------------------------------------
 
     /**
@@ -110,11 +150,7 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc1Version12RoutesToAnchoredAndVersion11RoutesToPacked(): void
     {
-        $variations = [
-            ['id' => 'O', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 5, 'status' => 'running'],
-        ];
+        $variations = $this->thirds(5);
         $visitorId = 'thirds-flip-V1-to-O-66'; // raw bucket value 601, per vector #1/#19
 
         $this->assertVariation('V1', $this->bucketFreshVisitor($variations, $visitorId, 11), 'version 11 (packed) must still select V1 per vector #1');
@@ -127,11 +163,7 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc1MissingOrNonNumericVersionRoutesToPacked(): void
     {
-        $variations = [
-            ['id' => 'O', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 5, 'status' => 'running'],
-        ];
+        $variations = $this->thirds(5);
         $visitorId = 'thirds-core-O-1'; // raw bucket value 293, per vector #0
 
         $this->assertVariation('O', $this->bucketFreshVisitor($variations, $visitorId, null), 'missing version must route to packed (vector #0 outcome)');
@@ -146,16 +178,8 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc2RaiseKeepsAlreadyBucketedVisitorsInTheSameArm(): void
     {
-        $fifteenPercent = [
-            ['id' => 'O', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 5, 'status' => 'running'],
-        ];
-        $twentyFivePercent = [
-            ['id' => 'O', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-        ];
+        $fifteenPercent = $this->thirds(5);
+        $twentyFivePercent = $this->thirds(8.333333333333334);
 
         $cases = [
             'thirds-core-O-1' => 'O',            // vectors #13/#14, raw value 293
@@ -175,16 +199,8 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc2RaiseAdmitsNewVisitorsIntoTheGrowthSliverOnly(): void
     {
-        $fifteenPercent = [
-            ['id' => 'O', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 5, 'status' => 'running'],
-        ];
-        $twentyFivePercent = [
-            ['id' => 'O', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-        ];
+        $fifteenPercent = $this->thirds(5);
+        $twentyFivePercent = $this->thirds(8.333333333333334);
 
         $cases = [
             'thirds-flip-V1-to-O-66' => 'O',        // vectors #19/#20, raw value 601
@@ -206,16 +222,8 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc3LowerNeverFlipsAnIdleVisitorIntoAnArm(): void
     {
-        $twentyFivePercent = [
-            ['id' => 'O', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-        ];
-        $fifteenPercent = [
-            ['id' => 'O', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 5, 'status' => 'running'],
-        ];
+        $twentyFivePercent = $this->thirds(8.333333333333334);
+        $fifteenPercent = $this->thirds(5);
         $visitorId = 'thirds-flip-V2-to-V1-5'; // raw bucket value 1213
 
         $this->assertNotBucketed($this->bucketFreshVisitor($twentyFivePercent, $visitorId, 12), 'must be idle at 25% per vector #26');
@@ -228,16 +236,8 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc3LowerEjectsAdmittedVisitorsWithoutReassigningThem(): void
     {
-        $twentyFivePercent = [
-            ['id' => 'O', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 8.333333333333334, 'status' => 'running'],
-        ];
-        $fifteenPercent = [
-            ['id' => 'O', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 5, 'status' => 'running'],
-        ];
+        $twentyFivePercent = $this->thirds(8.333333333333334);
+        $fifteenPercent = $this->thirds(5);
 
         $visitorIds = ['thirds-flip-V1-to-O-66', 'thirds-anchored-V1-sliver-15', 'thirds-anchored-V2-sliver-14'];
 
@@ -256,16 +256,8 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc4StoppingOneArmDoesNotMoveOtherArmsAnchorsAndZeroWidthsTheStoppedArm(): void
     {
-        $allRunning = [
-            ['id' => 'O', 'traffic_allocation' => 10, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 80, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 10, 'status' => 'running'],
-        ];
-        $v1Stopped = [
-            ['id' => 'O', 'traffic_allocation' => 10, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 80, 'status' => 'stopped'],
-            ['id' => 'V2', 'traffic_allocation' => 10, 'status' => 'running'],
-        ];
+        $allRunning = $this->tenEightyTen();
+        $v1Stopped = $this->tenEightyTen(['V1' => 'stopped']);
 
         // vectors #31/#32: O unaffected by V1's stop
         $this->assertVariation('O', $this->bucketFreshVisitor($allRunning, 'anchor-gate-visitor-106', 12));
@@ -349,11 +341,7 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc5BoundaryValuesAreInclusiveAtAnchorAndExclusiveAtAnchorPlusWidth(): void
     {
-        $variations = [
-            ['id' => 'O', 'traffic_allocation' => 10, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 80, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 10, 'status' => 'running'],
-        ];
+        $variations = $this->tenEightyTen();
 
         $this->assertVariation('O', $this->bucketFreshVisitor($variations, 'boundary-999-25207', 12), 'value 999 is just below V1\'s anchor (1000) -> stays in O');
         $this->assertVariation('V1', $this->bucketFreshVisitor($variations, 'boundary-1000-1145', 12), 'value 1000 EQUALS V1\'s anchor -> anchor is inclusive');
@@ -371,11 +359,7 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc6PackedPathIsUnchangedForVersion11(): void
     {
-        $fifteenPercent = [
-            ['id' => 'O', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 5, 'status' => 'running'],
-        ];
+        $fifteenPercent = $this->thirds(5);
 
         $cases = [
             'thirds-core-O-1' => 'O',                             // vector #0, raw value 293
@@ -401,11 +385,7 @@ class AnchoredBucketingLayoutTest extends TestCase
      */
     public function testAc8StoredDecisionWinsOverFreshComputationForBothLayouts(): void
     {
-        $variations = [
-            ['id' => 'O', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 5, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 5, 'status' => 'running'],
-        ];
+        $variations = $this->thirds(5);
         $visitorId = 'thirds-flip-V1-to-O-66'; // fresh compute: V1 at v11 (vector #1), not-bucketed at v12 (vector #19)
 
         foreach ([11, 12] as $version) {
@@ -437,11 +417,7 @@ class AnchoredBucketingLayoutTest extends TestCase
 
         // 100%-total config: packed and anchored provably coincide (vectors #46/#47), so
         // this isolates the SHAPE assertion from any layout-correctness concern.
-        $fullyAllocated = [
-            ['id' => 'O', 'traffic_allocation' => 10, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 80, 'status' => 'running'],
-            ['id' => 'V2', 'traffic_allocation' => 10, 'status' => 'running'],
-        ];
+        $fullyAllocated = $this->tenEightyTen();
 
         foreach ([11, 12] as $version) {
             $result = $this->bucketFreshVisitor($fullyAllocated, 'anchor-gate-visitor-106', $version);
@@ -450,11 +426,7 @@ class AnchoredBucketingLayoutTest extends TestCase
         }
 
         // Not-bucketed sentinel must stay BucketingError::VariationNotDecided under anchored too.
-        $v1Stopped = [
-            ['id' => 'O', 'traffic_allocation' => 10, 'status' => 'running'],
-            ['id' => 'V1', 'traffic_allocation' => 80, 'status' => 'stopped'],
-            ['id' => 'V2', 'traffic_allocation' => 10, 'status' => 'running'],
-        ];
+        $v1Stopped = $this->tenEightyTen(['V1' => 'stopped']);
         $this->assertNotBucketed(
             $this->bucketFreshVisitor($v1Stopped, 'anchor-gate-visitor-17', 12),
             'not-bucketed sentinel type must be unchanged under anchored (vector #36)'
