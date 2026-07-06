@@ -111,6 +111,14 @@ class ApiManager implements ApiManagerInterface
     /** @var string Cache level setting */
     private string $cacheLevel;
 
+    /**
+     * Optional QA/preview debug token (qs-02 capability A). When set, forces
+     * `debug_token=<value>` and `_conv_low_cache=1` onto every config-fetch
+     * URL, regardless of `network.cacheLevel`. Never sent to the track
+     * endpoint; redacted from log output via {@see redactDebugTokenForLog()}.
+     */
+    private ?string $debugToken = null;
+
     /** @var callable Mapper function for data transformation */
     private mixed $mapper;
 
@@ -188,6 +196,7 @@ class ApiManager implements ApiManagerInterface
         $this->cacheLevel = $config && $config->getNetwork() && isset($config->getNetwork()['cacheLevel'])
             ? (string) $config->getNetwork()['cacheLevel']
             : '';
+        $this->debugToken = $config ? $config->getDebugToken() : null;
 
         $this->httpClient = $httpClient ?? Psr18ClientDiscovery::find();
         $this->requestFactory = $requestFactory ?? Psr17FactoryDiscovery::findRequestFactory();
@@ -446,6 +455,28 @@ class ApiManager implements ApiManagerInterface
     }
 
     /**
+     * Redact the configured debugToken (qs-02 AC3 — token hygiene) from a
+     * log-only string, e.g. a config-fetch endpoint URL that carries
+     * `debug_token=<value>` in its query string. Only used for values passed
+     * to the logger — never affects the actual request URL.
+     *
+     * @param string $value The string to redact before logging
+     * @return string The value with the token masked, if present
+     */
+    private function redactDebugTokenForLog(string $value): string
+    {
+        if ($this->debugToken === null || $this->debugToken === '') {
+            return $value;
+        }
+
+        return str_replace(
+            'debug_token=' . urlencode($this->debugToken),
+            'debug_token=***REDACTED***',
+            $value
+        );
+    }
+
+    /**
      * Get configuration data
      *
      * @return ConfigResponseData
@@ -456,19 +487,20 @@ class ApiManager implements ApiManagerInterface
             $this->loggerManager->trace('ApiManager.getConfig()');
         }
 
-        $query = '';
-        if ($this->cacheLevel === 'low' || $this->environment) {
-            $query = '?';
-        }
+        $hasDebugToken = $this->debugToken !== null && $this->debugToken !== '';
+
+        $params = [];
         if ($this->environment) {
-            $query .= 'environment=' . urlencode($this->environment);
+            $params[] = 'environment=' . urlencode($this->environment);
         }
-        if ($this->cacheLevel === 'low') {
-            if ($query !== '?') {
-                $query .= '&';
-            }
-            $query .= '_conv_low_cache=1';
+        if ($hasDebugToken) {
+            // Forced regardless of network.cacheLevel — qs-02 AC1.
+            $params[] = 'debug_token=' . urlencode((string) $this->debugToken);
         }
+        if ($this->cacheLevel === 'low' || $hasDebugToken) {
+            $params[] = '_conv_low_cache=1';
+        }
+        $query = $params !== [] ? '?' . implode('&', $params) : '';
 
         try {
             $response = $this->request(
@@ -484,7 +516,7 @@ class ApiManager implements ApiManagerInterface
                 $url = $this->configEndpoint . "/config/{$this->sdkKey}";
                 if ($this->loggerManager) {
                     $this->loggerManager->error('ApiManager.getConfig()', [
-                        'endpoint' => $url . $query,
+                        'endpoint' => $this->redactDebugTokenForLog($url . $query),
                         'status' => 'error',
                         'httpStatus' => $statusCode,
                         'error' => "HTTP {$statusCode}",
@@ -506,7 +538,7 @@ class ApiManager implements ApiManagerInterface
             if ($this->loggerManager) {
                 $project = $configData->getProject();
                 $this->loggerManager->debug('ApiManager.getConfig()', [
-                    'endpoint' => $this->configEndpoint . "/config/{$this->sdkKey}" . $query,
+                    'endpoint' => $this->redactDebugTokenForLog($this->configEndpoint . "/config/{$this->sdkKey}" . $query),
                     'status' => 'success',
                     'httpStatus' => $statusCode,
                     'accountId' => $configData->getAccountId() ?? 'unknown',
@@ -519,7 +551,7 @@ class ApiManager implements ApiManagerInterface
         } catch (ClientExceptionInterface $e) {
             if ($this->loggerManager) {
                 $this->loggerManager->error('ApiManager.getConfig()', [
-                    'endpoint' => $this->configEndpoint . "/config/{$this->sdkKey}" . $query,
+                    'endpoint' => $this->redactDebugTokenForLog($this->configEndpoint . "/config/{$this->sdkKey}" . $query),
                     'status' => 'error',
                     'error' => $e->getMessage(),
                     'code' => method_exists($e, 'getCode') ? $e->getCode() : null,

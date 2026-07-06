@@ -242,27 +242,34 @@ final class Core implements CoreInterface
             ? $this->config->getApi()['endpoint']['config']
             : '';
 
-        // Check cache first
-        $cachedData = $this->cache->get($cacheKey);
+        // qs-02 AC2 — with debugToken set, the PSR-16 config cache entry is
+        // neither read nor written: every request fetches live from origin.
+        $debugToken = $this->config->getDebugToken();
+        $skipCache = $debugToken !== null && $debugToken !== '';
 
-        if ($cachedData instanceof ConfigResponseData) {
-            $this->loggerManager?->trace('Core.fetchConfig()', 'Using cached config');
+        $cachedData = null;
+        if (!$skipCache) {
+            $cachedData = $this->cache->get($cacheKey);
 
-            try {
-                $this->configValidator->validate($cachedData);
-            } catch (ConfigValidationException $e) {
-                $this->loggerManager?->error('Core.fetchConfig()', ['error' => 'Cached config invalid, fetching fresh: ' . $e->getMessage()]);
-                $this->cache->delete($cacheKey);
+            if ($cachedData instanceof ConfigResponseData) {
+                $this->loggerManager?->trace('Core.fetchConfig()', 'Using cached config');
+
+                try {
+                    $this->configValidator->validate($cachedData);
+                } catch (ConfigValidationException $e) {
+                    $this->loggerManager?->error('Core.fetchConfig()', ['error' => 'Cached config invalid, fetching fresh: ' . $e->getMessage()]);
+                    $this->cache->delete($cacheKey);
+                    $cachedData = null;
+                }
+            } else {
                 $cachedData = null;
             }
-        } else {
-            $cachedData = null;
         }
 
         if ($cachedData !== null) {
             $data = $cachedData;
         } else {
-            // Cache miss — fetch via HTTP
+            // Cache miss (or cache skipped for debugToken) — fetch via HTTP
             try {
                 $data = $this->apiManager->getConfig();
             } catch (\RuntimeException $error) {
@@ -278,9 +285,11 @@ final class Core implements CoreInterface
             // Validate fresh config
             $this->configValidator->validate($data);
 
-            // Store in cache
-            $this->cache->set($cacheKey, $data, $this->dataRefreshInterval);
-            $this->loggerManager?->trace('Core.fetchConfig()', 'Config cached with TTL ' . $this->dataRefreshInterval . 's');
+            if (!$skipCache) {
+                // Store in cache
+                $this->cache->set($cacheKey, $data, $this->dataRefreshInterval);
+                $this->loggerManager?->trace('Core.fetchConfig()', 'Config cached with TTL ' . $this->dataRefreshInterval . 's');
+            }
         }
 
         $this->dataManager->setConfigData($data);
