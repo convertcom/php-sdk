@@ -14,6 +14,7 @@ Bucket visitors into experiment variations, resolve feature flags with typed var
 - [Visitor Context](#visitor-context)
 - [Experience Bucketing](#experience-bucketing)
 - [Feature Flags](#feature-flags)
+- [Experiment Preview](#experiment-preview)
 - [Conversion Tracking](#conversion-tracking)
 - [Revenue Reporting](#revenue-reporting)
 - [Force Multiple Transactions](#force-multiple-transactions)
@@ -154,6 +155,24 @@ $sdk = ConvertSDK::create([
 
 Pass any PSR-16 `CacheInterface`. When omitted, an in-memory `ArrayCache` is used (no persistence between requests).
 
+### QA debug token
+
+For QA and preview scenarios where you need the freshest possible config, pass a `debugToken`:
+
+```php
+$sdk = ConvertSDK::create([
+    'sdkKey'     => 'your-sdk-key',
+    'debugToken' => 'your-qa-debug-token',
+]);
+```
+
+When set, the SDK:
+
+- appends `debug_token=<token>` and forces `_conv_low_cache=1` on every config fetch, regardless of the project's cache level;
+- bypasses the PSR-16 config cache entirely — every request fetches config live from origin (the config cache entry is neither read nor written);
+- redacts the token from all log output (including PSR-18 client exception messages);
+- never sends the token to the tracking endpoint.
+
 **Important:** The PSR-16 cache also serves as the visitor data store. When you provide a persistent cache (Redis, Memcached, filesystem), the SDK automatically persists visitor bucketing decisions across HTTP requests. This enables conversion tracking in later requests to be correctly attributed to experiment variations. See [Data Persistence](#data-persistence) for details.
 
 ### Full configuration options
@@ -167,6 +186,7 @@ $sdk = ConvertSDK::create([
     'dataStore'           => $customStore,        // Custom data store (overrides cache for visitor data)
     'dataRefreshInterval' => 300000,              // Config cache TTL in milliseconds (default: 300000 = 5 min)
     'environment'         => 'production',        // Environment targeting
+    'debugToken'          => 'qa-debug-token',    // QA/preview: bypass config cache + force fresh fetch (see QA debug token)
 ]);
 ```
 
@@ -340,6 +360,54 @@ foreach ($features as $feature) {
 ```
 
 **Returns:** `BucketedFeature[]` — an array of all resolved features.
+
+## Experiment Preview
+
+Force a visitor context to decide a specific variation of a specific experience, bypassing every normal gate — audiences, segments, locations, environment, experience/variation status, traffic allocation, stored decisions, and the bucketing hash. This is how you render a QA/preview of a variation that a real visitor would not otherwise be bucketed into.
+
+```php
+$context = $sdk->createContext('qa-visitor');
+
+// Force the experience whose id is 100200 to decide variation 300400
+$context->setPreview('100200', '300400');
+
+// When 'homepage-redesign' is the key of experience 100200, the forced
+// variation is returned regardless of targeting or bucketing
+$variation = $context->runExperience('homepage-redesign');
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `$experienceId` | `string` | Yes | The experience id (numeric string) to preview. |
+| `$variationId` | `string` | Yes | The variation id (numeric string) to force. |
+
+**Returns:** `void`
+
+### Zero-trace guarantee
+
+Once a preview target resolves successfully, the context becomes **zero-trace for its entire lifetime**: no tracking events are sent and no visitor state is persisted for **any** experience, feature, or conversion run through that context — not just the previewed one. Preview never pollutes real experiment data, including on the shutdown flush.
+
+### Inert on bad input
+
+If the experience or variation id cannot be resolved (unknown experience, unknown variation), `setPreview()` is a no-op and the context behaves fully normally — normal bucketing and tracking resume. A preview target absent from the current config is fetched on demand via a single-experience config request (`?exp=`) and memoized for 60 seconds.
+
+### Preview links
+
+The canonical preview link format is `convert_preview={experienceId}.{variationId}`. Your application extracts the raw query-string value and parses it with `PreviewParam` — the SDK never reads request superglobals directly:
+
+```php
+use ConvertSdk\Preview\PreviewParam;
+
+$parsed = PreviewParam::parse($_GET['convert_preview'] ?? '');
+
+if ($parsed !== null) {
+    $context->setPreview($parsed['experienceId'], $parsed['variationId']);
+}
+```
+
+`PreviewParam::parse()` returns `['experienceId' => string, 'variationId' => string]` for a well-formed value, or `null` when the value is malformed.
 
 ## Conversion Tracking
 
