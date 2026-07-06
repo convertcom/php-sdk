@@ -31,6 +31,16 @@ class LocationAttributes
     protected $forceEvent;
 
     /**
+     * qs-02 capability (B) preview input — mirrors
+     * {@see \OpenAPI\Client\BucketingAttributes::$suppressPersistence}. When
+     * true, {@see \ConvertSdk\DataManager::selectLocations()} suppresses its
+     * visitor-state persistence write.
+     *
+     * @var bool|null
+     */
+    protected $suppressPersistence;
+
+    /**
      * Constructor to initialize the object with data.
      *
      * @param array $data Associative array of property values
@@ -47,6 +57,7 @@ class LocationAttributes
         $this->identityField = $identityField;
 
         $this->forceEvent = $data['forceEvent'] ?? null;
+        $this->suppressPersistence = $data['suppressPersistence'] ?? null;
     }
 
     /**
@@ -116,6 +127,28 @@ class LocationAttributes
     public function setForceEvent(?bool $forceEvent): self
     {
         $this->forceEvent = $forceEvent;
+        return $this;
+    }
+
+    /**
+     * Get whether visitor-state persistence is suppressed.
+     *
+     * @return bool|null
+     */
+    public function getSuppressPersistence(): ?bool
+    {
+        return $this->suppressPersistence;
+    }
+
+    /**
+     * Set whether visitor-state persistence is suppressed.
+     *
+     * @param bool|null $suppressPersistence
+     * @return self
+     */
+    public function setSuppressPersistence(?bool $suppressPersistence): self
+    {
+        $this->suppressPersistence = $suppressPersistence;
         return $this;
     }
 }

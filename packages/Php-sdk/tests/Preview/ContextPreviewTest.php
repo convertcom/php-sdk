@@ -309,16 +309,23 @@ class ContextPreviewTest extends TestCase
     }
 
     /**
+     * Response body shape verified against the backend OpenAPI contract
+     * (`backend/apiDoc/serving/src/responses/index.yaml` — `ProjectConfigResponse`
+     * resolves directly to the `ConfigResponseData` schema, with no enclosing
+     * envelope) and against the JS SDK's own real-HTTP-server integration test
+     * for `getConfigByExperience()`
+     * (`javascript-sdk/packages/api/tests/api-manager-config-by-experience.tests.ts`),
+     * whose mock server returns the config fields at the top level of the
+     * response body.
+     *
      * @param array<string, mixed> $experience
      */
     private function queueExpFetchResponse(array $experience): void
     {
         $this->mockHttpClient->addResponse(new Response(200, ['Content-Type' => 'application/json'], (string) json_encode([
-            'data' => [
-                'account_id' => 'acct-1',
-                'project' => ['id' => 'proj-1'],
-                'experiences' => [$experience],
-            ],
+            'account_id' => 'acct-1',
+            'project' => ['id' => 'proj-1'],
+            'experiences' => [$experience],
         ])));
     }
 

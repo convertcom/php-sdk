@@ -77,15 +77,23 @@ class ApiManagerPreviewFetchTest extends TestCase
         );
     }
 
+    /**
+     * Response body shape verified against the backend OpenAPI contract
+     * (`backend/apiDoc/serving/src/responses/index.yaml` — `ProjectConfigResponse`
+     * resolves directly to the `ConfigResponseData` schema, with no enclosing
+     * envelope) and against the JS SDK's own real-HTTP-server integration test
+     * for `getConfigByExperience()`
+     * (`javascript-sdk/packages/api/tests/api-manager-config-by-experience.tests.ts`),
+     * whose mock server returns the config fields at the top level of the
+     * response body.
+     */
     private function queueExpConfigResponse(): void
     {
         $this->mockHttpClient->addResponse(new Response(200, ['Content-Type' => 'application/json'], (string) json_encode([
-            'data' => [
-                'account_id' => '999',
-                'project' => ['id' => '888'],
-                'experiences' => [
-                    ['id' => self::EXPERIENCE_ID, 'key' => 'preview-target', 'status' => 'draft', 'variations' => []],
-                ],
+            'account_id' => '999',
+            'project' => ['id' => '888'],
+            'experiences' => [
+                ['id' => self::EXPERIENCE_ID, 'key' => 'preview-target', 'status' => 'draft', 'variations' => []],
             ],
         ])));
     }

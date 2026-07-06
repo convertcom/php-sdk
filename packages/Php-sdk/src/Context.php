@@ -30,9 +30,11 @@ use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;
+use ConvertSdk\Preview\PreviewResolver;
 use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
+use Psr\SimpleCache\CacheInterface;
 
 /**
  * Provides visitor context for running experiences, features, and tracking conversions.
@@ -46,6 +48,30 @@ final class Context implements ContextInterface
     private ?array $visitorProperties = null;
 
     /**
+     * qs-02 capability (B) preview input — the resolved experience data for the
+     * current preview target (set via {@see setPreview()}), or null when no
+     * preview is active or the target could not be resolved (bad input →
+     * inert, per contract §2). A non-null value here is the SOLE source of
+     * truth for "is this context in preview mode" — it gates BOTH the forced
+     * decision in {@see runExperience()} AND the zero-trace persistence
+     * suppression forwarded to every DataManager call this context makes.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $previewExperience = null;
+
+    /**
+     * qs-02 capability (B) preview input — the pre-built forced decision for
+     * {@see $previewExperience}, computed once in {@see setPreview()} via
+     * {@see DataManagerInterface::buildPreviewDecision()} so a bad variationId
+     * is caught eagerly (both experience and variation validity are decided
+     * once, at setPreview() time — never re-derived per runExperience() call).
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $previewDecision = null;
+
+    /**
      * @param Config $config SDK configuration
      * @param string $visitorId Unique visitor identifier
      * @param EventManagerInterface $eventManager Event manager instance
@@ -56,6 +82,8 @@ final class Context implements ContextInterface
      * @param ApiManagerInterface $apiManager API manager instance
      * @param LogManagerInterface|null $loggerManager Optional logger manager instance
      * @param array<string, mixed>|null $visitorAttributes Initial visitor attributes for targeting
+     * @param CacheInterface|null $cache Optional PSR-16 cache, used for qs-02 preview-target
+     *     memoization (`preview_{experienceId}`, 60s TTL) — never the normal config cache
      *
      * @throws InvalidArgumentException If visitorId is empty
      */
@@ -70,6 +98,7 @@ final class Context implements ContextInterface
         private readonly ApiManagerInterface $apiManager,
         private readonly ?LogManagerInterface $loggerManager = null,
         ?array $visitorAttributes = null,
+        private readonly ?CacheInterface $cache = null,
     ) {
         if ($visitorId === '') {
             throw new InvalidArgumentException('Visitor ID must not be empty');
@@ -84,6 +113,53 @@ final class Context implements ContextInterface
             }
             $this->segmentsManager->putSegments($visitorId, $visitorAttributes);
         }
+    }
+
+    /**
+     * qs-02 capability (B) preview input — force this context to decide a
+     * specific variation for a specific experience, bypassing audiences,
+     * segments, locations, the environment check, experience status, variation
+     * status/traffic filters, stored decisions, and the bucketing hash.
+     *
+     * Resolution and variation validation both happen eagerly, here — not
+     * lazily inside runExperience() — so "the context behaves fully normally"
+     * on bad input (contract §2) is a single, context-wide decision rather
+     * than a per-call fallback. When resolution succeeds, this context
+     * becomes zero-trace for its ENTIRE lifetime (contract §2 "Zero-trace"):
+     * every runExperience()/runExperiences()/trackConversion() call this
+     * context makes afterwards suppresses visitor-state persistence and
+     * tracking enqueues, not just calls targeting $experienceId.
+     *
+     * Single preview target per context — calling this again overwrites the
+     * previous target (last-write-wins). Never leaks to other contexts: the
+     * resolved state lives entirely on this Context instance, never on the
+     * shared DataManager/ApiManager singletons.
+     *
+     * @param string $experienceId The experience id (numeric string)
+     * @param string $variationId The variation id to force (numeric string)
+     * @return void
+     */
+    public function setPreview(string $experienceId, string $variationId): void
+    {
+        $resolver = new PreviewResolver($this->dataManager, $this->apiManager, $this->cache, $this->loggerManager);
+        $experienceData = $resolver->resolveExperience($experienceId);
+
+        if ($experienceData === null) {
+            $this->previewExperience = null;
+            $this->previewDecision = null;
+            return;
+        }
+
+        $decision = $this->dataManager->buildPreviewDecision($experienceData, $variationId);
+        if ($decision === null) {
+            // Inert on bad input (contract §2) — DataManager already warned.
+            $this->previewExperience = null;
+            $this->previewDecision = null;
+            return;
+        }
+
+        $this->previewExperience = $experienceData;
+        $this->previewDecision = $decision;
     }
 
     /**
@@ -103,10 +179,32 @@ final class Context implements ContextInterface
             return null;
         }
 
+        // qs-02 capability (B) preview input — force the resolved decision when
+        // this experience key is the active preview target on this context.
+        if ($this->previewExperience !== null && ($this->previewExperience['key'] ?? null) === $experienceKey) {
+            $this->eventManager->fire(
+                SystemEvents::Bucketing,
+                [
+                    'visitorId' => $this->visitorId,
+                    'experienceKey' => $experienceKey,
+                    'variationKey' => $this->previewDecision['key'] ?? null,
+                ],
+                null,
+                true
+            );
+
+            return $this->mapToBucketedVariationDto($this->previewDecision);
+        }
+
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
         $forwardedData = $attributes ? get_object_vars($attributes) : [];
         $forwardedData['visitorProperties'] = $visitorProperties;
         $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
+        // qs-02: zero-trace across the WHOLE context once a preview is active —
+        // other experiences still decide normally, but never persist/track.
+        if ($this->previewExperience !== null) {
+            $forwardedData['suppressPersistence'] = true;
+        }
         $result = $this->experienceManager->selectVariation(
             $this->visitorId,
             $experienceKey,
@@ -154,6 +252,13 @@ final class Context implements ContextInterface
         $forwardedData = $attributes ? get_object_vars($attributes) : [];
         $forwardedData['visitorProperties'] = $visitorProperties;
         $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
+        // qs-02: zero-trace across the WHOLE context once a preview is active.
+        // Note: this does NOT force the preview target's decision (that override
+        // is scoped to runExperience() per contract §2) — an experience absent
+        // from the shared config still won't appear in this bulk result.
+        if ($this->previewExperience !== null) {
+            $forwardedData['suppressPersistence'] = true;
+        }
 
         $bucketedVariations = $this->experienceManager->selectVariations(
             $this->visitorId,
@@ -374,7 +479,9 @@ final class Context implements ContextInterface
             $attributes?->ruleData,
             $conversionData,
             $segments,
-            $attributes?->conversionSetting
+            $attributes?->conversionSetting,
+            // qs-02: zero-trace across the WHOLE context once a preview is active.
+            $this->previewExperience !== null
         );
 
         if ($triggered instanceof RuleError) {

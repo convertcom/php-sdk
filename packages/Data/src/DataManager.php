@@ -281,6 +281,10 @@ final class DataManager implements DataManagerInterface
         $locationProperties = $attributes->locationProperties ?? null;
         $ignoreLocationProperties = $attributes->ignoreLocationProperties ?? false;
         $environment = $attributes->environment ?? $this->_environment;
+        // qs-02 capability (B) preview input — per-context suppression signal,
+        // forwarded to selectLocations() below so a preview context's "other
+        // experiences evaluate normally" location matching never persists.
+        $suppressPersistence = $attributes->suppressPersistence ?? false;
 
         // Log trace information
         $this->_loggerManager?->trace(
@@ -354,6 +358,7 @@ final class DataManager implements DataManagerInterface
                     $matchedLocations = $this->selectLocations($visitorId, $locations, new LocationAttributes([
                         'locationProperties' => $locationProperties,
                         'identityField' => $identityField,
+                        'suppressPersistence' => $suppressPersistence,
                     ]));
                     $matchedErrors = array_filter($matchedLocations, fn ($match) => $match instanceof RuleError);
                     if (count($matchedErrors) > 0) {
@@ -531,6 +536,8 @@ final class DataManager implements DataManagerInterface
         $enableTracking = $attributes->enableTracking ?? true;
         $ignoreLocationProperties = $attributes->ignoreLocationProperties ?? false;
         $environment = $attributes->environment ?? $this->_environment;
+        // qs-02 capability (B) preview input — per-context suppression signal.
+        $suppressPersistence = $attributes->suppressPersistence ?? false;
         // Log trace information
         $this->_loggerManager?->trace(
             'DataManager._getBucketingByField()',
@@ -557,6 +564,7 @@ final class DataManager implements DataManagerInterface
                 'locationProperties' => $locationProperties,
                 'ignoreLocationProperties' => $ignoreLocationProperties,
                 'environment' => $environment,
+                'suppressPersistence' => $suppressPersistence,
             ])
         );
         if ($experience) {
@@ -569,7 +577,8 @@ final class DataManager implements DataManagerInterface
                 $updateVisitorProperties,
                 new ConfigExperience($experience),
                 $forceVariationId,
-                $enableTracking
+                $enableTracking,
+                $suppressPersistence
             );
         }
 
@@ -665,6 +674,9 @@ final class DataManager implements DataManagerInterface
      * @param ConfigExperience $experience
      * @param ?string $forceVariationId
      * @param bool $enableTracking Defaults to true
+     * @param bool $suppressPersistence qs-02 capability (B) preview input — when true,
+     *     suppresses the stored-decision write AND the bucketing-event enqueue
+     *     regardless of $enableTracking. Defaults to false.
      * @return mixed BucketedVariation array or BucketingError or null
      * @private
      */
@@ -674,7 +686,8 @@ final class DataManager implements DataManagerInterface
         ?bool $updateVisitorProperties,
         ConfigExperience $experience,
         ?string $forceVariationId = null,
-        bool $enableTracking = true
+        bool $enableTracking = true,
+        bool $suppressPersistence = false
     ): array|BucketingError|null {
         // Initial validation
         if (empty($visitorId) || $experience === null || empty($experience->getId())) {
@@ -790,9 +803,12 @@ final class DataManager implements DataManagerInterface
             if ($updateVisitorProperties && !empty($visitorProperties)) {
                 $storeDataObj['segments'] = $visitorProperties;
             }
-            $this->putData($visitorId, $storeDataObj);
+            // qs-02: suppressed for a preview context — zero-trace, regardless of enableTracking.
+            if (!$suppressPersistence) {
+                $this->putData($visitorId, $storeDataObj);
+            }
             // Track bucketing event if enabled
-            if ($enableTracking) {
+            if ($enableTracking && !$suppressPersistence) {
                 $bucketingEvent = [
                     'experienceId' => (string)$experience->getId(),
                     'variationId' => (string)$variationId,
@@ -855,6 +871,66 @@ final class DataManager implements DataManagerInterface
             'id'
         );
         return $subItem !== null ? new ExperienceVariationConfig($subItem) : null;
+    }
+
+    /**
+     * Build a bucketed-variation array for a preview forced decision (qs-02
+     * capability B preview input), bypassing every normal gate — audiences,
+     * segments, locations, the environment check, experience status, variation
+     * status/traffic filters, stored decisions, and the bucketing hash. Pure:
+     * never calls putData() and never enqueues a tracking event, so it stays
+     * entirely per-context regardless of whether $experienceData came from the
+     * current shared config or from a one-off `?exp=` fetch — and never
+     * touches the shared entity list either way.
+     *
+     * @param array<string, mixed> $experienceData The experience data (from the current
+     *     config, or from a `?exp=` fetch response — same raw shape either way)
+     * @param string $variationId The variation id to force
+     * @return array<string, mixed>|null Same shape as a normal bucketed decision (see
+     *     _retrieveBucketing()), or null when $variationId does not exist on the given
+     *     experience — the caller (Context) treats this as inert bad input.
+     */
+    public function buildPreviewDecision(array $experienceData, string $variationId): ?array
+    {
+        $variationData = null;
+        foreach ($experienceData['variations'] ?? [] as $candidate) {
+            if (is_array($candidate) && (string)($candidate['id'] ?? '') === $variationId) {
+                $variationData = $candidate;
+                break;
+            }
+        }
+
+        if ($variationData === null) {
+            $this->_loggerManager?->warn(
+                'DataManager.buildPreviewDecision()',
+                Messages::PREVIEW_VARIATION_NOT_FOUND,
+                LogUtils::toLoggable(($this->_mapper)([
+                    'experienceId' => $experienceData['id'] ?? null,
+                    'variationId' => $variationId,
+                ]))
+            );
+            return null;
+        }
+
+        $experience = new ConfigExperience($experienceData);
+        $variation = new ExperienceVariationConfig($variationData);
+
+        return array_merge(
+            [
+                'experienceId' => $experience->getId(),
+                'experienceName' => $experience->getName(),
+                'experienceKey' => $experience->getKey(),
+            ],
+            ['bucketingAllocation' => null],
+            [
+                'id' => $variation->getId(),
+                'name' => $variation->getName(),
+                'key' => $variation->getKey(),
+                'traffic_allocation' => $variation->getTrafficAllocation(),
+                'status' => $variation->getStatus(),
+                'changes' => $variation->getChanges(),
+            ]
+        );
     }
 
     /**
@@ -985,6 +1061,8 @@ final class DataManager implements DataManagerInterface
         $locationProperties = $attributes->getLocationProperties();
         $identityField = $attributes->getIdentityField() ?? 'key';
         $forceEvent = $attributes->getForceEvent();
+        // qs-02 capability (B) preview input — per-context suppression signal.
+        $suppressPersistence = $attributes->getSuppressPersistence() ?? false;
 
         $this->_loggerManager?->trace(
             'DataManager.selectLocations()',
@@ -1071,8 +1149,10 @@ final class DataManager implements DataManagerInterface
             }
         }
 
-        // Store the data
-        $this->putData($visitorId, ['locations' => $locations]);
+        // Store the data (qs-02: suppressed for a preview context — zero-trace)
+        if (!$suppressPersistence) {
+            $this->putData($visitorId, ['locations' => $locations]);
+        }
 
         $this->_loggerManager?->debug(
             'DataManager.selectLocations()',
@@ -1120,6 +1200,9 @@ final class DataManager implements DataManagerInterface
      * @param array|null $goalData Optional array of associative arrays containing goal data
      * @param VisitorSegments|null $segments Optional visitor segments object
      * @param array|null $conversionSetting Optional associative array of conversion settings
+     * @param bool $suppressPersistence qs-02 capability (B) preview input — when true,
+     *     suppresses the goal-triggered write AND the conversion/transaction
+     *     enqueue. Defaults to false.
      * @return bool|RuleError Returns true on success, or a RuleError instance on failure
      */
     public function convert(
@@ -1128,7 +1211,8 @@ final class DataManager implements DataManagerInterface
         ?array $goalRule = null,
         ?array $goalData = null,
         ?VisitorSegments $segments = null,
-        ?array $conversionSetting = null
+        ?array $conversionSetting = null,
+        bool $suppressPersistence = false
     ): bool|RuleError {
         // Retrieve the goal based on goalId type
         $goal = is_string($goalId)
@@ -1187,15 +1271,17 @@ final class DataManager implements DataManagerInterface
             }
         }
 
-        // Store the goal as triggered
-        $this->putData($visitorId, ['goals' => [$goalId => true]]);
+        // Store the goal as triggered (qs-02: suppressed for a preview context — zero-trace)
+        if (!$suppressPersistence) {
+            $this->putData($visitorId, ['goals' => [$goalId => true]]);
+        }
 
         // Send conversion event if goal wasn't previously triggered
-        if (!$goalTriggered) {
+        if (!$goalTriggered && !$suppressPersistence) {
             $this->sendConversion($visitorId, $goal['id'], $bucketingData, $segments);
         }
         // Send transaction event if goalData exists and conditions are met
-        if ($goalData !== null && (!$goalTriggered || $forceMultipleTransactions)) {
+        if ($goalData !== null && (!$goalTriggered || $forceMultipleTransactions) && !$suppressPersistence) {
             $this->sendTransaction($visitorId, $goal['id'], $goalData, $bucketingData, $segments);
         }
 

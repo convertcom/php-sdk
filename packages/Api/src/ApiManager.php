@@ -477,31 +477,47 @@ class ApiManager implements ApiManagerInterface
     }
 
     /**
-     * Get configuration data
+     * Build the query string for a config-fetch request, applying the shared
+     * environment/debug_token/_conv_low_cache rules (qs-02 AC1) plus any
+     * caller-supplied extra params (e.g. `exp=` for the preview fetch).
      *
-     * @return ConfigResponseData
+     * @param array<string, string> $additionalParams Extra key=>value params to append
+     * @param bool $forceLowCache Force `_conv_low_cache=1` regardless of cacheLevel/debugToken
+     * @return string The query string including the leading `?`, or '' if empty
      */
-    public function getConfig(): ConfigResponseData
+    private function buildConfigQueryString(array $additionalParams = [], bool $forceLowCache = false): string
     {
-        if ($this->loggerManager && method_exists($this->loggerManager, 'trace')) {
-            $this->loggerManager->trace('ApiManager.getConfig()');
-        }
-
         $hasDebugToken = $this->debugToken !== null && $this->debugToken !== '';
 
         $params = [];
         if ($this->environment) {
             $params[] = 'environment=' . urlencode($this->environment);
         }
+        foreach ($additionalParams as $key => $value) {
+            $params[] = $key . '=' . urlencode((string) $value);
+        }
         if ($hasDebugToken) {
             // Forced regardless of network.cacheLevel — qs-02 AC1.
             $params[] = 'debug_token=' . urlencode((string) $this->debugToken);
         }
-        if ($this->cacheLevel === 'low' || $hasDebugToken) {
+        if ($forceLowCache || $this->cacheLevel === 'low' || $hasDebugToken) {
             $params[] = '_conv_low_cache=1';
         }
-        $query = $params !== [] ? '?' . implode('&', $params) : '';
 
+        return $params !== [] ? '?' . implode('&', $params) : '';
+    }
+
+    /**
+     * Shared GET/parse/log/error-handling body for the two config-fetch entry
+     * points ({@see getConfig()} and {@see getConfigForExperience()}) — only
+     * the query string and the log context label differ between them.
+     *
+     * @param string $query The query string (including leading `?`, or '')
+     * @param string $logContext Log context label (e.g. 'ApiManager.getConfig()')
+     * @return ConfigResponseData
+     */
+    private function fetchConfigFromEndpoint(string $query, string $logContext): ConfigResponseData
+    {
         try {
             $response = $this->request(
                 'GET',
@@ -515,7 +531,7 @@ class ApiManager implements ApiManagerInterface
             if ($statusCode < 200 || $statusCode >= 300) {
                 $url = $this->configEndpoint . "/config/{$this->sdkKey}";
                 if ($this->loggerManager) {
-                    $this->loggerManager->error('ApiManager.getConfig()', [
+                    $this->loggerManager->error($logContext, [
                         'endpoint' => $this->redactDebugTokenForLog($url . $query),
                         'status' => 'error',
                         'httpStatus' => $statusCode,
@@ -537,7 +553,7 @@ class ApiManager implements ApiManagerInterface
 
             if ($this->loggerManager) {
                 $project = $configData->getProject();
-                $this->loggerManager->debug('ApiManager.getConfig()', [
+                $this->loggerManager->debug($logContext, [
                     'endpoint' => $this->redactDebugTokenForLog($this->configEndpoint . "/config/{$this->sdkKey}" . $query),
                     'status' => 'success',
                     'httpStatus' => $statusCode,
@@ -550,7 +566,7 @@ class ApiManager implements ApiManagerInterface
             return $configData;
         } catch (ClientExceptionInterface $e) {
             if ($this->loggerManager) {
-                $this->loggerManager->error('ApiManager.getConfig()', [
+                $this->loggerManager->error($logContext, [
                     'endpoint' => $this->redactDebugTokenForLog($this->configEndpoint . "/config/{$this->sdkKey}" . $query),
                     'status' => 'error',
                     'error' => $e->getMessage(),
@@ -564,5 +580,43 @@ class ApiManager implements ApiManagerInterface
                 $e
             );
         }
+    }
+
+    /**
+     * Get configuration data
+     *
+     * @return ConfigResponseData
+     */
+    public function getConfig(): ConfigResponseData
+    {
+        if ($this->loggerManager && method_exists($this->loggerManager, 'trace')) {
+            $this->loggerManager->trace('ApiManager.getConfig()');
+        }
+
+        $query = $this->buildConfigQueryString();
+
+        return $this->fetchConfigFromEndpoint($query, 'ApiManager.getConfig()');
+    }
+
+    /**
+     * Get configuration data scoped to a single experience (qs-02 capability B
+     * preview input — AC4). Forces `exp={experienceId}` and `_conv_low_cache=1`
+     * onto the config-fetch URL regardless of `network.cacheLevel`, plus
+     * `debug_token=` when configured — this is how the SDK resolves a preview
+     * target that is absent from the current config (draft/paused/other
+     * environment).
+     *
+     * @param string $experienceId The experience id to inject via `exp=`
+     * @return ConfigResponseData
+     */
+    public function getConfigForExperience(string $experienceId): ConfigResponseData
+    {
+        if ($this->loggerManager && method_exists($this->loggerManager, 'trace')) {
+            $this->loggerManager->trace('ApiManager.getConfigForExperience()', ['experienceId' => $experienceId]);
+        }
+
+        $query = $this->buildConfigQueryString(['exp' => $experienceId], true);
+
+        return $this->fetchConfigFromEndpoint($query, 'ApiManager.getConfigForExperience()');
     }
 }

@@ -171,7 +171,8 @@ final class Core implements CoreInterface
             $this->segmentsManager,
             $this->apiManager,
             $this->loggerManager,
-            $visitorAttributes
+            $visitorAttributes,
+            $this->cache
         );
     }
 

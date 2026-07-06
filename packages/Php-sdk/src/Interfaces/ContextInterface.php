@@ -164,4 +164,20 @@ interface ContextInterface
      * @return string The visitor ID
      */
     public function getVisitorId(): string;
+
+    /**
+     * qs-02 capability (B) preview input — force this context to decide a
+     * specific variation for a specific experience, bypassing every normal
+     * gate (audiences, segments, locations, environment, statuses, traffic,
+     * stored decisions, bucketing hash). Once resolved, this context becomes
+     * zero-trace for its entire lifetime: no tracking events and no
+     * visitor-state persistence writes, for any experience run through it.
+     * Inert on bad input (unknown experience/variation id) — the context then
+     * behaves fully normally. Per-context only; never leaks to other contexts.
+     *
+     * @param string $experienceId The experience id (numeric string)
+     * @param string $variationId The variation id to force (numeric string)
+     * @return void
+     */
+    public function setPreview(string $experienceId, string $variationId): void;
 }
