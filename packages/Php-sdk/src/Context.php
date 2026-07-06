@@ -253,9 +253,6 @@ final class Context implements ContextInterface
         $forwardedData['visitorProperties'] = $visitorProperties;
         $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
         // qs-02: zero-trace across the WHOLE context once a preview is active.
-        // Note: this does NOT force the preview target's decision (that override
-        // is scoped to runExperience() per contract §2) — an experience absent
-        // from the shared config still won't appear in this bulk result.
         if ($this->previewExperience !== null) {
             $forwardedData['suppressPersistence'] = true;
         }
@@ -264,6 +261,31 @@ final class Context implements ContextInterface
             $this->visitorId,
             new BucketingAttributes($forwardedData)
         );
+
+        // qs-02 capability (B) contract §3 precedence — "preview forcing beats
+        // stored decisions and normal bucketing for the target experience" is
+        // method-agnostic, so the bulk method must honor it too, not just
+        // runExperience(). Scoped to the in-config preview target: when the
+        // target experience is present in config and would normally decide
+        // (running, environment-matching — i.e. it already appears in
+        // $bucketedVariations), replace that entry with the forced decision,
+        // mirroring runExperience()'s short-circuit at ~line 184. An experience
+        // absent from this bulk result (out-of-config-only via ?exp= fetch, or
+        // blocked by a status/environment/traffic gate the preview would
+        // otherwise bypass) is intentionally NOT injected here — replicating
+        // runExperience()'s full gate bypass for the bulk method would require
+        // restructuring how this method sources per-experience decisions, which
+        // is out of scope for this fix (see qs-02 decision-audit remediation,
+        // Defect 3 note in the PHP SDK decision log).
+        if ($this->previewExperience !== null) {
+            $previewKey = $this->previewExperience['key'] ?? null;
+            foreach ($bucketedVariations as $index => $variation) {
+                if (is_array($variation) && ($variation['experienceKey'] ?? null) === $previewKey) {
+                    $bucketedVariations[$index] = $this->previewDecision;
+                    break;
+                }
+            }
+        }
 
         $dtos = [];
         foreach ($bucketedVariations as $variation) {
@@ -305,18 +327,25 @@ final class Context implements ContextInterface
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
 
+        $forwardedData = [
+            'visitorProperties' => $visitorProperties,
+            'locationProperties' => $attributes?->getLocationProperties(),
+            'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
+            'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
+                ? $attributes->getTypeCasting()
+                : true,
+            'environment' => $attributes?->getEnvironment() ?? $this->environment,
+        ];
+        // qs-02: zero-trace across the WHOLE context once a preview is active —
+        // runFeature() buckets every experience in config, not just a named one.
+        if ($this->previewExperience !== null) {
+            $forwardedData['suppressPersistence'] = true;
+        }
+
         $result = $this->featureManager->runFeature(
             $this->visitorId,
             $key,
-            new BucketingAttributes([
-                'visitorProperties' => $visitorProperties,
-                'locationProperties' => $attributes?->getLocationProperties(),
-                'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-                'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
-                    ? $attributes->getTypeCasting()
-                    : true,
-                'environment' => $attributes?->getEnvironment() ?? $this->environment,
-            ]),
+            new BucketingAttributes($forwardedData),
             $attributes?->getExperienceKeys()
         );
 
@@ -397,7 +426,7 @@ final class Context implements ContextInterface
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
 
-        $bucketedFeatures = $this->featureManager->runFeatures($this->visitorId, new BucketingAttributes([
+        $forwardedData = [
             'visitorProperties' => $visitorProperties,
             'locationProperties' => $attributes?->getLocationProperties(),
             'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
@@ -405,7 +434,14 @@ final class Context implements ContextInterface
                 ? $attributes->getTypeCasting()
                 : true,
             'environment' => $attributes?->getEnvironment() ?? $this->environment,
-        ]));
+        ];
+        // qs-02: zero-trace across the WHOLE context once a preview is active —
+        // runFeatures() buckets every experience in config.
+        if ($this->previewExperience !== null) {
+            $forwardedData['suppressPersistence'] = true;
+        }
+
+        $bucketedFeatures = $this->featureManager->runFeatures($this->visitorId, new BucketingAttributes($forwardedData));
 
         // Filter out RuleError results
         $matchedErrors = array_filter($bucketedFeatures, function ($match) {

@@ -8,10 +8,11 @@ use ConvertSdk\ApiManager;
 use ConvertSdk\BucketingManager;
 use ConvertSdk\Core;
 use ConvertSdk\DataManager;
+use ConvertSdk\DTO\BucketedFeature;
 use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
-use ConvertSdk\Interfaces\FeatureManagerInterface;
+use ConvertSdk\FeatureManager;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use ConvertSdk\LogManager;
 use ConvertSdk\RuleManager;
@@ -165,6 +166,17 @@ class ContextPreviewTest extends TestCase
     private const OTHER_EXPERIENCE_KEY = 'other-exp';
     private const GOAL_KEY = 'preview-goal';
     private const NO_LOCATION_GATE = ['ignoreLocationProperties' => true];
+    private const FEATURE_ID = '20001';
+    private const FEATURE_KEY = 'preview-feature';
+    private const FEATURE_EXPERIENCE_ID = '9105';
+    private const FEATURE_EXPERIENCE_KEY = 'feature-carrying-exp';
+    /** Non-empty location properties so the location-agnostic fixtures (no
+     * `locations`/`site_area`) fall into matchRulesByField()'s "not restricted"
+     * branch and actually reach the bucketing/persistence code — required so a
+     * zero-trace regression test genuinely exercises the write path instead of
+     * short-circuiting on the location gate before it ever would.
+     */
+    private const LOCATION_PROPERTIES = ['locationProperties' => ['url' => 'https://convert.com/']];
 
     private MockHttpClient $mockHttpClient;
     private Psr17Factory $psr17Factory;
@@ -185,14 +197,16 @@ class ContextPreviewTest extends TestCase
      * current config" per qs-02 contract §2, needing no ?exp= fetch.
      *
      * @param array<int, array<string, mixed>> $extraExperiences
+     * @param array<int, array<string, mixed>> $features
      * @return array{core: Core, dataManager: DataManager, apiManager: ApiManager, cache: RecordingCache, dataStore: RecordingDataStore}
      */
-    private function buildRig(array $extraExperiences = []): array
+    private function buildRig(array $extraExperiences = [], array $features = []): array
     {
         $data = new ConfigResponseData([
             'account_id' => 'acct-1',
             'project' => ['id' => 'proj-1'],
             'experiences' => array_merge([$this->otherExperience()], $extraExperiences),
+            'features' => $features,
             'goals' => [
                 ['id' => '7001', 'key' => self::GOAL_KEY, 'name' => 'Preview Goal', 'rules' => null],
             ],
@@ -231,6 +245,7 @@ class ContextPreviewTest extends TestCase
         $dataManager->setDataStore($dataStore);
 
         $experienceManager = new ExperienceManager(dataManager: $dataManager);
+        $featureManager = new FeatureManager(dataManager: $dataManager);
         $cache = new RecordingCache();
 
         $core = new Core(
@@ -238,7 +253,7 @@ class ContextPreviewTest extends TestCase
             $dataManager,
             $eventManager,
             $experienceManager,
-            $this->createMock(FeatureManagerInterface::class),
+            $featureManager,
             $this->createMock(SegmentsManagerInterface::class),
             $apiManager,
             $cache,
@@ -275,6 +290,45 @@ class ContextPreviewTest extends TestCase
                 $this->variation(self::OTHER_EXPERIENCE_ID . '-B', 'b'),
             ],
         ];
+    }
+
+    /**
+     * A feature declaration paired with {@see featureCarryingExperience()} — used to prove
+     * the Context::runFeature()/runFeatures() zero-trace regression (qs-02 decision-audit
+     * Defect 1/2): these methods bucket EVERY experience in the config (not just a
+     * targeted one), so a leak here would persist/track for an experience the caller
+     * never even named.
+     *
+     * @return array<string, mixed>
+     */
+    private function featureFixture(): array
+    {
+        return [
+            'id' => self::FEATURE_ID,
+            'key' => self::FEATURE_KEY,
+            'name' => 'Preview Feature',
+            'variables' => [],
+        ];
+    }
+
+    /**
+     * A location/audience-agnostic, always-decidable experience carrying a fullStackFeature
+     * change linked to {@see featureFixture()} — present in the base config (like
+     * {@see otherExperience()}) so Context::runFeature()/runFeatures() bucket it as part of
+     * their "iterate every experience in config" sweep.
+     *
+     * @return array<string, mixed>
+     */
+    private function featureCarryingExperience(): array
+    {
+        return $this->experienceFixture(self::FEATURE_EXPERIENCE_ID, self::FEATURE_EXPERIENCE_KEY, [], [
+            $this->variation(self::FEATURE_EXPERIENCE_ID . '-A', 'a', [
+                'changes' => [['id' => 'chg-feat-a', 'type' => 'fullStackFeature', 'data' => ['feature_id' => self::FEATURE_ID]]],
+            ]),
+            $this->variation(self::FEATURE_EXPERIENCE_ID . '-B', 'b', [
+                'changes' => [['id' => 'chg-feat-b', 'type' => 'fullStackFeature', 'data' => ['feature_id' => self::FEATURE_ID]]],
+            ]),
+        ]);
     }
 
     /**
@@ -458,6 +512,46 @@ class ContextPreviewTest extends TestCase
         }
     }
 
+    // -- §3 precedence: the bulk method must also honor preview forcing ------------------
+
+    /**
+     * qs-02 decision-audit remediation, Defect 3: contract §3 ("preview forcing beats
+     * stored decisions and normal bucketing for the target experience on that context")
+     * is method-agnostic — runExperiences() must honor it for an in-config, running,
+     * environment-matching preview target, not just runExperience(). Seeds a stored
+     * decision (mirroring the 'different stored decision' bypassCasesProvider() case)
+     * so the un-forced bulk result is deterministic, proving the override — not hash
+     * luck — is what makes the assertion pass.
+     */
+    #[Test]
+    public function previewForcingOverridesTheTargetExperienceInBulkRunExperiences(): void
+    {
+        $targetId = '9106';
+        $targetKey = 'bulk-precedence-exp';
+        $target = $this->experienceFixture($targetId, $targetKey, [], [
+            $this->variation('9106-A', 'a'),
+            $this->variation('9106-B', 'b'),
+        ]);
+
+        $rig = $this->buildRig([$target]);
+        $visitorId = 'preview-visitor-bulk-precedence';
+        $rig['dataManager']->putData($visitorId, ['bucketing' => [$targetId => '9106-A']]);
+
+        $context = $rig['core']->createContext($visitorId);
+        $context->setPreview($targetId, '9106-B');
+
+        $decisions = $context->runExperiences(new BucketingAttributes(self::NO_LOCATION_GATE));
+
+        $byKey = [];
+        foreach ($decisions as $decision) {
+            $byKey[$decision->experienceKey] = $decision;
+        }
+
+        $this->assertArrayHasKey($targetKey, $byKey, 'the in-config running preview target must still appear in the bulk result');
+        $this->assertSame('9106-B', $byKey[$targetKey]->variationId, 'preview forcing must beat the stored decision for the target experience in the bulk method too (contract §3, method-agnostic)');
+        $this->assertArrayHasKey(self::OTHER_EXPERIENCE_KEY, $byKey, 'other experiences must still decide normally on a preview context');
+    }
+
     // -- AC6: zero trace across the full lifecycle, including shutdown -------------------
 
     #[Test]
@@ -493,6 +587,47 @@ class ContextPreviewTest extends TestCase
 
         $this->assertSame([], $this->trackRequests(), 'zero requests to the track endpoint across the full preview-context lifecycle, including shutdown flush');
         $this->assertSame(0, $rig['dataStore']->setCalls, 'zero visitor-state dataStore writes across the full preview-context lifecycle');
+    }
+
+    /**
+     * qs-02 decision-audit remediation, Defect 1/2: Context::runFeature()/runFeatures() must
+     * be just as zero-trace as runExperience()/runExperiences() on a preview-set context.
+     * These feature methods bucket EVERY experience in the config (FeatureManager::runFeatures()
+     * has no experience filter by default), so calling either one on a preview context leaks
+     * persistence/tracking for every not-yet-bucketed experience unless suppressPersistence is
+     * forwarded — exactly the gap the original AC6 test missed by mocking FeatureManager instead
+     * of exercising the real bucketing path.
+     */
+    #[Test]
+    public function previewContextLeavesZeroTraceAcrossFeatureMethodsIncludingShutdown(): void
+    {
+        $targetId = '9104';
+        $targetKey = 'feature-preview-target-exp';
+        $target = $this->experienceFixture($targetId, $targetKey, ['status' => 'draft'], [
+            $this->variation('9104-A', 'a'),
+            $this->variation('9104-B', 'b'),
+        ]);
+
+        $rig = $this->buildRig([$this->featureCarryingExperience()], [$this->featureFixture()]);
+        $this->queueExpFetchResponse($target);
+
+        $context = $rig['core']->createContext('preview-visitor-feature');
+        $context->setPreview($targetId, '9104-B');
+
+        $forced = $context->runExperience($targetKey);
+        $this->assertInstanceOf(BucketedVariation::class, $forced, 'preview target must still force its decision');
+
+        $feature = $context->runFeature(self::FEATURE_KEY, new BucketingAttributes(self::LOCATION_PROPERTIES));
+        $this->assertInstanceOf(BucketedFeature::class, $feature, 'the feature-carrying experience must actually bucket, not be blocked by a gate — otherwise this test would pass trivially');
+
+        $features = $context->runFeatures(new BucketingAttributes(self::LOCATION_PROPERTIES));
+        $this->assertNotEmpty($features, 'runFeatures() must actually bucket experiences, not be blocked by a gate — otherwise this test would pass trivially');
+
+        // Model the PHP-FPM shutdown handler ConvertSDK::create() registers.
+        $rig['apiManager']->releaseQueue('shutdown');
+
+        $this->assertSame([], $this->trackRequests(), 'zero requests to the track endpoint after runFeature()/runFeatures() on a preview context, including shutdown flush');
+        $this->assertSame(0, $rig['dataStore']->setCalls, 'zero visitor-state dataStore writes after runFeature()/runFeatures() on a preview context');
     }
 
     // -- AC7: isolation from a concurrent non-preview context ----------------------------
