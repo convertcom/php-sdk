@@ -280,8 +280,34 @@ class ApiManagerDebugTokenTest extends TestCase
     }
 
     /**
-     * AC3 — token hygiene: never logged in clear when the HTTP client throws
-     * a network-level exception (the other logging codepath in getConfig()).
+     * Build a PSR-18 network-level exception whose message embeds the full
+     * config-fetch URL — including `debug_token=<value>` — mirroring how
+     * Guzzle's ConnectException/RequestException append `" for <URI>"` to
+     * connection/DNS/TLS/timeout failures. This is the shape that actually
+     * exercises the AC3 leak: a message-less exception (e.g. bare
+     * "Connection refused") never touches the token and passes trivially
+     * regardless of whether redaction is applied.
+     */
+    private function buildNetworkExceptionWithLeakingUrl(): \Http\Client\Exception\NetworkException
+    {
+        $leakingUrl = self::HOST . ':' . self::PORT
+            . '/config/?environment=staging&debug_token=' . self::SECRET_TOKEN . '&_conv_low_cache=1';
+
+        return new \Http\Client\Exception\NetworkException(
+            'cURL error 6: Could not resolve host: localhost for ' . $leakingUrl,
+            $this->psr17Factory->createRequest('GET', $leakingUrl)
+        );
+    }
+
+    /**
+     * AC3 — token hygiene: never logged in clear, and never present in the
+     * rethrown exception's message, when the HTTP client throws a
+     * network-level exception whose own message embeds the full config URL
+     * (Guzzle's ConnectException/RequestException behavior). This is the
+     * codepath that leaked before the fix: `redactDebugTokenForLog()` was
+     * applied to the sibling `endpoint` log field but not to `$e->getMessage()`
+     * itself, which is both logged raw and interpolated raw into the
+     * rethrown RuntimeException.
      */
     #[Test]
     public function debugTokenNeverAppearsInConfigFetchNetworkErrorLogs(): void
@@ -290,20 +316,54 @@ class ApiManagerDebugTokenTest extends TestCase
         $this->spyAllLogCalls($captured);
 
         $apiManager = $this->buildApiManager(['debugToken' => self::SECRET_TOKEN]);
-        $this->mockHttpClient->addException(
-            new \Http\Client\Exception\NetworkException(
-                'Connection refused',
-                $this->psr17Factory->createRequest('GET', 'http://localhost')
-            )
-        );
+        $this->mockHttpClient->addException($this->buildNetworkExceptionWithLeakingUrl());
 
+        $thrown = null;
         try {
             $apiManager->getConfig();
         } catch (\RuntimeException $e) {
-            // Expected — getConfig() wraps and rethrows; the assertion below still applies.
+            $thrown = $e;
         }
 
+        $this->assertNotNull($thrown, 'Expected getConfig() to rethrow a RuntimeException');
         $this->assertNotEmpty($captured, 'Expected at least one log call to inspect');
         $this->assertNoSecretLeak($captured, self::SECRET_TOKEN);
+        $this->assertStringNotContainsString(
+            self::SECRET_TOKEN,
+            $thrown->getMessage(),
+            'Secret token leaked into the rethrown exception message'
+        );
+    }
+
+    /**
+     * AC3/AC4 symmetry — the preview-fetch entry point
+     * (`getConfigForExperience()`, used by `PreviewResolver`) shares the same
+     * `fetchConfigFromEndpoint()` error-handling body as `getConfig()`, so it
+     * must be equally immune to the network-exception leak.
+     */
+    #[Test]
+    public function debugTokenNeverAppearsInConfigForExperienceNetworkErrorLogs(): void
+    {
+        $captured = [];
+        $this->spyAllLogCalls($captured);
+
+        $apiManager = $this->buildApiManager(['debugToken' => self::SECRET_TOKEN]);
+        $this->mockHttpClient->addException($this->buildNetworkExceptionWithLeakingUrl());
+
+        $thrown = null;
+        try {
+            $apiManager->getConfigForExperience('exp-1');
+        } catch (\RuntimeException $e) {
+            $thrown = $e;
+        }
+
+        $this->assertNotNull($thrown, 'Expected getConfigForExperience() to rethrow a RuntimeException');
+        $this->assertNotEmpty($captured, 'Expected at least one log call to inspect');
+        $this->assertNoSecretLeak($captured, self::SECRET_TOKEN);
+        $this->assertStringNotContainsString(
+            self::SECRET_TOKEN,
+            $thrown->getMessage(),
+            'Secret token leaked into the rethrown exception message'
+        );
     }
 }

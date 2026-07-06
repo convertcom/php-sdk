@@ -565,17 +565,24 @@ class ApiManager implements ApiManagerInterface
 
             return $configData;
         } catch (ClientExceptionInterface $e) {
+            // qs-02 AC3 — PSR-18 client exceptions (e.g. Guzzle's ConnectException
+            // on DNS/TLS/timeout failures) commonly append " for <full URI>" to
+            // getMessage(), which carries the same debug_token=<value> query
+            // param as the sibling `endpoint` log field below. Redact once here
+            // so neither the log entry nor the rethrown RuntimeException leaks it.
+            $safeMessage = $this->redactDebugTokenForLog($e->getMessage());
+
             if ($this->loggerManager) {
                 $this->loggerManager->error($logContext, [
                     'endpoint' => $this->redactDebugTokenForLog($this->configEndpoint . "/config/{$this->sdkKey}" . $query),
                     'status' => 'error',
-                    'error' => $e->getMessage(),
+                    'error' => $safeMessage,
                     'code' => method_exists($e, 'getCode') ? $e->getCode() : null,
                 ]);
             }
 
             throw new \RuntimeException(
-                "Failed to fetch config from {$this->configEndpoint}/config/{$this->sdkKey}: HTTP error - {$e->getMessage()}",
+                "Failed to fetch config from {$this->configEndpoint}/config/{$this->sdkKey}: HTTP error - {$safeMessage}",
                 (int)$e->getCode(),
                 $e
             );
