@@ -455,13 +455,19 @@ class ApiManager implements ApiManagerInterface
     }
 
     /**
-     * Redact the configured debugToken (qs-02 AC3 — token hygiene) from a
-     * log-only string, e.g. a config-fetch endpoint URL that carries
-     * `debug_token=<value>` in its query string. Only used for values passed
-     * to the logger — never affects the actual request URL.
+     * Redact the `debug_token` query-param value (qs-02 AC3 — token hygiene)
+     * from a log-only string, e.g. a config-fetch endpoint URL or an
+     * exception message that carries `debug_token=<value>` in its query
+     * string. Encoding-agnostic: matches the value regardless of whether it
+     * was produced by `urlencode()`, `rawurlencode()`, left decoded, or
+     * mangled by an arbitrary PSR-18 client — the exception message passed
+     * in here originates from whatever HTTP client is plugged in, which is
+     * not guaranteed to encode (or even include) the URL the same way this
+     * SDK built it. Only used for values passed to the logger/rethrown
+     * exception — never affects the actual request URL.
      *
      * @param string $value The string to redact before logging
-     * @return string The value with the token masked, if present
+     * @return string The value with the token value masked, if present
      */
     private function redactDebugTokenForLog(string $value): string
     {
@@ -469,9 +475,9 @@ class ApiManager implements ApiManagerInterface
             return $value;
         }
 
-        return str_replace(
-            'debug_token=' . urlencode($this->debugToken),
-            'debug_token=***REDACTED***',
+        return (string) preg_replace(
+            '/(debug_token=)[^&\s]*/i',
+            '${1}***REDACTED***',
             $value
         );
     }

@@ -13,6 +13,7 @@ use ConvertSdk\DTO\BucketedVariation;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
+use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;
 use ConvertSdk\LogManager;
 use ConvertSdk\RuleManager;
@@ -198,10 +199,19 @@ class ContextPreviewTest extends TestCase
      *
      * @param array<int, array<string, mixed>> $extraExperiences
      * @param array<int, array<string, mixed>> $features
+     * @param ExperienceManagerInterface|null $experienceManagerOverride Substitutes a
+     *     test double for the real ExperienceManager — used only by tests that need to
+     *     synthesize a bucketedVariations shape the real manager can never produce (e.g.
+     *     an entry missing `experienceKey`), while keeping DataManager/ApiManager real so
+     *     {@see \ConvertSdk\Context::setPreview()}'s resolution/persistence still exercises
+     *     genuine code.
      * @return array{core: Core, dataManager: DataManager, apiManager: ApiManager, cache: RecordingCache, dataStore: RecordingDataStore}
      */
-    private function buildRig(array $extraExperiences = [], array $features = []): array
-    {
+    private function buildRig(
+        array $extraExperiences = [],
+        array $features = [],
+        ?ExperienceManagerInterface $experienceManagerOverride = null
+    ): array {
         $data = new ConfigResponseData([
             'account_id' => 'acct-1',
             'project' => ['id' => 'proj-1'],
@@ -244,7 +254,7 @@ class ContextPreviewTest extends TestCase
         $dataStore = new RecordingDataStore();
         $dataManager->setDataStore($dataStore);
 
-        $experienceManager = new ExperienceManager(dataManager: $dataManager);
+        $experienceManager = $experienceManagerOverride ?? new ExperienceManager(dataManager: $dataManager);
         $featureManager = new FeatureManager(dataManager: $dataManager);
         $cache = new RecordingCache();
 
@@ -550,6 +560,68 @@ class ContextPreviewTest extends TestCase
         $this->assertArrayHasKey($targetKey, $byKey, 'the in-config running preview target must still appear in the bulk result');
         $this->assertSame('9106-B', $byKey[$targetKey]->variationId, 'preview forcing must beat the stored decision for the target experience in the bulk method too (contract §3, method-agnostic)');
         $this->assertArrayHasKey(self::OTHER_EXPERIENCE_KEY, $byKey, 'other experiences must still decide normally on a preview context');
+    }
+
+    /**
+     * Gemini PR #51 review finding (correctness): before the fix, the bulk
+     * injection loop sourced `$previewKey` from `$this->previewExperience['key']
+     * ?? null` with no guard — when the preview target's raw config data is
+     * missing `key` (malformed/legacy data; {@see ConfigExperience::getKey()}
+     * defaults to `null` when unset), `$previewKey` resolves to `null`. Any
+     * OTHER bucketed variation entry whose own `experienceKey` is also
+     * missing/null would then spuriously satisfy `null === null` and get
+     * overwritten with the preview decision — even though it has nothing to
+     * do with the preview target.
+     *
+     * The real {@see \ConvertSdk\ExperienceManager::selectVariations()} can
+     * never itself produce an entry with a missing `experienceKey` (it always
+     * sets it from the `string $experienceKey` it was called with), so this
+     * synthesizes that shape via a mocked ExperienceManager to exercise the
+     * defensive guard directly. Fixed code sources the key from
+     * `$this->previewDecision['experienceKey']` (the authoritative key
+     * {@see \ConvertSdk\DataManager::buildPreviewDecision()} derives from
+     * `ConfigExperience::getKey()`) and skips injection entirely when it is
+     * null/empty — this test's target experience has the same "no key"
+     * defect, so both sourcing approaches agree here; the guard itself is
+     * what's under test.
+     */
+    #[Test]
+    public function nullPreviewKeyDoesNotOverwriteABucketedVariationWithMissingExperienceKey(): void
+    {
+        $targetId = '9107';
+        // Deliberately no 'key' field — ConfigExperience::getKey() returns
+        // null for it, so previewDecision['experienceKey'] is null too.
+        $targetWithNoKey = [
+            'id' => $targetId,
+            'status' => 'running',
+            'variations' => [
+                $this->variation($targetId . '-A', 'a'),
+            ],
+        ];
+
+        $unrelatedVariationId = 'unrelated-exp-A';
+        $spy = $this->createMock(ExperienceManagerInterface::class);
+        $spy->method('selectVariations')->willReturn([
+            // No 'experienceKey' entry at all — the shape a real
+            // ExperienceManager can never produce, but the guard must
+            // still defend against it.
+            ['id' => $unrelatedVariationId, 'key' => 'a', 'changes' => []],
+        ]);
+
+        $rig = $this->buildRig([$targetWithNoKey], [], $spy);
+
+        $context = $rig['core']->createContext('preview-visitor-null-key');
+        $context->setPreview($targetId, $targetId . '-A');
+
+        $decisions = $context->runExperiences();
+
+        $this->assertCount(1, $decisions);
+        $this->assertSame(
+            $unrelatedVariationId,
+            $decisions[0]->variationId,
+            'a bucketed variation with a missing experienceKey must not be overwritten by the preview decision when the preview key itself is null/empty'
+        );
+        $this->assertSame('', $decisions[0]->experienceKey);
     }
 
     // -- AC6: zero trace across the full lifecycle, including shutdown -------------------

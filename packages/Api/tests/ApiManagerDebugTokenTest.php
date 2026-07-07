@@ -38,6 +38,14 @@ class ApiManagerDebugTokenTest extends TestCase
     private const BATCH_SIZE = 2;
     private const SECRET_TOKEN = 'qa-debug-token-xyz789';
 
+    /**
+     * Contains a space so its urlencode() and rawurlencode() representations
+     * genuinely differ (`+` vs `%20`) — required to prove the encoding-agnostic
+     * redaction fix, since the old `str_replace('debug_token=' . urlencode(...))`
+     * approach only ever matched the urlencode() shape.
+     */
+    private const ENCODING_TEST_TOKEN = 'qa debug token xyz';
+
     private MockHttpClient $mockHttpClient;
     private Psr17Factory $psr17Factory;
     /** @var EventManagerInterface&\PHPUnit\Framework\MockObject\MockObject */
@@ -364,6 +372,115 @@ class ApiManagerDebugTokenTest extends TestCase
             self::SECRET_TOKEN,
             $thrown->getMessage(),
             'Secret token leaked into the rethrown exception message'
+        );
+    }
+
+    /**
+     * Build a PSR-18 network-level exception whose message embeds
+     * `debug_token=<tokenAsItAppearsInUrl>&other=param` — the caller controls
+     * exactly how the token is represented in the message (rawurlencode()'d,
+     * fully decoded/un-encoded, etc.) so the redaction fix can be proven
+     * encoding-agnostic rather than coupled to `urlencode()` output.
+     */
+    private function buildNetworkExceptionWithEncodedDebugToken(
+        string $tokenAsItAppearsInUrl
+    ): \Http\Client\Exception\NetworkException {
+        $leakingUrl = self::HOST . ':' . self::PORT
+            . '/config/?environment=staging&debug_token=' . $tokenAsItAppearsInUrl . '&other=param';
+
+        return new \Http\Client\Exception\NetworkException(
+            'cURL error 6: Could not resolve host: localhost for ' . $leakingUrl,
+            $this->psr17Factory->createRequest('GET', self::HOST . ':' . self::PORT . '/config/')
+        );
+    }
+
+    /**
+     * Two representations of {@see ENCODING_TEST_TOKEN} that a plugged-in
+     * PSR-18 client could plausibly embed in an exception message: Guzzle
+     * (and most HTTP clients) rawurlencode() query values, while a client
+     * that logs/presents a decoded URL for readability would show the value
+     * fully un-encoded. Both must be redacted regardless of which shows up.
+     *
+     * @return array<string, array{0: string}>
+     */
+    public static function debugTokenEncodingProvider(): array
+    {
+        return [
+            'rawurlencoded (spaces as %20)' => [rawurlencode(self::ENCODING_TEST_TOKEN)],
+            'un-encoded / decoded' => [self::ENCODING_TEST_TOKEN],
+        ];
+    }
+
+    /**
+     * AC3 — token hygiene must hold regardless of how the plugged-in PSR-18
+     * client encoded (or didn't encode) the token in its own exception
+     * message. Before the fix, `redactDebugTokenForLog()` matched only the
+     * exact `urlencode($this->debugToken)` byte sequence — since
+     * `urlencode('qa debug token xyz')` produces `qa+debug+token+xyz`, it
+     * would silently no-op against a rawurlencode()'d (`%20`) or fully
+     * decoded (raw space) representation, leaking the token verbatim into
+     * both the log payload and the rethrown RuntimeException. The
+     * regex-based fix redacts `debug_token=<value>` regardless of encoding,
+     * while leaving the surrounding message (prefix and the trailing
+     * `&other=param`) untouched.
+     */
+    #[DataProvider('debugTokenEncodingProvider')]
+    public function testDebugTokenRedactionIsEncodingAgnostic(string $tokenAsItAppearsInUrl): void
+    {
+        $captured = [];
+        $this->spyAllLogCalls($captured);
+
+        $apiManager = $this->buildApiManager(['debugToken' => self::ENCODING_TEST_TOKEN]);
+        $this->mockHttpClient->addException(
+            $this->buildNetworkExceptionWithEncodedDebugToken($tokenAsItAppearsInUrl)
+        );
+
+        $thrown = null;
+        try {
+            $apiManager->getConfig();
+        } catch (\RuntimeException $e) {
+            $thrown = $e;
+        }
+
+        $this->assertNotNull($thrown, 'Expected getConfig() to rethrow a RuntimeException');
+        $this->assertNotEmpty($captured, 'Expected at least one log call to inspect');
+
+        $serializedLogs = (string) json_encode($captured, JSON_PARTIAL_OUTPUT_ON_ERROR);
+
+        // The exact on-the-wire representation the exception message carried
+        // must be gone — this is what proves the fix works regardless of
+        // encoding (for the decoded row, this representation IS the full
+        // secret; for the rawurlencoded row, it's the %20-encoded value).
+        $this->assertStringNotContainsString(
+            $tokenAsItAppearsInUrl,
+            $serializedLogs,
+            'Debug token representation leaked into a log payload'
+        );
+        $this->assertStringNotContainsString(
+            $tokenAsItAppearsInUrl,
+            $thrown->getMessage(),
+            'Debug token representation leaked into the rethrown exception message'
+        );
+
+        // The full configured secret must never appear verbatim either way.
+        $this->assertNoSecretLeak($captured, self::ENCODING_TEST_TOKEN);
+        $this->assertStringNotContainsString(
+            self::ENCODING_TEST_TOKEN,
+            $thrown->getMessage(),
+            'Full secret token leaked into the rethrown exception message'
+        );
+
+        // Surrounding message content — before `debug_token=` and after the
+        // redacted value — must be preserved untouched.
+        $this->assertStringContainsString(
+            'Could not resolve host',
+            $thrown->getMessage(),
+            'Message content preceding debug_token= must be preserved'
+        );
+        $this->assertStringContainsString(
+            '&other=param',
+            $thrown->getMessage(),
+            'Message content following the redacted value must be preserved'
         );
     }
 }

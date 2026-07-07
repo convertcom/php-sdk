@@ -278,11 +278,22 @@ final class Context implements ContextInterface
         // is out of scope for this fix (see qs-02 decision-audit remediation,
         // Defect 3 note in the PHP SDK decision log).
         if ($this->previewExperience !== null) {
-            $previewKey = $this->previewExperience['key'] ?? null;
-            foreach ($bucketedVariations as $index => $variation) {
-                if (is_array($variation) && ($variation['experienceKey'] ?? null) === $previewKey) {
-                    $bucketedVariations[$index] = $this->previewDecision;
-                    break;
+            // Source the key from the decision actually built by
+            // DataManager::buildPreviewDecision() (experienceKey ===
+            // ConfigExperience::getKey()) rather than the raw config
+            // experience — this is the authoritative key used to build the
+            // forced decision. Guard against null/empty: without it, a
+            // bucketed variation with a missing/null `experienceKey` would
+            // spuriously match null === null and be overwritten with the
+            // preview decision (mirrors the defensive idiom in
+            // ApiManager::redactDebugTokenForLog()'s null/empty-token guard).
+            $previewKey = $this->previewDecision['experienceKey'] ?? null;
+            if ($previewKey !== null && $previewKey !== '') {
+                foreach ($bucketedVariations as $index => $variation) {
+                    if (is_array($variation) && ($variation['experienceKey'] ?? null) === $previewKey) {
+                        $bucketedVariations[$index] = $this->previewDecision;
+                        break;
+                    }
                 }
             }
         }
