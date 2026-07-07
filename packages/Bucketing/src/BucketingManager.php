@@ -137,4 +137,120 @@ final class BucketingManager implements BucketingManagerInterface
             'bucketingAllocation' => $value,
         ];
     }
+
+    /**
+     * Build the anchored bucket layout for a set of variation allocations (qs-01).
+     *
+     * Anchors are computed over the total weight of ALL entries (active and inactive) so
+     * that raising an experience's total allocation only ever grows arms (superset
+     * property) and never reshuffles an already-bucketed visitor into a different arm.
+     * Inactive (or explicit zero-allocation) entries keep their weight for anchor
+     * stability but get a zero-width range so they can never be selected.
+     *
+     * @param array<int, array{id: string, allocation: float, active: bool}> $allocations Variation allocations in config order
+     * @return array<int, array{id: string, anchor: float, width: float}>
+     */
+    public function getBucketRanges(array $allocations): array
+    {
+        $totalWeight = array_reduce(
+            $allocations,
+            fn (float $sum, array $allocation) => $sum + $allocation['allocation'],
+            0.0
+        );
+
+        $ranges = [];
+
+        if ($totalWeight <= 0) {
+            if ($this->logManager) {
+                $this->logManager->debug('BucketingManager.getBucketRanges()', [
+                    'allocations' => $allocations,
+                    'totalWeight' => $totalWeight,
+                ]);
+            }
+
+            return $ranges;
+        }
+
+        $cumWeight = 0.0;
+        foreach ($allocations as $allocation) {
+            $anchor = ($cumWeight / $totalWeight) * $this->maxTraffic;
+            $width = $allocation['active'] ? $allocation['allocation'] * 100 : 0.0;
+            $ranges[] = [
+                'id' => $allocation['id'],
+                'anchor' => $anchor,
+                'width' => $width,
+            ];
+            $cumWeight += $allocation['allocation'];
+        }
+
+        if ($this->logManager) {
+            $this->logManager->debug('BucketingManager.getBucketRanges()', [
+                'allocations' => $allocations,
+                'totalWeight' => $totalWeight,
+            ], ['ranges' => $ranges]);
+        }
+
+        return $ranges;
+    }
+
+    /**
+     * Select the variation whose anchored range contains the provided value.
+     *
+     * @param array<int, array{id: string, anchor: float, width: float}> $ranges Anchored bucket ranges (see getBucketRanges())
+     * @param float $value A normalized bucket value in [0, maxTraffic)
+     * @return string|null The selected variation ID, or null if no match
+     */
+    public function selectBucketAnchored(array $ranges, float $value): ?string
+    {
+        $variation = null;
+
+        foreach ($ranges as $range) {
+            if ($value >= $range['anchor'] && $value < $range['anchor'] + $range['width']) {
+                $variation = $range['id'];
+                break;
+            }
+        }
+
+        if ($this->logManager) {
+            $this->logManager->debug('BucketingManager.selectBucketAnchored()', [
+                'ranges' => $ranges,
+                'value' => $value,
+            ], ['variation' => $variation]);
+        }
+
+        return $variation;
+    }
+
+    /**
+     * Get an anchored bucket for the visitor (qs-01). Reuses the existing
+     * visitor-based hash value unchanged, then resolves it through the anchored layout.
+     *
+     * @param array<int, array{id: string, allocation: float, active: bool}> $allocations Variation allocations in config order
+     * @param string $visitorId The visitor's unique identifier
+     * @param array{seed?: int, experienceId?: string}|null $options Optional overrides
+     * @return array{variationId: string, bucketingAllocation: int}|null Assignment result or null
+     */
+    public function getBucketForVisitorAnchored(array $allocations, string $visitorId, ?array $options = null): ?array
+    {
+        $value = $this->getValueVisitorBased($visitorId, $options);
+        $selectedBucket = $this->selectBucketAnchored($this->getBucketRanges($allocations), (float)$value);
+
+        if ($this->logManager) {
+            $this->logManager->debug('BucketingManager.getBucketForVisitorAnchored()', [
+                'visitorId' => $visitorId,
+                'experienceId' => $options['experienceId'] ?? '',
+                'bucketValue' => $value,
+                'selectedVariationId' => $selectedBucket,
+            ]);
+        }
+
+        if (!$selectedBucket) {
+            return null;
+        }
+
+        return [
+            'variationId' => $selectedBucket,
+            'bucketingAllocation' => $value,
+        ];
+    }
 }

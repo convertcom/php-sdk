@@ -40,4 +40,38 @@ interface BucketingManagerInterface
      * @return array{variationId: string, bucketingAllocation: int}|null Assignment result or null
      */
     public function getBucketForVisitor(array $buckets, string $visitorId, ?array $options = null): ?array;
+
+    /**
+     * Build the anchored bucket layout for a set of variation allocations (qs-01).
+     *
+     * Anchors are computed over the total weight of ALL entries (active and inactive) so
+     * that raising an experience's total allocation only ever grows arms (superset
+     * property) and never reshuffles an already-bucketed visitor into a different arm.
+     * Inactive (or explicit zero-allocation) entries keep their weight for anchor
+     * stability but get a zero-width range so they can never be selected.
+     *
+     * @param array<int, array{id: string, allocation: float, active: bool}> $allocations Variation allocations in config order
+     * @return array<int, array{id: string, anchor: float, width: float}>
+     */
+    public function getBucketRanges(array $allocations): array;
+
+    /**
+     * Select the variation whose anchored range contains the provided value.
+     *
+     * @param array<int, array{id: string, anchor: float, width: float}> $ranges Anchored bucket ranges (see getBucketRanges())
+     * @param float $value A normalized bucket value in [0, maxTraffic)
+     * @return string|null The selected variation ID, or null if no match
+     */
+    public function selectBucketAnchored(array $ranges, float $value): ?string;
+
+    /**
+     * Get an anchored bucket for the visitor (qs-01). Reuses the existing
+     * visitor-based hash value unchanged, then resolves it through the anchored layout.
+     *
+     * @param array<int, array{id: string, allocation: float, active: bool}> $allocations Variation allocations in config order
+     * @param string $visitorId The visitor's unique identifier
+     * @param array{seed?: int, experienceId?: string}|null $options Optional overrides
+     * @return array{variationId: string, bucketingAllocation: int}|null Assignment result or null
+     */
+    public function getBucketForVisitorAnchored(array $allocations, string $visitorId, ?array $options = null): ?array;
 }
