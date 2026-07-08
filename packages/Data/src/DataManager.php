@@ -430,7 +430,13 @@ final class DataManager implements DataManagerInterface
                 if (count($audiencesToCheck) > 0) {
                     $matchedAudiences = $this->filterMatchedRecordsWithRule(
                         $audiencesToCheck,
-                        $visitorProperties,
+                        // qs-03 gate widening (line 425) can reach this call with
+                        // $visitorProperties still null (no caller-supplied
+                        // properties at all). Coerce to [] here: the exclusion
+                        // path reads stored bucketing state via getData(), not
+                        // visitorProperties content, so an empty array is a safe,
+                        // behavior-preserving default (Gemini review R1).
+                        $visitorProperties ?? [],
                         'audience',
                         $identityField,
                         $visitorId
@@ -1410,7 +1416,7 @@ final class DataManager implements DataManagerInterface
                 // never modified (AC7); any item whose rule tree is NOT a sole
                 // bucketed_into_experience_key rule (every generic key/value rule shape
                 // in production today) is passed through completely unchanged below.
-                $exclusionRule = $visitorId !== null
+                $exclusionRule = ($visitorId !== null && is_array($item['rules']))
                     ? $this->_findSoleBucketedIntoExperienceKeyRule($item['rules'])
                     : null;
 
@@ -1460,7 +1466,7 @@ final class DataManager implements DataManagerInterface
     private function _audiencesContainBucketedIntoExperienceKeyRule(array $audiences): bool
     {
         foreach ($audiences as $audience) {
-            if (!empty($audience['rules']) && $this->_findSoleBucketedIntoExperienceKeyRule($audience['rules']) !== null) {
+            if (!empty($audience['rules']) && is_array($audience['rules']) && $this->_findSoleBucketedIntoExperienceKeyRule($audience['rules']) !== null) {
                 return true;
             }
         }
@@ -1540,7 +1546,7 @@ final class DataManager implements DataManagerInterface
         } else {
             $visitorData = $this->getData($visitorId) ?? [];
             $bucketingData = $visitorData['bucketing'] ?? [];
-            $bucketedRaw = array_key_exists((string)$target['id'], $bucketingData);
+            $bucketedRaw = array_key_exists((string)($target['id'] ?? ''), $bucketingData);
         }
 
         $syntheticKey = '__convertSdk_bucketedIntoExperienceKey';

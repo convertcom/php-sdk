@@ -128,4 +128,61 @@ final class MutualExclusionRuleResolutionTest extends TestCase
             );
         }
     }
+
+    /**
+     * Regression test (Gemini review R1, post-qs-03 merge): mirrors fixture
+     * row 4 (bucketed into exp-a, negated exclusion rule targeting exp-a,
+     * expectedMatched=false) but constructs BucketingAttributes WITHOUT ever
+     * setting visitorProperties, so the internal field is genuinely `null`
+     * (every other row/test in this file uses `[]`). This is a real,
+     * previously-untested caller path: the qs-03 gate widening at
+     * DataManager.php:425 (`if ($visitorProperties || $hasBucketingExclusionAudience)`)
+     * lets execution reach filterMatchedRecordsWithRule() even when
+     * $visitorProperties is null, and that call site used to forward
+     * $visitorProperties as-is into filterMatchedRecordsWithRule()'s
+     * non-nullable `array $visitorProperties` parameter — a reachable
+     * TypeError. Asserts both that no TypeError is thrown AND that the
+     * negated-exclusion outcome is correct (mirrors row 4's expectedMatched).
+     */
+    public function testNullVisitorPropertiesDoesNotThrowOnNegatedExclusion(): void
+    {
+        $visitorId = 'mx-null-visitor-properties';
+        $configData = MutualExclusionAudienceBuilder::withUnderTestExperience(
+            MutualExclusionAudienceBuilder::loadBaseConfigData(),
+            MutualExclusionFixture::EXPERIENCE_A_KEY,
+            true
+        );
+
+        $built = MutualExclusionDataManagerFactory::build($configData);
+        $dataManager = $built['dataManager'];
+        $ruleManager = $built['ruleManager'];
+
+        $dataManager->putData($visitorId, ['bucketing' => [
+            MutualExclusionFixture::EXPERIENCE_A_ID => MutualExclusionFixture::VARIATION_A_ID,
+        ]]);
+
+        $result = $dataManager->matchRulesByField(
+            $visitorId,
+            MutualExclusionAudienceBuilder::UNDER_TEST_EXPERIENCE_KEY,
+            IdentityField::KEY,
+            new BucketingAttributes([
+                'ignoreLocationProperties' => true,
+                // visitorProperties intentionally omitted -> genuinely null,
+                // not [] -- reproduces the previously-untested caller path.
+            ])
+        );
+
+        self::assertNull(
+            $result,
+            'Visitor already bucketed into exp-a must be excluded by the negated rule '
+                . '(matches fixture row 4) even when visitorProperties was never set (null, not []).'
+        );
+
+        self::assertGreaterThan(
+            0,
+            $ruleManager->isRuleMatchedCallCount,
+            'RuleManager::isRuleMatched() must be invoked even with null visitorProperties '
+                . 'once the audience carries a bucketed_into_experience_key rule.'
+        );
+    }
 }
