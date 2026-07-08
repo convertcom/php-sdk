@@ -1534,7 +1534,7 @@ final class DataManager implements DataManagerInterface
         if ($target === null) {
             $this->_loggerManager?->warn(
                 'DataManager.filterMatchedRecordsWithRule()',
-                str_replace('#', $targetKey, ErrorMessages::BUCKETING_EXCLUSION_TARGET_NOT_FOUND)
+                str_replace('#', $targetKey, Messages::BUCKETING_EXCLUSION_TARGET_NOT_FOUND)
             );
             $bucketedRaw = false;
         } else {

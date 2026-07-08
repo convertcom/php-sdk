@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
-use ConvertSdk\Enums\ErrorMessages;
+use ConvertSdk\Enums\Messages;
 use ConvertSdk\Enums\RuleType;
 use PHPUnit\Framework\TestCase;
 
@@ -20,7 +20,7 @@ class MutualExclusionRuleConstantsTest extends TestCase
 {
     public function testBucketingExclusionTargetNotFoundContainsPlaceholder(): void
     {
-        $this->assertStringContainsString('#', ErrorMessages::BUCKETING_EXCLUSION_TARGET_NOT_FOUND);
+        $this->assertStringContainsString('#', Messages::BUCKETING_EXCLUSION_TARGET_NOT_FOUND);
     }
 
     public function testRuleTypeBucketedIntoExperienceKeyValue(): void

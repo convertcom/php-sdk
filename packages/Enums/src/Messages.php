@@ -66,4 +66,7 @@ final class Messages
     // qs-02 capability (B) preview input
     public const PREVIEW_EXPERIENCE_NOT_FOUND = 'Preview experience not found in config or via exp= fetch';
     public const PREVIEW_VARIATION_NOT_FOUND = 'Preview variation not found on the resolved experience';
+
+    // qs-03 (mutual-exclusion audience rule, bucketed_into_experience_key) — AC8
+    public const BUCKETING_EXCLUSION_TARGET_NOT_FOUND = 'Mutual exclusion target experience key "#" not found in config';
 }
