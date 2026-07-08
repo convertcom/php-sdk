@@ -22,4 +22,7 @@ final class ErrorMessages
     public const UNABLE_TO_SELECT_BUCKET_FOR_VISITOR = 'Unable to bucket visitor';
     public const UNABLE_TO_PERFORM_NETWORK_REQUEST = 'Unable to perform network request';
     public const UNSUPPORTED_RESPONSE_TYPE = 'Unsupported response type';
+
+    // qs-03 (mutual-exclusion audience rule, bucketed_into_experience_key) — AC8
+    public const BUCKETING_EXCLUSION_TARGET_NOT_FOUND = 'Mutual exclusion target experience key "#" not found in config';
 }
