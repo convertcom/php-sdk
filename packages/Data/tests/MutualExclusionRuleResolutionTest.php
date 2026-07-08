@@ -122,7 +122,7 @@ final class MutualExclusionRuleResolutionTest extends TestCase
                 $logManager->hasWarnContaining($ruleValue),
                 sprintf(
                     'Expected a warn log naming unresolved target key "%s" '
-                        . '(ErrorMessages::BUCKETING_EXCLUSION_TARGET_NOT_FOUND, AC8).',
+                        . '(Messages::BUCKETING_EXCLUSION_TARGET_NOT_FOUND, AC8).',
                     $ruleValue
                 )
             );
