@@ -451,18 +451,19 @@ final class MutualExclusionAudienceBuilder
     }
 
     /**
-     * AC1/AC4/AC8/AC5: appends a synthetic "exp-under-test" experience whose
-     * SOLE audience is the exclusion rule — isolated from exp-a/exp-b so the
-     * fixture's bucketing-map rows never interact with exp-under-test's own
-     * bucketing state.
+     * Shared shape for the synthetic "exp-under-test" experience, parameterized
+     * only by which audience id(s) it carries. Used by both
+     * withUnderTestExperience() (exclusion-rule audience) and
+     * withGenericOnlyUnderTestExperience() (AC7 regression lock — generic-only
+     * audience, no exclusion rule anywhere in the tree) so the two stay in
+     * lockstep and avoid duplicating this ~15-line fixture shape.
      *
-     * @param array<string, mixed> $configData
+     * @param array<int, string> $audienceIds
      * @return array<string, mixed>
      */
-    public static function withUnderTestExperience(array $configData, string $ruleValue, bool $negated): array
+    private static function underTestExperienceShape(array $audienceIds): array
     {
-        $configData['audiences'][] = self::exclusionOnlyAudience($ruleValue, $negated);
-        $configData['experiences'][] = [
+        return [
             'id' => self::UNDER_TEST_EXPERIENCE_ID,
             'name' => 'Mutual Exclusion Under Test',
             'key' => self::UNDER_TEST_EXPERIENCE_KEY,
@@ -470,7 +471,7 @@ final class MutualExclusionAudienceBuilder
             'version' => 6,
             'status' => 'active',
             'environments' => ['live', 'staging'],
-            'audiences' => [self::EXCLUSION_AUDIENCE_ID],
+            'audiences' => $audienceIds,
             'settings' => ['matching_options' => ['audiences' => GenericListMatchingOptions::ALL]],
             'variations' => [[
                 'id' => self::UNDER_TEST_VARIATION_ID,
@@ -482,6 +483,41 @@ final class MutualExclusionAudienceBuilder
                 'traffic_allocation' => 100.0,
             ]],
         ];
+    }
+
+    /**
+     * AC1/AC4/AC8/AC5: appends a synthetic "exp-under-test" experience whose
+     * SOLE audience is the exclusion rule — isolated from exp-a/exp-b so the
+     * fixture's bucketing-map rows never interact with exp-under-test's own
+     * bucketing state.
+     *
+     * @param array<string, mixed> $configData
+     * @return array<string, mixed>
+     */
+    public static function withUnderTestExperience(array $configData, string $ruleValue, bool $negated): array
+    {
+        $configData['audiences'][] = self::exclusionOnlyAudience($ruleValue, $negated);
+        $configData['experiences'][] = self::underTestExperienceShape([self::EXCLUSION_AUDIENCE_ID]);
+        return $configData;
+    }
+
+    /**
+     * AC7 (generic-rule regression lock): appends the SAME synthetic
+     * "exp-under-test" experience shape, but with a SOLE audience that carries
+     * only a generic key/value rule — no bucketed_into_experience_key rule
+     * anywhere in the tree. Used to lock that the qs-03 gate widening at
+     * DataManager.php:410-425 (`$visitorProperties || $hasBucketingExclusionAudience`)
+     * stays scoped strictly to exclusion audiences: a generic-only audience
+     * evaluated with empty visitorProperties must still resolve to null, exactly
+     * as the pre-qs-03 `if ($visitorProperties)` gate did.
+     *
+     * @param array<string, mixed> $configData
+     * @return array<string, mixed>
+     */
+    public static function withGenericOnlyUnderTestExperience(array $configData, string $key, string $value): array
+    {
+        $configData['audiences'][] = self::genericOnlyAudience($key, $value);
+        $configData['experiences'][] = self::underTestExperienceShape([self::GENERIC_AUDIENCE_ID]);
         return $configData;
     }
 
