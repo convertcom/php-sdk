@@ -59,6 +59,19 @@ class BucketingAttributes
     public $ignoreLocationProperties;
 
     /**
+     * qs-02 capability (B) preview input — per-context suppression signal.
+     * When true, DataManager suppresses ALL visitor-state persistence writes
+     * (putData()) and ALL tracking-event enqueues for this call, regardless of
+     * `enableTracking` (which only gates the bucketing-event enqueue, not
+     * persistence). Set by Context on every forwarded call once
+     * `setPreview()` has resolved successfully — never exposed as a public
+     * per-call override.
+     *
+     * @var bool|null
+     */
+    public $suppressPersistence;
+
+    /**
      * Constructor to initialize the object with data.
      *
      * @param array $data Associative array of property values
@@ -74,6 +87,7 @@ class BucketingAttributes
         $this->forceVariationId = $data['forceVariationId'] ?? null;
         $this->enableTracking = $data['enableTracking'] ?? null;
         $this->ignoreLocationProperties = $data['ignoreLocationProperties'] ?? null;
+        $this->suppressPersistence = $data['suppressPersistence'] ?? null;
     }
 
     /**
@@ -271,6 +285,28 @@ class BucketingAttributes
     public function setIgnoreLocationProperties(?bool $ignoreLocationProperties): self
     {
         $this->ignoreLocationProperties = $ignoreLocationProperties;
+        return $this;
+    }
+
+    /**
+     * Get whether visitor-state persistence and tracking enqueues are suppressed.
+     *
+     * @return bool|null
+     */
+    public function getSuppressPersistence(): ?bool
+    {
+        return $this->suppressPersistence;
+    }
+
+    /**
+     * Set whether visitor-state persistence and tracking enqueues are suppressed.
+     *
+     * @param bool|null $suppressPersistence
+     * @return self
+     */
+    public function setSuppressPersistence(?bool $suppressPersistence): self
+    {
+        $this->suppressPersistence = $suppressPersistence;
         return $this;
     }
 }

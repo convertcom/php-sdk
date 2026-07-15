@@ -49,6 +49,15 @@ class Config
     /** @var ?string Optional SDK key secret */
     private ?string $sdkKeySecret = null;
 
+    /**
+     * Optional QA/preview debug token (qs-02 capability A). When set, every
+     * config-fetch URL carries `debug_token=<value>` and `_conv_low_cache=1`
+     * (forced), and the SDK-side config cache is bypassed entirely.
+     *
+     * @var ?string
+     */
+    private ?string $debugToken = null;
+
     /** @var ?ConfigResponseData Configuration data from API */
     private ?ConfigResponseData $data = null;
 
@@ -105,6 +114,9 @@ class Config
         $this->logger = isset($options['logger']) && is_array($options['logger']) ? $options['logger'] : null;
         $this->network = isset($options['network']) && is_array($options['network']) ? $options['network'] : null;
         $this->mapper = isset($options['mapper']) && is_callable($options['mapper']) ? $options['mapper'] : null;
+        $this->debugToken = isset($options['debugToken']) && is_string($options['debugToken']) && $options['debugToken'] !== ''
+            ? $options['debugToken']
+            : null;
     }
 
     // Getters
@@ -168,6 +180,11 @@ class Config
     public function getSdkKeySecret(): ?string
     {
         return $this->sdkKeySecret;
+    }
+
+    public function getDebugToken(): ?string
+    {
+        return $this->debugToken;
     }
 
     public function getData(): ?ConfigResponseData
