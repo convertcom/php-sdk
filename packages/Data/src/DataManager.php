@@ -16,6 +16,7 @@ use ConvertSdk\Enums\DataEntities;
 use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\Enums\RuleError;
+use ConvertSdk\Enums\RuleType;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\ApiManagerInterface;
@@ -405,10 +406,23 @@ final class DataManager implements DataManagerInterface
         $segmentsMatched = false;
 
         if (isset($experience['audiences']) && is_array($experience['audiences']) && count($experience['audiences']) > 0) {
+            // Hoisted above the visitorProperties gate below: getItemsByIds() is a
+            // pure config lookup (no side effects), so fetching it unconditionally
+            // lets us inspect the fetched audiences' rule trees for a
+            // bucketed_into_experience_key rule (qs-03) before deciding whether the
+            // empty-visitorProperties gate applies.
+            $audiences = $this->getItemsByIds($experience['audiences'], 'audiences');
+            // qs-03 (mutual-exclusion audience rule): a bucketed_into_experience_key
+            // rule resolves against SDK-stored visitor bucketing state, not
+            // caller-supplied visitor properties, so it must still be evaluated when
+            // $visitorProperties is empty (AC4 "zero new application inputs").
+            $hasBucketingExclusionAudience = $this->_audiencesContainBucketedIntoExperienceKeyRule($audiences);
             // In PHP, an empty array [] is falsy (unlike JS where {} is truthy).
-            // This check correctly requires non-empty visitorProperties to evaluate audience rules.
-            if ($visitorProperties) {
-                $audiences = $this->getItemsByIds($experience['audiences'], 'audiences');
+            // This check correctly requires non-empty visitorProperties to evaluate audience rules
+            // -- UNLESS the audience carries a bucketed_into_experience_key rule, which reads
+            // stored bucketing state instead of visitor properties (qs-03 AC4). Generic-only
+            // audiences (no such rule) keep today's exact gate behavior (AC7).
+            if ($visitorProperties || $hasBucketingExclusionAudience) {
                 $audiencesToCheck = array_filter(
                     $audiences,
                     fn ($audience) => !($isBucketed && $audience['type'] === ConfigAudienceTypes::PERMANENT)
@@ -416,9 +430,16 @@ final class DataManager implements DataManagerInterface
                 if (count($audiencesToCheck) > 0) {
                     $matchedAudiences = $this->filterMatchedRecordsWithRule(
                         $audiencesToCheck,
-                        $visitorProperties,
+                        // qs-03 gate widening (line 425) can reach this call with
+                        // $visitorProperties still null (no caller-supplied
+                        // properties at all). Coerce to [] here: the exclusion
+                        // path reads stored bucketing state via getData(), not
+                        // visitorProperties content, so an empty array is a safe,
+                        // behavior-preserving default (Gemini review R1).
+                        $visitorProperties ?? [],
                         'audience',
-                        $identityField
+                        $identityField,
+                        $visitorId
                     );
                     $matchedErrors = array_filter($matchedAudiences, fn ($match) => $match instanceof RuleError);
                     if (count($matchedErrors) > 0) {
@@ -443,8 +464,9 @@ final class DataManager implements DataManagerInterface
                     );
                 }
             }
-            // If visitorProperties is null/empty and experience has audiences,
-            // audiencesMatched stays false — can't evaluate without properties
+            // If visitorProperties is null/empty, no bucketed_into_experience_key
+            // audience is present, and the experience has (other) audiences,
+            // audiencesMatched stays false — can't evaluate without properties.
         } else {
             // No audiences on experience — all visitors qualify
             $audiencesMatched = true;
@@ -1352,13 +1374,18 @@ final class DataManager implements DataManagerInterface
      * @param array $visitorProperties Associative array of visitor properties
      * @param string $entityType Type of entity being filtered (e.g., 'audience')
      * @param string $field Identity field to use, defaults to 'id'
+     * @param string|null $visitorId qs-03: required only when an item's rule tree is a
+     *     sole bucketed_into_experience_key rule, to resolve against SDK-stored
+     *     visitor bucketing state instead of $visitorProperties. Null for callers
+     *     that never carry such a rule (RuleManager path is untouched for them).
      * @return array Array of matched items or RuleError instances
      */
     public function filterMatchedRecordsWithRule(
         array $items,
         array $visitorProperties,
         string $entityType,
-        string $field = IdentityField::ID
+        string $field = IdentityField::ID,
+        ?string $visitorId = null
     ): array {
         $this->_loggerManager?->trace(
             'DataManager.filterMatchedRecordsWithRule()',
@@ -1377,11 +1404,36 @@ final class DataManager implements DataManagerInterface
                     continue;
                 }
 
-                $match = $this->_ruleManager->isRuleMatched(
-                    $visitorProperties,
-                    new RuleObject($item['rules']),
-                    StringUtils::camelCase($entityType) . " #{$item[$field]}"
-                );
+                // qs-03 (mutual-exclusion audience rule): a bucketed_into_experience_key
+                // rule resolves against SDK-stored visitor bucketing state instead of
+                // $visitorProperties. It is resolved read-only here (getEntity() +
+                // getData(), no bucketing/writes/tracking) into a raw boolean, then
+                // routed through the SAME untouched isRuleMatched() generic key/value
+                // dispatch every other rule uses — via a synthetic single-key data/rule
+                // pair whose 'equals' comparison reproduces `matching.negated ? !raw :
+                // raw` using RuleManager's own (unmodified) negation logic
+                // (Comparisons::equals()/returnNegationCheck()). RuleManager itself is
+                // never modified (AC7); any item whose rule tree is NOT a sole
+                // bucketed_into_experience_key rule (every generic key/value rule shape
+                // in production today) is passed through completely unchanged below.
+                $exclusionRule = ($visitorId !== null && is_array($item['rules']))
+                    ? $this->_findSoleBucketedIntoExperienceKeyRule($item['rules'])
+                    : null;
+
+                if ($exclusionRule !== null) {
+                    [$ruleData, $ruleObject] = $this->_buildBucketedIntoExperienceKeyRuleMatch($exclusionRule, $visitorId);
+                    $match = $this->_ruleManager->isRuleMatched(
+                        $ruleData,
+                        $ruleObject,
+                        StringUtils::camelCase($entityType) . " #{$item[$field]}"
+                    );
+                } else {
+                    $match = $this->_ruleManager->isRuleMatched(
+                        $visitorProperties,
+                        new RuleObject($item['rules']),
+                        StringUtils::camelCase($entityType) . " #{$item[$field]}"
+                    );
+                }
 
                 if ($match === true) {
                     $matchedRecords[] = $item;
@@ -1400,6 +1452,120 @@ final class DataManager implements DataManagerInterface
         );
 
         return $matchedRecords;
+    }
+
+    /**
+     * qs-03: whether any of the given (already-fetched) audiences carries a
+     * bucketed_into_experience_key rule as its sole rule. Used to widen the
+     * DataManager.php empty-visitorProperties audience-evaluation gate SOLELY
+     * for experiences whose audience tree needs this rule type (AC4), while
+     * leaving the gate untouched for every generic-only audience (AC7).
+     *
+     * @param array<int, array<string, mixed>> $audiences
+     */
+    private function _audiencesContainBucketedIntoExperienceKeyRule(array $audiences): bool
+    {
+        foreach ($audiences as $audience) {
+            if (!empty($audience['rules']) && is_array($audience['rules']) && $this->_findSoleBucketedIntoExperienceKeyRule($audience['rules']) !== null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * qs-03: returns the rule element if $rulesTree contains EXACTLY ONE
+     * rule element in total and it is a bucketed_into_experience_key rule;
+     * otherwise null (including for mixed generic+exclusion trees, which are
+     * out of scope per qs-03-mutual-exclusion-rule.md's non-goals — no served
+     * config can yet emit one). Returning null routes the item through the
+     * untouched, generic isRuleMatched() path unchanged.
+     *
+     * @param array<string, mixed> $rulesTree The OR/AND/OR_WHEN rule tree
+     * @return array{rule_type: string, matching: array{match_type: string, negated: bool}, value: mixed}|null
+     */
+    private function _findSoleBucketedIntoExperienceKeyRule(array $rulesTree): ?array
+    {
+        $elements = $this->_collectRuleElements($rulesTree);
+        if (count($elements) === 1 && ($elements[0]['rule_type'] ?? null) === RuleType::BucketedIntoExperienceKey->value) {
+            return $elements[0];
+        }
+        return null;
+    }
+
+    /**
+     * qs-03: recursively collects every leaf rule element (identified by the
+     * presence of a `rule_type` key) anywhere within an OR/AND/OR_WHEN rule
+     * tree, regardless of nesting depth or shape.
+     *
+     * @param mixed $node
+     * @return array<int, array<string, mixed>>
+     */
+    private function _collectRuleElements(mixed $node): array
+    {
+        if (!is_array($node)) {
+            return [];
+        }
+        if (isset($node['rule_type'])) {
+            return [$node];
+        }
+        $elements = [];
+        foreach ($node as $value) {
+            if (is_array($value)) {
+                $elements = array_merge($elements, $this->_collectRuleElements($value));
+            }
+        }
+        return $elements;
+    }
+
+    /**
+     * qs-03: resolves a bucketed_into_experience_key rule element read-only
+     * (target lookup via getEntity(), presence check via getData() — never
+     * triggers bucketing of the target, never writes, never tracks — AC5),
+     * then builds a synthetic single-key $data/RuleObject pair that reproduces
+     * the contract's `matching.negated ? !bucketedRaw : bucketedRaw` via the
+     * SAME real, unmodified isRuleMatched() -> Comparisons::equals() negation
+     * logic every generic 'equals' rule already uses.
+     *
+     * Unknown target key -> bucketedRaw = false + AC8 warning naming the key.
+     *
+     * @param array{rule_type: string, matching: array{match_type: string, negated: bool}, value: mixed} $rule
+     * @return array{0: array<string, string>, 1: RuleObject}
+     */
+    private function _buildBucketedIntoExperienceKeyRuleMatch(array $rule, string $visitorId): array
+    {
+        $targetKey = (string)($rule['value'] ?? '');
+        $target = $this->getEntity($targetKey, 'experiences');
+
+        if ($target === null) {
+            $this->_loggerManager?->warn(
+                'DataManager.filterMatchedRecordsWithRule()',
+                str_replace('#', $targetKey, Messages::BUCKETING_EXCLUSION_TARGET_NOT_FOUND)
+            );
+            $bucketedRaw = false;
+        } else {
+            $visitorData = $this->getData($visitorId) ?? [];
+            $bucketingData = $visitorData['bucketing'] ?? [];
+            $bucketedRaw = array_key_exists((string)($target['id'] ?? ''), $bucketingData);
+        }
+
+        $syntheticKey = '__convertSdk_bucketedIntoExperienceKey';
+        $negated = (bool)($rule['matching']['negated'] ?? false);
+        $syntheticData = [$syntheticKey => $bucketedRaw ? 'true' : 'false'];
+        $syntheticRuleObject = new RuleObject([
+            'OR' => [
+                ['AND' => [
+                    ['OR_WHEN' => [[
+                        'rule_type' => RuleType::BucketedIntoExperienceKey->value,
+                        'key' => $syntheticKey,
+                        'matching' => ['match_type' => 'equals', 'negated' => $negated],
+                        'value' => 'true',
+                    ]]],
+                ]],
+            ],
+        ]);
+
+        return [$syntheticData, $syntheticRuleObject];
     }
 
     /**

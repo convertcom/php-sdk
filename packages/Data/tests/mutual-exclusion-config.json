@@ -1,0 +1,57 @@
+{
+  "environment": "staging",
+  "data": {
+    "account_id": "900000",
+    "project": {
+      "id": "900001",
+      "name": "qs-03 Mutual Exclusion Test Project",
+      "type": "fullstack"
+    },
+    "audiences": [],
+    "segments": [],
+    "features": [],
+    "goals": [],
+    "experiences": [
+      {
+        "id": "100111",
+        "name": "Mutual Exclusion Experience A",
+        "key": "exp-a",
+        "type": "a/b_fullstack",
+        "version": 6,
+        "status": "active",
+        "environments": ["live", "staging"],
+        "variations": [
+          {
+            "id": "100901",
+            "name": "Original",
+            "status": "running",
+            "is_baseline": true,
+            "changes": [],
+            "key": "100901-original",
+            "traffic_allocation": 100.0
+          }
+        ]
+      },
+      {
+        "id": "100222",
+        "name": "Mutual Exclusion Experience B",
+        "key": "exp-b",
+        "type": "a/b_fullstack",
+        "version": 6,
+        "status": "active",
+        "environments": ["live", "staging"],
+        "variations": [
+          {
+            "id": "100902",
+            "name": "Original",
+            "status": "running",
+            "is_baseline": true,
+            "changes": [],
+            "key": "100902-original",
+            "traffic_allocation": 100.0
+          }
+        ]
+      }
+    ]
+  }
+}
