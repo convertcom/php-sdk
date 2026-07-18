@@ -9,4 +9,5 @@ return [
     'feature_key_stats' => env('CONVERT_FEATURE_KEY_STATS', 'feature-4'),
     'goal_key' => env('CONVERT_GOAL_KEY', 'button-primary-click'),
     'segment_key' => env('CONVERT_SEGMENT_KEY', 'test-segment-1'),
+    'debug_token' => env('CONVERT_DEBUG_TOKEN'),
 ];

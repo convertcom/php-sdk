@@ -21,7 +21,7 @@ class ConvertServiceProvider extends ServiceProvider
                 directory: storage_path('framework/cache/convert'),
             ));
 
-            return ConvertSDK::create([
+            $sdkConfig = [
                 'sdkKey' => config('convert.sdk_key'),       // [ConvertSDK]
                 'cache' => $cache,                            // [ConvertSDK]
                 'environment' => config('convert.environment'), // [ConvertSDK]
@@ -29,7 +29,17 @@ class ConvertServiceProvider extends ServiceProvider
                     'logLevel' => LogLevel::Trace,
                     'customLoggers' => [$app->make(LoggerInterface::class)],
                 ],
-            ]);
+            ];
+
+            // [ConvertSDK] qs-16 QA capability — only pass debugToken when a non-empty
+            // token is configured; passing null/empty would needlessly disable the
+            // config cache (Core::fetchConfig() treats any non-empty string as "skip cache").
+            $debugToken = config('convert.debug_token');
+            if (is_string($debugToken) && $debugToken !== '') {
+                $sdkConfig['debugToken'] = $debugToken; // [ConvertSDK]
+            }
+
+            return ConvertSDK::create($sdkConfig);
         });
     }
 }
