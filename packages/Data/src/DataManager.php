@@ -1118,7 +1118,16 @@ final class DataManager implements DataManagerInterface
                         str_replace('#', "#{$identity}", Messages::LOCATION_MATCH)
                     );
 
-                    if (!in_array($identity, $locations, true) || $forceEvent) {
+                    if ((!in_array($identity, $locations, true) || $forceEvent) && !$suppressPersistence) {
+                        // qs-16 correction: JS mirrors this with a distinct `suppressEvents`
+                        // flag (data-manager.ts selectLocations(), gating only the
+                        // LOCATION_ACTIVATED/LOCATION_DEACTIVATED fires, independent of its
+                        // `enableStorage`). PHP's `suppressPersistence` is contractually
+                        // preview-exclusive (see LocationAttributes::$suppressPersistence
+                        // docblock — "never exposed as a public per-call override"), so it is
+                        // reused here to gate both event fires as well as the persistence
+                        // write, achieving the same zero-trace behavior with one flag instead
+                        // of two. Location matching/bookkeeping above is never gated.
                         $this->_eventManager->fire(
                             SystemEvents::LocationActivated,
                             [
@@ -1146,27 +1155,32 @@ final class DataManager implements DataManagerInterface
                     // Catch rule errors
                     $matchedRecords[] = $match;
                 } elseif ($match === false && in_array($identity, $locations, true)) {
-                    $this->_eventManager->fire(
-                        SystemEvents::LocationDeactivated,
-                        [
-                            'visitorId' => $visitorId,
-                            'location' => [
-                                'id' => $item['id'] ?? null,
-                                'key' => $item['key'] ?? null,
-                                'name' => $item['name'] ?? null,
+                    // qs-16 correction: gated on the same preview-exclusive
+                    // $suppressPersistence signal as LocationActivated above — mirrors JS's
+                    // separate `suppressEvents` flag (data-manager.ts selectLocations()).
+                    if (!$suppressPersistence) {
+                        $this->_eventManager->fire(
+                            SystemEvents::LocationDeactivated,
+                            [
+                                'visitorId' => $visitorId,
+                                'location' => [
+                                    'id' => $item['id'] ?? null,
+                                    'key' => $item['key'] ?? null,
+                                    'name' => $item['name'] ?? null,
+                                ],
                             ],
-                        ],
-                        null,
-                        true
-                    );
+                            null,
+                            true
+                        );
+                        $this->_loggerManager?->info(
+                            'DataManager.selectLocations()',
+                            str_replace('#', "#{$identity}", Messages::LOCATION_DEACTIVATED)
+                        );
+                    }
                     $locationIndex = array_search($identity, $locations, true);
                     if ($locationIndex !== false) {
                         array_splice($locations, $locationIndex, 1);
                     }
-                    $this->_loggerManager?->info(
-                        'DataManager.selectLocations()',
-                        str_replace('#', "#{$identity}", Messages::LOCATION_DEACTIVATED)
-                    );
                 }
             }
         }

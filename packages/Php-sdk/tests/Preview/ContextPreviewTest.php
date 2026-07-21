@@ -10,6 +10,7 @@ use ConvertSdk\Core;
 use ConvertSdk\DataManager;
 use ConvertSdk\DTO\BucketedFeature;
 use ConvertSdk\DTO\BucketedVariation;
+use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
@@ -178,6 +179,10 @@ class ContextPreviewTest extends TestCase
      * short-circuiting on the location gate before it ever would.
      */
     private const LOCATION_PROPERTIES = ['locationProperties' => ['url' => 'https://convert.com/']];
+    private const LOCATION_ID = '30001';
+    private const LOCATION_KEY = 'preview-location';
+    private const LOCATION_EXPERIENCE_ID = '9109';
+    private const LOCATION_EXPERIENCE_KEY = 'location-bearing-exp';
 
     private MockHttpClient $mockHttpClient;
     private Psr17Factory $psr17Factory;
@@ -205,18 +210,23 @@ class ContextPreviewTest extends TestCase
      *     an entry missing `experienceKey`), while keeping DataManager/ApiManager real so
      *     {@see \ConvertSdk\Context::setPreview()}'s resolution/persistence still exercises
      *     genuine code.
-     * @return array{core: Core, dataManager: DataManager, apiManager: ApiManager, cache: RecordingCache, dataStore: RecordingDataStore}
+     * @param array<int, array<string, mixed>> $locations Top-level config `locations`
+     *     entities (id/key/name/rules) — only referenced by fixtures whose `locations`
+     *     field names their `id` (see {@see locationBearingExperience()}).
+     * @return array{core: Core, dataManager: DataManager, apiManager: ApiManager, cache: RecordingCache, dataStore: RecordingDataStore, eventManager: EventManager}
      */
     private function buildRig(
         array $extraExperiences = [],
         array $features = [],
-        ?ExperienceManagerInterface $experienceManagerOverride = null
+        ?ExperienceManagerInterface $experienceManagerOverride = null,
+        array $locations = []
     ): array {
         $data = new ConfigResponseData([
             'account_id' => 'acct-1',
             'project' => ['id' => 'proj-1'],
             'experiences' => array_merge([$this->otherExperience()], $extraExperiences),
             'features' => $features,
+            'locations' => $locations,
             'goals' => [
                 ['id' => '7001', 'key' => self::GOAL_KEY, 'name' => 'Preview Goal', 'rules' => null],
             ],
@@ -277,7 +287,102 @@ class ContextPreviewTest extends TestCase
             'apiManager' => $apiManager,
             'cache' => $cache,
             'dataStore' => $dataStore,
+            'eventManager' => $eventManager,
         ];
+    }
+
+    /**
+     * Registers spies on SystemEvents::Bucketing, SystemEvents::Conversion,
+     * SystemEvents::LocationActivated, and SystemEvents::LocationDeactivated,
+     * capturing every fired payload. Used by the preview event-suppression
+     * tests (assert empty) and the non-preview regression/control test
+     * (assert non-empty) below.
+     *
+     * qs-16 correction: LocationActivated/LocationDeactivated are spied here too
+     * (not just Bucketing/Conversion) because JS SDK parity requires them
+     * suppressed under preview as well — see
+     * ../javascript-sdk/packages/data/src/data-manager.ts selectLocations()'s
+     * `suppressEvents` gate and every preview call site in
+     * ../javascript-sdk/packages/js-sdk/src/context.ts setting
+     * `suppressEvents: true` alongside `enableStorage: false`.
+     *
+     * @return \stdClass{bucketing: array<int, mixed>, conversion: array<int, mixed>, locationActivated: array<int, mixed>, locationDeactivated: array<int, mixed>}
+     */
+    private function attachEventSpies(EventManager $eventManager): \stdClass
+    {
+        $captured = new \stdClass();
+        $captured->bucketing = [];
+        $captured->conversion = [];
+        $captured->locationActivated = [];
+        $captured->locationDeactivated = [];
+        $eventManager->on(SystemEvents::Bucketing, function ($args) use ($captured) {
+            $captured->bucketing[] = $args;
+        });
+        $eventManager->on(SystemEvents::Conversion, function ($args) use ($captured) {
+            $captured->conversion[] = $args;
+        });
+        $eventManager->on(SystemEvents::LocationActivated, function ($args) use ($captured) {
+            $captured->locationActivated[] = $args;
+        });
+        $eventManager->on(SystemEvents::LocationDeactivated, function ($args) use ($captured) {
+            $captured->locationDeactivated[] = $args;
+        });
+        return $captured;
+    }
+
+    /**
+     * A location entity present in the config's top-level `locations` list —
+     * paired with {@see locationBearingExperience()}'s `locations: [id]` field.
+     * Matches when `locationProperties.url === 'https://convert.com/'` (the
+     * value {@see LOCATION_PROPERTIES} supplies), so running the paired
+     * experience with those properties genuinely reaches
+     * `DataManager::selectLocations()` and fires `LocationActivated` on first
+     * match — the only way to prove the qs-16 event-suppression gate end to
+     * end (a fixture without `locations`/`site_area` short-circuits into
+     * matchRulesByField()'s "not restricted" branch and never calls
+     * selectLocations() at all).
+     *
+     * @return array<string, mixed>
+     */
+    private function locationFixture(): array
+    {
+        return [
+            'id' => self::LOCATION_ID,
+            'key' => self::LOCATION_KEY,
+            'name' => 'Preview Location',
+            'rules' => [
+                'OR' => [
+                    ['AND' => [
+                        ['OR_WHEN' => [
+                            [
+                                'rule_type' => 'generic_key_value',
+                                'matching' => ['match_type' => 'matches', 'negated' => false],
+                                'key' => 'url',
+                                'value' => 'https://convert.com/',
+                            ],
+                        ]],
+                    ]],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * A location-restricted, audience-agnostic experience — a DIFFERENT experience
+     * from the preview target, so running it on an active preview context exercises
+     * "other experiences still decide (and location-match) normally" (AC6) while
+     * proving the location events themselves are zero-trace (qs-16 correction).
+     *
+     * @return array<string, mixed>
+     */
+    private function locationBearingExperience(): array
+    {
+        return $this->experienceFixture(self::LOCATION_EXPERIENCE_ID, self::LOCATION_EXPERIENCE_KEY, [
+            'locations' => [self::LOCATION_ID],
+        ], [
+            $this->variation(self::LOCATION_EXPERIENCE_ID . '-A', 'a'),
+            $this->variation(self::LOCATION_EXPERIENCE_ID . '-B', 'b'),
+        ]);
     }
 
     /**
@@ -659,6 +764,126 @@ class ContextPreviewTest extends TestCase
 
         $this->assertSame([], $this->trackRequests(), 'zero requests to the track endpoint across the full preview-context lifecycle, including shutdown flush');
         $this->assertSame(0, $rig['dataStore']->setCalls, 'zero visitor-state dataStore writes across the full preview-context lifecycle');
+    }
+
+    /**
+     * Remediation (post-qs-02): "zero-trace" also covers the in-process
+     * SystemEvents::Bucketing / SystemEvents::Conversion pub/sub — a
+     * preview-active context must never notify consumer listeners, not just
+     * skip network tracking / persistence. Exercises every surface that fires
+     * SystemEvents::Bucketing (runExperience() on the target AND a different
+     * experience, runExperiences(), runFeature(), runFeatures()) plus
+     * trackConversion()'s SystemEvents::Conversion — all on the SAME preview
+     * context — and asserts zero fires across the board.
+     *
+     * JS SDK parity confirmed directly against
+     * ../javascript-sdk/packages/js-sdk/src/context.ts: every run*() method
+     * gates its BUCKETING fire on `if (!this._preview)` and trackConversion()
+     * short-circuits entirely under preview (never reaching its CONVERSION
+     * fire).
+     *
+     * qs-16 correction: this test ALSO asserts zero
+     * SystemEvents::LocationActivated / LocationDeactivated fires under
+     * preview. A prior remediation pass wrongly concluded JS fires Location
+     * events regardless of preview, based on
+     * ../javascript-sdk/packages/data/src/data-manager.ts selectLocations()'s
+     * `enableStorage` docblock — that flag is persistence-only, but JS keeps a
+     * SEPARATE `suppressEvents` flag (declared alongside `enableStorage` on
+     * `packages/types/src/{BucketingAttributes,LocationAttributes}.ts`) that
+     * specifically gates the two event fires (`if (!suppressEvents) { fire(...) }`
+     * at data-manager.ts's LOCATION_ACTIVATED/LOCATION_DEACTIVATED sites), and
+     * every preview call site in context.ts sets `suppressEvents: true`
+     * alongside `enableStorage: false`. PHP reuses its single
+     * `suppressPersistence` flag (contractually preview-exclusive, per
+     * LocationAttributes::$suppressPersistence's docblock) to gate both the
+     * persistence write AND the two Location event fires in
+     * DataManager::selectLocations() — see the qs-16 fix there.
+     */
+    #[Test]
+    public function previewContextFiresZeroBucketingOrConversionEventsAcrossEveryRunMethod(): void
+    {
+        $targetId = '9108';
+        $targetKey = 'event-suppression-target-exp';
+        $target = $this->experienceFixture($targetId, $targetKey, ['status' => 'draft'], [
+            $this->variation('9108-A', 'a'),
+            $this->variation('9108-B', 'b'),
+        ]);
+
+        $rig = $this->buildRig(
+            [$this->featureCarryingExperience(), $this->locationBearingExperience()],
+            [$this->featureFixture()],
+            null,
+            [$this->locationFixture()]
+        );
+        $this->queueExpFetchResponse($target);
+        $captured = $this->attachEventSpies($rig['eventManager']);
+
+        $context = $rig['core']->createContext('preview-visitor-event-suppression');
+        $context->setPreview($targetId, '9108-B');
+
+        $forced = $context->runExperience($targetKey);
+        $this->assertInstanceOf(BucketedVariation::class, $forced, 'preview target must still force its decision');
+
+        $other = $context->runExperience(self::OTHER_EXPERIENCE_KEY, new BucketingAttributes(self::NO_LOCATION_GATE));
+        $this->assertInstanceOf(BucketedVariation::class, $other, 'a different experience must still decide normally on the same preview context');
+
+        // qs-16: a DIFFERENT, location-restricted experience must still location-match
+        // (AC6 "other experiences decide normally") while its LocationActivated fire
+        // is suppressed (zero-trace, corrected AC5).
+        $locationMatched = $context->runExperience(self::LOCATION_EXPERIENCE_KEY, new BucketingAttributes(self::LOCATION_PROPERTIES));
+        $this->assertInstanceOf(BucketedVariation::class, $locationMatched, 'the location-restricted experience must still location-match and decide normally on a preview context');
+
+        $all = $context->runExperiences(new BucketingAttributes(self::NO_LOCATION_GATE));
+        $this->assertNotEmpty($all, 'runExperiences() must actually bucket, not be blocked by a gate — otherwise this test would pass trivially');
+
+        $feature = $context->runFeature(self::FEATURE_KEY, new BucketingAttributes(self::LOCATION_PROPERTIES));
+        $this->assertInstanceOf(BucketedFeature::class, $feature, 'runFeature() must actually bucket, not be blocked by a gate');
+
+        $features = $context->runFeatures(new BucketingAttributes(self::LOCATION_PROPERTIES));
+        $this->assertNotEmpty($features, 'runFeatures() must actually bucket, not be blocked by a gate');
+
+        $context->trackConversion(self::GOAL_KEY);
+
+        $this->assertSame([], $captured->bucketing, 'zero SystemEvents::Bucketing fires across runExperience() (target + other), runExperiences(), runFeature(), and runFeatures() on a preview context');
+        $this->assertSame([], $captured->conversion, 'zero SystemEvents::Conversion fires from trackConversion() on a preview context');
+        $this->assertSame([], $captured->locationActivated, 'zero SystemEvents::LocationActivated fires on a preview context (qs-16 correction)');
+        $this->assertSame([], $captured->locationDeactivated, 'zero SystemEvents::LocationDeactivated fires on a preview context (qs-16 correction)');
+    }
+
+    /**
+     * Control/regression case for the fix above: a NORMAL (non-preview)
+     * context must keep firing SystemEvents::Bucketing, SystemEvents::Conversion,
+     * and (qs-16 correction) SystemEvents::LocationActivated exactly as before —
+     * proving the new `$this->previewExperience === null` / `suppressPersistence`
+     * gates do not suppress anything outside an active preview.
+     */
+    #[Test]
+    public function nonPreviewContextStillFiresBucketingAndConversionEventsNormally(): void
+    {
+        $rig = $this->buildRig(
+            [$this->featureCarryingExperience(), $this->locationBearingExperience()],
+            [$this->featureFixture()],
+            null,
+            [$this->locationFixture()]
+        );
+        $captured = $this->attachEventSpies($rig['eventManager']);
+
+        $context = $rig['core']->createContext('normal-visitor-event-regression');
+
+        $decision = $context->runExperience(self::OTHER_EXPERIENCE_KEY, new BucketingAttributes(self::NO_LOCATION_GATE));
+        $this->assertInstanceOf(BucketedVariation::class, $decision);
+
+        $locationMatched = $context->runExperience(self::LOCATION_EXPERIENCE_KEY, new BucketingAttributes(self::LOCATION_PROPERTIES));
+        $this->assertInstanceOf(BucketedVariation::class, $locationMatched);
+
+        $feature = $context->runFeature(self::FEATURE_KEY, new BucketingAttributes(self::LOCATION_PROPERTIES));
+        $this->assertInstanceOf(BucketedFeature::class, $feature);
+
+        $context->trackConversion(self::GOAL_KEY);
+
+        $this->assertNotEmpty($captured->bucketing, 'a normal non-preview context must still fire SystemEvents::Bucketing');
+        $this->assertNotEmpty($captured->conversion, 'a normal non-preview context must still fire SystemEvents::Conversion');
+        $this->assertNotEmpty($captured->locationActivated, 'a normal non-preview context must still fire SystemEvents::LocationActivated (qs-16 correction)');
     }
 
     /**

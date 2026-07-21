@@ -181,18 +181,11 @@ final class Context implements ContextInterface
 
         // qs-02 capability (B) preview input — force the resolved decision when
         // this experience key is the active preview target on this context.
+        // Remediation (post-qs-02): the previewed decision is forced, not a
+        // real bucketing outcome — never notify consumer listeners for it.
+        // Mirrors JS SDK's Context.runExperience(), which returns
+        // getPreviewDecision() directly with no BUCKETING fire at all.
         if ($this->previewExperience !== null && ($this->previewExperience['key'] ?? null) === $experienceKey) {
-            $this->eventManager->fire(
-                SystemEvents::Bucketing,
-                [
-                    'visitorId' => $this->visitorId,
-                    'experienceKey' => $experienceKey,
-                    'variationKey' => $this->previewDecision['key'] ?? null,
-                ],
-                null,
-                true
-            );
-
             return $this->mapToBucketedVariationDto($this->previewDecision);
         }
 
@@ -218,16 +211,22 @@ final class Context implements ContextInterface
             return null;
         }
 
-        $this->eventManager->fire(
-            SystemEvents::Bucketing,
-            [
-                'visitorId' => $this->visitorId,
-                'experienceKey' => $experienceKey,
-                'variationKey' => $result['key'] ?? null,
-            ],
-            null,
-            true
-        );
+        // Remediation (post-qs-02): suppress the in-process notification for
+        // the WHOLE context while a preview is active — mirrors JS SDK's
+        // `if (!this._preview)` gate, applied to every experience evaluated
+        // on this context, not just the previewed one.
+        if ($this->previewExperience === null) {
+            $this->eventManager->fire(
+                SystemEvents::Bucketing,
+                [
+                    'visitorId' => $this->visitorId,
+                    'experienceKey' => $experienceKey,
+                    'variationKey' => $result['key'] ?? null,
+                ],
+                null,
+                true
+            );
+        }
 
         return $this->mapToBucketedVariationDto($result);
     }
@@ -303,16 +302,21 @@ final class Context implements ContextInterface
             if (!is_array($variation)) {
                 continue;
             }
-            $this->eventManager->fire(
-                SystemEvents::Bucketing,
-                [
-                    'visitorId' => $this->visitorId,
-                    'experienceKey' => $variation['experienceKey'] ?? null,
-                    'variationKey' => $variation['key'] ?? null,
-                ],
-                null,
-                true
-            );
+            // Remediation (post-qs-02): same context-wide suppression as
+            // runExperience() above — applies to every entry in the bulk
+            // result, including the previewed experience's forced entry.
+            if ($this->previewExperience === null) {
+                $this->eventManager->fire(
+                    SystemEvents::Bucketing,
+                    [
+                        'visitorId' => $this->visitorId,
+                        'experienceKey' => $variation['experienceKey'] ?? null,
+                        'variationKey' => $variation['key'] ?? null,
+                    ],
+                    null,
+                    true
+                );
+            }
             $dtos[] = $this->mapToBucketedVariationDto($variation);
         }
 
@@ -370,19 +374,22 @@ final class Context implements ContextInterface
 
             $dto = $this->mapToBucketedFeatureDto($result);
 
-            // Fire event only for enabled features
+            // Fire event only for enabled features. Remediation (post-qs-02):
+            // also suppressed context-wide while a preview is active.
             if ($dto->status === FeatureStatus::Enabled) {
-                $this->eventManager->fire(
-                    SystemEvents::Bucketing,
-                    [
-                        'visitorId' => $this->visitorId,
-                        'experienceKey' => $result['experienceKey'] ?? null,
-                        'featureKey' => $key,
-                        'status' => $result['status'] ?? null,
-                    ],
-                    null,
-                    true
-                );
+                if ($this->previewExperience === null) {
+                    $this->eventManager->fire(
+                        SystemEvents::Bucketing,
+                        [
+                            'visitorId' => $this->visitorId,
+                            'experienceKey' => $result['experienceKey'] ?? null,
+                            'featureKey' => $key,
+                            'status' => $result['status'] ?? null,
+                        ],
+                        null,
+                        true
+                    );
+                }
             }
 
             return $dto;
@@ -395,17 +402,21 @@ final class Context implements ContextInterface
             }
             $dto = $this->mapToBucketedFeatureDto($feature);
             if ($dto->status === FeatureStatus::Enabled) {
-                $this->eventManager->fire(
-                    SystemEvents::Bucketing,
-                    [
-                        'visitorId' => $this->visitorId,
-                        'experienceKey' => $feature['experienceKey'] ?? null,
-                        'featureKey' => $key,
-                        'status' => $feature['status'] ?? null,
-                    ],
-                    null,
-                    true
-                );
+                // Remediation (post-qs-02): suppressed context-wide while a
+                // preview is active — the DTO is still returned regardless.
+                if ($this->previewExperience === null) {
+                    $this->eventManager->fire(
+                        SystemEvents::Bucketing,
+                        [
+                            'visitorId' => $this->visitorId,
+                            'experienceKey' => $feature['experienceKey'] ?? null,
+                            'featureKey' => $key,
+                            'status' => $feature['status'] ?? null,
+                        ],
+                        null,
+                        true
+                    );
+                }
                 return $dto;
             }
         }
@@ -470,8 +481,9 @@ final class Context implements ContextInterface
 
             $dto = $this->mapToBucketedFeatureDto($feature);
 
-            // Fire event only for enabled features
-            if ($dto->status === FeatureStatus::Enabled) {
+            // Fire event only for enabled features. Remediation (post-qs-02):
+            // also suppressed context-wide while a preview is active.
+            if ($dto->status === FeatureStatus::Enabled && $this->previewExperience === null) {
                 $this->eventManager->fire(
                     SystemEvents::Bucketing,
                     [
@@ -537,7 +549,13 @@ final class Context implements ContextInterface
         if ($triggered === false) {
             return false;
         }
-        if ($triggered) {
+        // Remediation (post-qs-02, found via sweep — not in the original
+        // Bucketing/Location scope): DataManager::convert() returns `true`
+        // regardless of $suppressPersistence (it only gates the goal-write
+        // and the sendConversion()/sendTransaction() enqueues), so this fire
+        // needs its own context-wide preview gate — the same defect class as
+        // the Bucketing fires above.
+        if ($triggered && $this->previewExperience === null) {
             $this->eventManager->fire(
                 SystemEvents::Conversion,
                 [
