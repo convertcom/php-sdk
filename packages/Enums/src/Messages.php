@@ -62,4 +62,11 @@ final class Messages
     public const NULL_RETURN_AUDIENCE_MISMATCH = 'Null return: visitor does not match audience rules';
     public const NULL_RETURN_LOCATION_MISMATCH = 'Null return: visitor does not match location rules';
     public const NULL_RETURN_EXPERIENCE_PAUSED = 'Null return: experience is paused/stopped';
+
+    // qs-02 capability (B) preview input
+    public const PREVIEW_EXPERIENCE_NOT_FOUND = 'Preview experience not found in config or via exp= fetch';
+    public const PREVIEW_VARIATION_NOT_FOUND = 'Preview variation not found on the resolved experience';
+
+    // qs-03 (mutual-exclusion audience rule, bucketed_into_experience_key) — AC8
+    public const BUCKETING_EXCLUSION_TARGET_NOT_FOUND = 'Mutual exclusion target experience key "#" not found in config';
 }

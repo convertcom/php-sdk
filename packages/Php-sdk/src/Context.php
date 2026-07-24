@@ -30,9 +30,11 @@ use ConvertSdk\Interfaces\ExperienceManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
 use ConvertSdk\Interfaces\LogManagerInterface;
 use ConvertSdk\Interfaces\SegmentsManagerInterface;
+use ConvertSdk\Preview\PreviewResolver;
 use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
+use Psr\SimpleCache\CacheInterface;
 
 /**
  * Provides visitor context for running experiences, features, and tracking conversions.
@@ -46,6 +48,30 @@ final class Context implements ContextInterface
     private ?array $visitorProperties = null;
 
     /**
+     * qs-02 capability (B) preview input — the resolved experience data for the
+     * current preview target (set via {@see setPreview()}), or null when no
+     * preview is active or the target could not be resolved (bad input →
+     * inert, per contract §2). A non-null value here is the SOLE source of
+     * truth for "is this context in preview mode" — it gates BOTH the forced
+     * decision in {@see runExperience()} AND the zero-trace persistence
+     * suppression forwarded to every DataManager call this context makes.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $previewExperience = null;
+
+    /**
+     * qs-02 capability (B) preview input — the pre-built forced decision for
+     * {@see $previewExperience}, computed once in {@see setPreview()} via
+     * {@see DataManagerInterface::buildPreviewDecision()} so a bad variationId
+     * is caught eagerly (both experience and variation validity are decided
+     * once, at setPreview() time — never re-derived per runExperience() call).
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $previewDecision = null;
+
+    /**
      * @param Config $config SDK configuration
      * @param string $visitorId Unique visitor identifier
      * @param EventManagerInterface $eventManager Event manager instance
@@ -56,6 +82,8 @@ final class Context implements ContextInterface
      * @param ApiManagerInterface $apiManager API manager instance
      * @param LogManagerInterface|null $loggerManager Optional logger manager instance
      * @param array<string, mixed>|null $visitorAttributes Initial visitor attributes for targeting
+     * @param CacheInterface|null $cache Optional PSR-16 cache, used for qs-02 preview-target
+     *     memoization (`preview_{experienceId}`, 60s TTL) — never the normal config cache
      *
      * @throws InvalidArgumentException If visitorId is empty
      */
@@ -70,6 +98,7 @@ final class Context implements ContextInterface
         private readonly ApiManagerInterface $apiManager,
         private readonly ?LogManagerInterface $loggerManager = null,
         ?array $visitorAttributes = null,
+        private readonly ?CacheInterface $cache = null,
     ) {
         if ($visitorId === '') {
             throw new InvalidArgumentException('Visitor ID must not be empty');
@@ -84,6 +113,53 @@ final class Context implements ContextInterface
             }
             $this->segmentsManager->putSegments($visitorId, $visitorAttributes);
         }
+    }
+
+    /**
+     * qs-02 capability (B) preview input — force this context to decide a
+     * specific variation for a specific experience, bypassing audiences,
+     * segments, locations, the environment check, experience status, variation
+     * status/traffic filters, stored decisions, and the bucketing hash.
+     *
+     * Resolution and variation validation both happen eagerly, here — not
+     * lazily inside runExperience() — so "the context behaves fully normally"
+     * on bad input (contract §2) is a single, context-wide decision rather
+     * than a per-call fallback. When resolution succeeds, this context
+     * becomes zero-trace for its ENTIRE lifetime (contract §2 "Zero-trace"):
+     * every runExperience()/runExperiences()/trackConversion() call this
+     * context makes afterwards suppresses visitor-state persistence and
+     * tracking enqueues, not just calls targeting $experienceId.
+     *
+     * Single preview target per context — calling this again overwrites the
+     * previous target (last-write-wins). Never leaks to other contexts: the
+     * resolved state lives entirely on this Context instance, never on the
+     * shared DataManager/ApiManager singletons.
+     *
+     * @param string $experienceId The experience id (numeric string)
+     * @param string $variationId The variation id to force (numeric string)
+     * @return void
+     */
+    public function setPreview(string $experienceId, string $variationId): void
+    {
+        $resolver = new PreviewResolver($this->dataManager, $this->apiManager, $this->cache, $this->loggerManager);
+        $experienceData = $resolver->resolveExperience($experienceId);
+
+        if ($experienceData === null) {
+            $this->previewExperience = null;
+            $this->previewDecision = null;
+            return;
+        }
+
+        $decision = $this->dataManager->buildPreviewDecision($experienceData, $variationId);
+        if ($decision === null) {
+            // Inert on bad input (contract §2) — DataManager already warned.
+            $this->previewExperience = null;
+            $this->previewDecision = null;
+            return;
+        }
+
+        $this->previewExperience = $experienceData;
+        $this->previewDecision = $decision;
     }
 
     /**
@@ -103,10 +179,25 @@ final class Context implements ContextInterface
             return null;
         }
 
+        // qs-02 capability (B) preview input — force the resolved decision when
+        // this experience key is the active preview target on this context.
+        // Remediation (post-qs-02): the previewed decision is forced, not a
+        // real bucketing outcome — never notify consumer listeners for it.
+        // Mirrors JS SDK's Context.runExperience(), which returns
+        // getPreviewDecision() directly with no BUCKETING fire at all.
+        if ($this->previewExperience !== null && ($this->previewExperience['key'] ?? null) === $experienceKey) {
+            return $this->mapToBucketedVariationDto($this->previewDecision);
+        }
+
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
         $forwardedData = $attributes ? get_object_vars($attributes) : [];
         $forwardedData['visitorProperties'] = $visitorProperties;
         $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
+        // qs-02: zero-trace across the WHOLE context once a preview is active —
+        // other experiences still decide normally, but never persist/track.
+        if ($this->previewExperience !== null) {
+            $forwardedData['suppressPersistence'] = true;
+        }
         $result = $this->experienceManager->selectVariation(
             $this->visitorId,
             $experienceKey,
@@ -120,16 +211,22 @@ final class Context implements ContextInterface
             return null;
         }
 
-        $this->eventManager->fire(
-            SystemEvents::Bucketing,
-            [
-                'visitorId' => $this->visitorId,
-                'experienceKey' => $experienceKey,
-                'variationKey' => $result['key'] ?? null,
-            ],
-            null,
-            true
-        );
+        // Remediation (post-qs-02): suppress the in-process notification for
+        // the WHOLE context while a preview is active — mirrors JS SDK's
+        // `if (!this._preview)` gate, applied to every experience evaluated
+        // on this context, not just the previewed one.
+        if ($this->previewExperience === null) {
+            $this->eventManager->fire(
+                SystemEvents::Bucketing,
+                [
+                    'visitorId' => $this->visitorId,
+                    'experienceKey' => $experienceKey,
+                    'variationKey' => $result['key'] ?? null,
+                ],
+                null,
+                true
+            );
+        }
 
         return $this->mapToBucketedVariationDto($result);
     }
@@ -154,27 +251,72 @@ final class Context implements ContextInterface
         $forwardedData = $attributes ? get_object_vars($attributes) : [];
         $forwardedData['visitorProperties'] = $visitorProperties;
         $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
+        // qs-02: zero-trace across the WHOLE context once a preview is active.
+        if ($this->previewExperience !== null) {
+            $forwardedData['suppressPersistence'] = true;
+        }
 
         $bucketedVariations = $this->experienceManager->selectVariations(
             $this->visitorId,
             new BucketingAttributes($forwardedData)
         );
 
+        // qs-02 capability (B) contract §3 precedence — "preview forcing beats
+        // stored decisions and normal bucketing for the target experience" is
+        // method-agnostic, so the bulk method must honor it too, not just
+        // runExperience(). Scoped to the in-config preview target: when the
+        // target experience is present in config and would normally decide
+        // (running, environment-matching — i.e. it already appears in
+        // $bucketedVariations), replace that entry with the forced decision,
+        // mirroring runExperience()'s short-circuit at ~line 184. An experience
+        // absent from this bulk result (out-of-config-only via ?exp= fetch, or
+        // blocked by a status/environment/traffic gate the preview would
+        // otherwise bypass) is intentionally NOT injected here — replicating
+        // runExperience()'s full gate bypass for the bulk method would require
+        // restructuring how this method sources per-experience decisions, which
+        // is out of scope for this fix (see qs-02 decision-audit remediation,
+        // Defect 3 note in the PHP SDK decision log).
+        if ($this->previewExperience !== null) {
+            // Source the key from the decision actually built by
+            // DataManager::buildPreviewDecision() (experienceKey ===
+            // ConfigExperience::getKey()) rather than the raw config
+            // experience — this is the authoritative key used to build the
+            // forced decision. Guard against null/empty: without it, a
+            // bucketed variation with a missing/null `experienceKey` would
+            // spuriously match null === null and be overwritten with the
+            // preview decision (mirrors the defensive idiom in
+            // ApiManager::redactDebugTokenForLog()'s null/empty-token guard).
+            $previewKey = $this->previewDecision['experienceKey'] ?? null;
+            if ($previewKey !== null && $previewKey !== '') {
+                foreach ($bucketedVariations as $index => $variation) {
+                    if (is_array($variation) && ($variation['experienceKey'] ?? null) === $previewKey) {
+                        $bucketedVariations[$index] = $this->previewDecision;
+                        break;
+                    }
+                }
+            }
+        }
+
         $dtos = [];
         foreach ($bucketedVariations as $variation) {
             if (!is_array($variation)) {
                 continue;
             }
-            $this->eventManager->fire(
-                SystemEvents::Bucketing,
-                [
-                    'visitorId' => $this->visitorId,
-                    'experienceKey' => $variation['experienceKey'] ?? null,
-                    'variationKey' => $variation['key'] ?? null,
-                ],
-                null,
-                true
-            );
+            // Remediation (post-qs-02): same context-wide suppression as
+            // runExperience() above — applies to every entry in the bulk
+            // result, including the previewed experience's forced entry.
+            if ($this->previewExperience === null) {
+                $this->eventManager->fire(
+                    SystemEvents::Bucketing,
+                    [
+                        'visitorId' => $this->visitorId,
+                        'experienceKey' => $variation['experienceKey'] ?? null,
+                        'variationKey' => $variation['key'] ?? null,
+                    ],
+                    null,
+                    true
+                );
+            }
             $dtos[] = $this->mapToBucketedVariationDto($variation);
         }
 
@@ -200,18 +342,25 @@ final class Context implements ContextInterface
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
 
+        $forwardedData = [
+            'visitorProperties' => $visitorProperties,
+            'locationProperties' => $attributes?->getLocationProperties(),
+            'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
+            'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
+                ? $attributes->getTypeCasting()
+                : true,
+            'environment' => $attributes?->getEnvironment() ?? $this->environment,
+        ];
+        // qs-02: zero-trace across the WHOLE context once a preview is active —
+        // runFeature() buckets every experience in config, not just a named one.
+        if ($this->previewExperience !== null) {
+            $forwardedData['suppressPersistence'] = true;
+        }
+
         $result = $this->featureManager->runFeature(
             $this->visitorId,
             $key,
-            new BucketingAttributes([
-                'visitorProperties' => $visitorProperties,
-                'locationProperties' => $attributes?->getLocationProperties(),
-                'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-                'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
-                    ? $attributes->getTypeCasting()
-                    : true,
-                'environment' => $attributes?->getEnvironment() ?? $this->environment,
-            ]),
+            new BucketingAttributes($forwardedData),
             $attributes?->getExperienceKeys()
         );
 
@@ -225,19 +374,22 @@ final class Context implements ContextInterface
 
             $dto = $this->mapToBucketedFeatureDto($result);
 
-            // Fire event only for enabled features
+            // Fire event only for enabled features. Remediation (post-qs-02):
+            // also suppressed context-wide while a preview is active.
             if ($dto->status === FeatureStatus::Enabled) {
-                $this->eventManager->fire(
-                    SystemEvents::Bucketing,
-                    [
-                        'visitorId' => $this->visitorId,
-                        'experienceKey' => $result['experienceKey'] ?? null,
-                        'featureKey' => $key,
-                        'status' => $result['status'] ?? null,
-                    ],
-                    null,
-                    true
-                );
+                if ($this->previewExperience === null) {
+                    $this->eventManager->fire(
+                        SystemEvents::Bucketing,
+                        [
+                            'visitorId' => $this->visitorId,
+                            'experienceKey' => $result['experienceKey'] ?? null,
+                            'featureKey' => $key,
+                            'status' => $result['status'] ?? null,
+                        ],
+                        null,
+                        true
+                    );
+                }
             }
 
             return $dto;
@@ -250,17 +402,21 @@ final class Context implements ContextInterface
             }
             $dto = $this->mapToBucketedFeatureDto($feature);
             if ($dto->status === FeatureStatus::Enabled) {
-                $this->eventManager->fire(
-                    SystemEvents::Bucketing,
-                    [
-                        'visitorId' => $this->visitorId,
-                        'experienceKey' => $feature['experienceKey'] ?? null,
-                        'featureKey' => $key,
-                        'status' => $feature['status'] ?? null,
-                    ],
-                    null,
-                    true
-                );
+                // Remediation (post-qs-02): suppressed context-wide while a
+                // preview is active — the DTO is still returned regardless.
+                if ($this->previewExperience === null) {
+                    $this->eventManager->fire(
+                        SystemEvents::Bucketing,
+                        [
+                            'visitorId' => $this->visitorId,
+                            'experienceKey' => $feature['experienceKey'] ?? null,
+                            'featureKey' => $key,
+                            'status' => $feature['status'] ?? null,
+                        ],
+                        null,
+                        true
+                    );
+                }
                 return $dto;
             }
         }
@@ -292,7 +448,7 @@ final class Context implements ContextInterface
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
 
-        $bucketedFeatures = $this->featureManager->runFeatures($this->visitorId, new BucketingAttributes([
+        $forwardedData = [
             'visitorProperties' => $visitorProperties,
             'locationProperties' => $attributes?->getLocationProperties(),
             'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
@@ -300,7 +456,14 @@ final class Context implements ContextInterface
                 ? $attributes->getTypeCasting()
                 : true,
             'environment' => $attributes?->getEnvironment() ?? $this->environment,
-        ]));
+        ];
+        // qs-02: zero-trace across the WHOLE context once a preview is active —
+        // runFeatures() buckets every experience in config.
+        if ($this->previewExperience !== null) {
+            $forwardedData['suppressPersistence'] = true;
+        }
+
+        $bucketedFeatures = $this->featureManager->runFeatures($this->visitorId, new BucketingAttributes($forwardedData));
 
         // Filter out RuleError results
         $matchedErrors = array_filter($bucketedFeatures, function ($match) {
@@ -318,8 +481,9 @@ final class Context implements ContextInterface
 
             $dto = $this->mapToBucketedFeatureDto($feature);
 
-            // Fire event only for enabled features
-            if ($dto->status === FeatureStatus::Enabled) {
+            // Fire event only for enabled features. Remediation (post-qs-02):
+            // also suppressed context-wide while a preview is active.
+            if ($dto->status === FeatureStatus::Enabled && $this->previewExperience === null) {
                 $this->eventManager->fire(
                     SystemEvents::Bucketing,
                     [
@@ -374,7 +538,9 @@ final class Context implements ContextInterface
             $attributes?->ruleData,
             $conversionData,
             $segments,
-            $attributes?->conversionSetting
+            $attributes?->conversionSetting,
+            // qs-02: zero-trace across the WHOLE context once a preview is active.
+            $this->previewExperience !== null
         );
 
         if ($triggered instanceof RuleError) {
@@ -383,7 +549,13 @@ final class Context implements ContextInterface
         if ($triggered === false) {
             return false;
         }
-        if ($triggered) {
+        // Remediation (post-qs-02, found via sweep — not in the original
+        // Bucketing/Location scope): DataManager::convert() returns `true`
+        // regardless of $suppressPersistence (it only gates the goal-write
+        // and the sendConversion()/sendTransaction() enqueues), so this fire
+        // needs its own context-wide preview gate — the same defect class as
+        // the Bucketing fires above.
+        if ($triggered && $this->previewExperience === null) {
             $this->eventManager->fire(
                 SystemEvents::Conversion,
                 [

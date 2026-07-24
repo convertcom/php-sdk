@@ -16,6 +16,7 @@ use ConvertSdk\Enums\DataEntities;
 use ConvertSdk\Enums\ErrorMessages;
 use ConvertSdk\Enums\Messages;
 use ConvertSdk\Enums\RuleError;
+use ConvertSdk\Enums\RuleType;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\Interfaces\EventManagerInterface;
 use ConvertSdk\Interfaces\ApiManagerInterface;
@@ -281,6 +282,10 @@ final class DataManager implements DataManagerInterface
         $locationProperties = $attributes->locationProperties ?? null;
         $ignoreLocationProperties = $attributes->ignoreLocationProperties ?? false;
         $environment = $attributes->environment ?? $this->_environment;
+        // qs-02 capability (B) preview input — per-context suppression signal,
+        // forwarded to selectLocations() below so a preview context's "other
+        // experiences evaluate normally" location matching never persists.
+        $suppressPersistence = $attributes->suppressPersistence ?? false;
 
         // Log trace information
         $this->_loggerManager?->trace(
@@ -354,6 +359,7 @@ final class DataManager implements DataManagerInterface
                     $matchedLocations = $this->selectLocations($visitorId, $locations, new LocationAttributes([
                         'locationProperties' => $locationProperties,
                         'identityField' => $identityField,
+                        'suppressPersistence' => $suppressPersistence,
                     ]));
                     $matchedErrors = array_filter($matchedLocations, fn ($match) => $match instanceof RuleError);
                     if (count($matchedErrors) > 0) {
@@ -400,10 +406,23 @@ final class DataManager implements DataManagerInterface
         $segmentsMatched = false;
 
         if (isset($experience['audiences']) && is_array($experience['audiences']) && count($experience['audiences']) > 0) {
+            // Hoisted above the visitorProperties gate below: getItemsByIds() is a
+            // pure config lookup (no side effects), so fetching it unconditionally
+            // lets us inspect the fetched audiences' rule trees for a
+            // bucketed_into_experience_key rule (qs-03) before deciding whether the
+            // empty-visitorProperties gate applies.
+            $audiences = $this->getItemsByIds($experience['audiences'], 'audiences');
+            // qs-03 (mutual-exclusion audience rule): a bucketed_into_experience_key
+            // rule resolves against SDK-stored visitor bucketing state, not
+            // caller-supplied visitor properties, so it must still be evaluated when
+            // $visitorProperties is empty (AC4 "zero new application inputs").
+            $hasBucketingExclusionAudience = $this->_audiencesContainBucketedIntoExperienceKeyRule($audiences);
             // In PHP, an empty array [] is falsy (unlike JS where {} is truthy).
-            // This check correctly requires non-empty visitorProperties to evaluate audience rules.
-            if ($visitorProperties) {
-                $audiences = $this->getItemsByIds($experience['audiences'], 'audiences');
+            // This check correctly requires non-empty visitorProperties to evaluate audience rules
+            // -- UNLESS the audience carries a bucketed_into_experience_key rule, which reads
+            // stored bucketing state instead of visitor properties (qs-03 AC4). Generic-only
+            // audiences (no such rule) keep today's exact gate behavior (AC7).
+            if ($visitorProperties || $hasBucketingExclusionAudience) {
                 $audiencesToCheck = array_filter(
                     $audiences,
                     fn ($audience) => !($isBucketed && $audience['type'] === ConfigAudienceTypes::PERMANENT)
@@ -411,9 +430,16 @@ final class DataManager implements DataManagerInterface
                 if (count($audiencesToCheck) > 0) {
                     $matchedAudiences = $this->filterMatchedRecordsWithRule(
                         $audiencesToCheck,
-                        $visitorProperties,
+                        // qs-03 gate widening (line 425) can reach this call with
+                        // $visitorProperties still null (no caller-supplied
+                        // properties at all). Coerce to [] here: the exclusion
+                        // path reads stored bucketing state via getData(), not
+                        // visitorProperties content, so an empty array is a safe,
+                        // behavior-preserving default (Gemini review R1).
+                        $visitorProperties ?? [],
                         'audience',
-                        $identityField
+                        $identityField,
+                        $visitorId
                     );
                     $matchedErrors = array_filter($matchedAudiences, fn ($match) => $match instanceof RuleError);
                     if (count($matchedErrors) > 0) {
@@ -438,8 +464,9 @@ final class DataManager implements DataManagerInterface
                     );
                 }
             }
-            // If visitorProperties is null/empty and experience has audiences,
-            // audiencesMatched stays false — can't evaluate without properties
+            // If visitorProperties is null/empty, no bucketed_into_experience_key
+            // audience is present, and the experience has (other) audiences,
+            // audiencesMatched stays false — can't evaluate without properties.
         } else {
             // No audiences on experience — all visitors qualify
             $audiencesMatched = true;
@@ -531,6 +558,8 @@ final class DataManager implements DataManagerInterface
         $enableTracking = $attributes->enableTracking ?? true;
         $ignoreLocationProperties = $attributes->ignoreLocationProperties ?? false;
         $environment = $attributes->environment ?? $this->_environment;
+        // qs-02 capability (B) preview input — per-context suppression signal.
+        $suppressPersistence = $attributes->suppressPersistence ?? false;
         // Log trace information
         $this->_loggerManager?->trace(
             'DataManager._getBucketingByField()',
@@ -557,6 +586,7 @@ final class DataManager implements DataManagerInterface
                 'locationProperties' => $locationProperties,
                 'ignoreLocationProperties' => $ignoreLocationProperties,
                 'environment' => $environment,
+                'suppressPersistence' => $suppressPersistence,
             ])
         );
         if ($experience) {
@@ -569,11 +599,92 @@ final class DataManager implements DataManagerInterface
                 $updateVisitorProperties,
                 new ConfigExperience($experience),
                 $forceVariationId,
-                $enableTracking
+                $enableTracking,
+                $suppressPersistence
             );
         }
 
         return null;
+    }
+
+    /**
+     * Shared "running + non-zero-traffic" active predicate used by BOTH the packed
+     * (buildPackedBuckets) and anchored (buildVariationAllocations) layout builders,
+     * so both layouts agree on activeness.
+     *
+     * @param array<string, mixed> $variation
+     */
+    private function isVariationActive(array $variation): bool
+    {
+        return (isset($variation['status']) ? $variation['status'] === VariationStatuses::RUNNING : true) &&
+            (array_key_exists('traffic_allocation', $variation) ?
+                ($variation['traffic_allocation'] > 0 || !is_numeric($variation['traffic_allocation'])) :
+                true);
+    }
+
+    /**
+     * Build buckets where key is variation id and value is traffic distribution
+     * (existing packed layout, experience version <= 11, missing, or non-numeric;
+     * byte-for-byte unchanged). Version 11 is the version stamped on every experience
+     * currently served in production (backend CURRENT_EXPERIENCE_VERSION), so this is
+     * the active path for all currently-running experiments.
+     *
+     * @param array<int, array<string, mixed>> $variations
+     * @return array<string, float|int>
+     * @private
+     */
+    private function buildPackedBuckets(array $variations): array
+    {
+        return array_reduce(
+            array_filter(
+                $variations,
+                fn ($variation) => $this->isVariationActive($variation)
+            ),
+            function ($carry, $variation) {
+                if (!empty($variation['id'])) {
+                    $carry[$variation['id']] = $variation['traffic_allocation'] ?? 100.0;
+                }
+                return $carry;
+            },
+            []
+        );
+    }
+
+    /**
+     * Build variation allocations for the anchored layout (qs-01, contract v12).
+     * Activates only once the served experience version is > 11 (i.e. >= 12, once the
+     * backend bumps CURRENT_EXPERIENCE_VERSION past its current value of 11).
+     * Inactive arms (stopped, or explicit zero traffic_allocation) keep their weight for
+     * anchor stability but are marked inactive so BucketingManager::getBucketRanges()
+     * gives them zero width. Uses the shared isVariationActive() predicate, also used
+     * by buildPackedBuckets(), so both layouts agree on activeness. See
+     * qs-01-anchored-bucketing-layout.md "The contract (normative)".
+     *
+     * @param array<int, array<string, mixed>> $variations
+     * @return array<int, array{id: string, allocation: float, active: bool}>
+     * @private
+     */
+    private function buildVariationAllocations(array $variations): array
+    {
+        $allocations = [];
+
+        foreach ($variations as $variation) {
+            if (empty($variation['id'])) {
+                continue;
+            }
+
+            $trafficAllocation = array_key_exists('traffic_allocation', $variation)
+                ? $variation['traffic_allocation']
+                : null;
+
+            $allocations[] = [
+                'id' => (string)$variation['id'],
+                'allocation' => is_numeric($trafficAllocation) ? (float)$trafficAllocation : 100.0,
+                'active' => $this->isVariationActive($variation),
+            ];
+        }
+
+        return $allocations;
     }
 
     /**
@@ -585,6 +696,9 @@ final class DataManager implements DataManagerInterface
      * @param ConfigExperience $experience
      * @param ?string $forceVariationId
      * @param bool $enableTracking Defaults to true
+     * @param bool $suppressPersistence qs-02 capability (B) preview input — when true,
+     *     suppresses the stored-decision write AND the bucketing-event enqueue
+     *     regardless of $enableTracking. Defaults to false.
      * @return mixed BucketedVariation array or BucketingError or null
      * @private
      */
@@ -594,7 +708,8 @@ final class DataManager implements DataManagerInterface
         ?bool $updateVisitorProperties,
         ConfigExperience $experience,
         ?string $forceVariationId = null,
-        bool $enableTracking = true
+        bool $enableTracking = true,
+        bool $suppressPersistence = false
     ): array|BucketingError|null {
         // Initial validation
         if (empty($visitorId) || $experience === null || empty($experience->getId())) {
@@ -651,33 +766,35 @@ final class DataManager implements DataManagerInterface
                 )
             );
         } else {
-            // Build buckets from variations
-            $buckets = array_reduce(
-                array_filter(
-                    $experience->getVariations(),
-                    fn ($variation) =>
-                      (isset($variation['status']) ? $variation['status'] === VariationStatuses::RUNNING : true) &&
-                      (array_key_exists('traffic_allocation', $variation) ?
-                          ($variation['traffic_allocation'] > 0 || !is_numeric($variation['traffic_allocation'])) :
-                          true)
-                ),
-                function ($carry, $variation) {
-                    if (!empty($variation['id'])) {
-                        $carry[$variation['id']] = $variation['traffic_allocation'] ?? 100.0;
-                    }
-                    return $carry;
-                },
-                []
-            );
+            // qs-01: anchored-vs-packed GATE. `experience.version > 11` runs the anchored
+            // layout (contract v12); version <= 11, missing, or non-numeric keeps the
+            // existing packed cumulative walk unchanged -- this is every currently-served
+            // production experience (backend CURRENT_EXPERIENCE_VERSION = 11). The SDK
+            // must never infer the layout from anything but this field. See
+            // qs-01-anchored-bucketing-layout.md "The contract (normative)".
+            $version = $experience->getVersion();
+            $isAnchoredLayout = is_numeric($version) && (float)$version > 11;
+
             // Determine bucket for visitor
             $bucketingParams = $this->_config->bucketing->excludeExperienceIdHash ?? false
                 ? null
                 : ['experienceId' => (string)$experience->getId()];
-            $bucketing = $this->_bucketingManager->getBucketForVisitor(
-                $buckets,
-                $visitorId,
-                $bucketingParams
-            );
+
+            if ($isAnchoredLayout) {
+                $buckets = $this->buildVariationAllocations($experience->getVariations());
+                $bucketing = $this->_bucketingManager->getBucketForVisitorAnchored(
+                    $buckets,
+                    $visitorId,
+                    $bucketingParams
+                );
+            } else {
+                $buckets = $this->buildPackedBuckets($experience->getVariations());
+                $bucketing = $this->_bucketingManager->getBucketForVisitor(
+                    $buckets,
+                    $visitorId,
+                    $bucketingParams
+                );
+            }
 
             $variationId = $variationId ?? $bucketing['variationId'] ?? null;
             $bucketingAllocation = $bucketing['bucketingAllocation'] ?? null;
@@ -708,9 +825,12 @@ final class DataManager implements DataManagerInterface
             if ($updateVisitorProperties && !empty($visitorProperties)) {
                 $storeDataObj['segments'] = $visitorProperties;
             }
-            $this->putData($visitorId, $storeDataObj);
+            // qs-02: suppressed for a preview context — zero-trace, regardless of enableTracking.
+            if (!$suppressPersistence) {
+                $this->putData($visitorId, $storeDataObj);
+            }
             // Track bucketing event if enabled
-            if ($enableTracking) {
+            if ($enableTracking && !$suppressPersistence) {
                 $bucketingEvent = [
                     'experienceId' => (string)$experience->getId(),
                     'variationId' => (string)$variationId,
@@ -773,6 +893,66 @@ final class DataManager implements DataManagerInterface
             'id'
         );
         return $subItem !== null ? new ExperienceVariationConfig($subItem) : null;
+    }
+
+    /**
+     * Build a bucketed-variation array for a preview forced decision (qs-02
+     * capability B preview input), bypassing every normal gate — audiences,
+     * segments, locations, the environment check, experience status, variation
+     * status/traffic filters, stored decisions, and the bucketing hash. Pure:
+     * never calls putData() and never enqueues a tracking event, so it stays
+     * entirely per-context regardless of whether $experienceData came from the
+     * current shared config or from a one-off `?exp=` fetch — and never
+     * touches the shared entity list either way.
+     *
+     * @param array<string, mixed> $experienceData The experience data (from the current
+     *     config, or from a `?exp=` fetch response — same raw shape either way)
+     * @param string $variationId The variation id to force
+     * @return array<string, mixed>|null Same shape as a normal bucketed decision (see
+     *     _retrieveBucketing()), or null when $variationId does not exist on the given
+     *     experience — the caller (Context) treats this as inert bad input.
+     */
+    public function buildPreviewDecision(array $experienceData, string $variationId): ?array
+    {
+        $variationData = null;
+        foreach ($experienceData['variations'] ?? [] as $candidate) {
+            if (is_array($candidate) && (string)($candidate['id'] ?? '') === $variationId) {
+                $variationData = $candidate;
+                break;
+            }
+        }
+
+        if ($variationData === null) {
+            $this->_loggerManager?->warn(
+                'DataManager.buildPreviewDecision()',
+                Messages::PREVIEW_VARIATION_NOT_FOUND,
+                LogUtils::toLoggable(($this->_mapper)([
+                    'experienceId' => $experienceData['id'] ?? null,
+                    'variationId' => $variationId,
+                ]))
+            );
+            return null;
+        }
+
+        $experience = new ConfigExperience($experienceData);
+        $variation = new ExperienceVariationConfig($variationData);
+
+        return array_merge(
+            [
+                'experienceId' => $experience->getId(),
+                'experienceName' => $experience->getName(),
+                'experienceKey' => $experience->getKey(),
+            ],
+            ['bucketingAllocation' => null],
+            [
+                'id' => $variation->getId(),
+                'name' => $variation->getName(),
+                'key' => $variation->getKey(),
+                'traffic_allocation' => $variation->getTrafficAllocation(),
+                'status' => $variation->getStatus(),
+                'changes' => $variation->getChanges(),
+            ]
+        );
     }
 
     /**
@@ -903,6 +1083,8 @@ final class DataManager implements DataManagerInterface
         $locationProperties = $attributes->getLocationProperties();
         $identityField = $attributes->getIdentityField() ?? 'key';
         $forceEvent = $attributes->getForceEvent();
+        // qs-02 capability (B) preview input — per-context suppression signal.
+        $suppressPersistence = $attributes->getSuppressPersistence() ?? false;
 
         $this->_loggerManager?->trace(
             'DataManager.selectLocations()',
@@ -936,7 +1118,16 @@ final class DataManager implements DataManagerInterface
                         str_replace('#', "#{$identity}", Messages::LOCATION_MATCH)
                     );
 
-                    if (!in_array($identity, $locations, true) || $forceEvent) {
+                    if ((!in_array($identity, $locations, true) || $forceEvent) && !$suppressPersistence) {
+                        // qs-16 correction: JS mirrors this with a distinct `suppressEvents`
+                        // flag (data-manager.ts selectLocations(), gating only the
+                        // LOCATION_ACTIVATED/LOCATION_DEACTIVATED fires, independent of its
+                        // `enableStorage`). PHP's `suppressPersistence` is contractually
+                        // preview-exclusive (see LocationAttributes::$suppressPersistence
+                        // docblock — "never exposed as a public per-call override"), so it is
+                        // reused here to gate both event fires as well as the persistence
+                        // write, achieving the same zero-trace behavior with one flag instead
+                        // of two. Location matching/bookkeeping above is never gated.
                         $this->_eventManager->fire(
                             SystemEvents::LocationActivated,
                             [
@@ -964,33 +1155,40 @@ final class DataManager implements DataManagerInterface
                     // Catch rule errors
                     $matchedRecords[] = $match;
                 } elseif ($match === false && in_array($identity, $locations, true)) {
-                    $this->_eventManager->fire(
-                        SystemEvents::LocationDeactivated,
-                        [
-                            'visitorId' => $visitorId,
-                            'location' => [
-                                'id' => $item['id'] ?? null,
-                                'key' => $item['key'] ?? null,
-                                'name' => $item['name'] ?? null,
+                    // qs-16 correction: gated on the same preview-exclusive
+                    // $suppressPersistence signal as LocationActivated above — mirrors JS's
+                    // separate `suppressEvents` flag (data-manager.ts selectLocations()).
+                    if (!$suppressPersistence) {
+                        $this->_eventManager->fire(
+                            SystemEvents::LocationDeactivated,
+                            [
+                                'visitorId' => $visitorId,
+                                'location' => [
+                                    'id' => $item['id'] ?? null,
+                                    'key' => $item['key'] ?? null,
+                                    'name' => $item['name'] ?? null,
+                                ],
                             ],
-                        ],
-                        null,
-                        true
-                    );
+                            null,
+                            true
+                        );
+                        $this->_loggerManager?->info(
+                            'DataManager.selectLocations()',
+                            str_replace('#', "#{$identity}", Messages::LOCATION_DEACTIVATED)
+                        );
+                    }
                     $locationIndex = array_search($identity, $locations, true);
                     if ($locationIndex !== false) {
                         array_splice($locations, $locationIndex, 1);
                     }
-                    $this->_loggerManager?->info(
-                        'DataManager.selectLocations()',
-                        str_replace('#', "#{$identity}", Messages::LOCATION_DEACTIVATED)
-                    );
                 }
             }
         }
 
-        // Store the data
-        $this->putData($visitorId, ['locations' => $locations]);
+        // Store the data (qs-02: suppressed for a preview context — zero-trace)
+        if (!$suppressPersistence) {
+            $this->putData($visitorId, ['locations' => $locations]);
+        }
 
         $this->_loggerManager?->debug(
             'DataManager.selectLocations()',
@@ -1038,6 +1236,9 @@ final class DataManager implements DataManagerInterface
      * @param array|null $goalData Optional array of associative arrays containing goal data
      * @param VisitorSegments|null $segments Optional visitor segments object
      * @param array|null $conversionSetting Optional associative array of conversion settings
+     * @param bool $suppressPersistence qs-02 capability (B) preview input — when true,
+     *     suppresses the goal-triggered write AND the conversion/transaction
+     *     enqueue. Defaults to false.
      * @return bool|RuleError Returns true on success, or a RuleError instance on failure
      */
     public function convert(
@@ -1046,7 +1247,8 @@ final class DataManager implements DataManagerInterface
         ?array $goalRule = null,
         ?array $goalData = null,
         ?VisitorSegments $segments = null,
-        ?array $conversionSetting = null
+        ?array $conversionSetting = null,
+        bool $suppressPersistence = false
     ): bool|RuleError {
         // Retrieve the goal based on goalId type
         $goal = is_string($goalId)
@@ -1105,15 +1307,17 @@ final class DataManager implements DataManagerInterface
             }
         }
 
-        // Store the goal as triggered
-        $this->putData($visitorId, ['goals' => [$goalId => true]]);
+        // Store the goal as triggered (qs-02: suppressed for a preview context — zero-trace)
+        if (!$suppressPersistence) {
+            $this->putData($visitorId, ['goals' => [$goalId => true]]);
+        }
 
         // Send conversion event if goal wasn't previously triggered
-        if (!$goalTriggered) {
+        if (!$goalTriggered && !$suppressPersistence) {
             $this->sendConversion($visitorId, $goal['id'], $bucketingData, $segments);
         }
         // Send transaction event if goalData exists and conditions are met
-        if ($goalData !== null && (!$goalTriggered || $forceMultipleTransactions)) {
+        if ($goalData !== null && (!$goalTriggered || $forceMultipleTransactions) && !$suppressPersistence) {
             $this->sendTransaction($visitorId, $goal['id'], $goalData, $bucketingData, $segments);
         }
 
@@ -1184,13 +1388,18 @@ final class DataManager implements DataManagerInterface
      * @param array $visitorProperties Associative array of visitor properties
      * @param string $entityType Type of entity being filtered (e.g., 'audience')
      * @param string $field Identity field to use, defaults to 'id'
+     * @param string|null $visitorId qs-03: required only when an item's rule tree is a
+     *     sole bucketed_into_experience_key rule, to resolve against SDK-stored
+     *     visitor bucketing state instead of $visitorProperties. Null for callers
+     *     that never carry such a rule (RuleManager path is untouched for them).
      * @return array Array of matched items or RuleError instances
      */
     public function filterMatchedRecordsWithRule(
         array $items,
         array $visitorProperties,
         string $entityType,
-        string $field = IdentityField::ID
+        string $field = IdentityField::ID,
+        ?string $visitorId = null
     ): array {
         $this->_loggerManager?->trace(
             'DataManager.filterMatchedRecordsWithRule()',
@@ -1209,11 +1418,36 @@ final class DataManager implements DataManagerInterface
                     continue;
                 }
 
-                $match = $this->_ruleManager->isRuleMatched(
-                    $visitorProperties,
-                    new RuleObject($item['rules']),
-                    StringUtils::camelCase($entityType) . " #{$item[$field]}"
-                );
+                // qs-03 (mutual-exclusion audience rule): a bucketed_into_experience_key
+                // rule resolves against SDK-stored visitor bucketing state instead of
+                // $visitorProperties. It is resolved read-only here (getEntity() +
+                // getData(), no bucketing/writes/tracking) into a raw boolean, then
+                // routed through the SAME untouched isRuleMatched() generic key/value
+                // dispatch every other rule uses — via a synthetic single-key data/rule
+                // pair whose 'equals' comparison reproduces `matching.negated ? !raw :
+                // raw` using RuleManager's own (unmodified) negation logic
+                // (Comparisons::equals()/returnNegationCheck()). RuleManager itself is
+                // never modified (AC7); any item whose rule tree is NOT a sole
+                // bucketed_into_experience_key rule (every generic key/value rule shape
+                // in production today) is passed through completely unchanged below.
+                $exclusionRule = ($visitorId !== null && is_array($item['rules']))
+                    ? $this->_findSoleBucketedIntoExperienceKeyRule($item['rules'])
+                    : null;
+
+                if ($exclusionRule !== null) {
+                    [$ruleData, $ruleObject] = $this->_buildBucketedIntoExperienceKeyRuleMatch($exclusionRule, $visitorId);
+                    $match = $this->_ruleManager->isRuleMatched(
+                        $ruleData,
+                        $ruleObject,
+                        StringUtils::camelCase($entityType) . " #{$item[$field]}"
+                    );
+                } else {
+                    $match = $this->_ruleManager->isRuleMatched(
+                        $visitorProperties,
+                        new RuleObject($item['rules']),
+                        StringUtils::camelCase($entityType) . " #{$item[$field]}"
+                    );
+                }
 
                 if ($match === true) {
                     $matchedRecords[] = $item;
@@ -1232,6 +1466,120 @@ final class DataManager implements DataManagerInterface
         );
 
         return $matchedRecords;
+    }
+
+    /**
+     * qs-03: whether any of the given (already-fetched) audiences carries a
+     * bucketed_into_experience_key rule as its sole rule. Used to widen the
+     * DataManager.php empty-visitorProperties audience-evaluation gate SOLELY
+     * for experiences whose audience tree needs this rule type (AC4), while
+     * leaving the gate untouched for every generic-only audience (AC7).
+     *
+     * @param array<int, array<string, mixed>> $audiences
+     */
+    private function _audiencesContainBucketedIntoExperienceKeyRule(array $audiences): bool
+    {
+        foreach ($audiences as $audience) {
+            if (!empty($audience['rules']) && is_array($audience['rules']) && $this->_findSoleBucketedIntoExperienceKeyRule($audience['rules']) !== null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * qs-03: returns the rule element if $rulesTree contains EXACTLY ONE
+     * rule element in total and it is a bucketed_into_experience_key rule;
+     * otherwise null (including for mixed generic+exclusion trees, which are
+     * out of scope per qs-03-mutual-exclusion-rule.md's non-goals — no served
+     * config can yet emit one). Returning null routes the item through the
+     * untouched, generic isRuleMatched() path unchanged.
+     *
+     * @param array<string, mixed> $rulesTree The OR/AND/OR_WHEN rule tree
+     * @return array{rule_type: string, matching: array{match_type: string, negated: bool}, value: mixed}|null
+     */
+    private function _findSoleBucketedIntoExperienceKeyRule(array $rulesTree): ?array
+    {
+        $elements = $this->_collectRuleElements($rulesTree);
+        if (count($elements) === 1 && ($elements[0]['rule_type'] ?? null) === RuleType::BucketedIntoExperienceKey->value) {
+            return $elements[0];
+        }
+        return null;
+    }
+
+    /**
+     * qs-03: recursively collects every leaf rule element (identified by the
+     * presence of a `rule_type` key) anywhere within an OR/AND/OR_WHEN rule
+     * tree, regardless of nesting depth or shape.
+     *
+     * @param mixed $node
+     * @return array<int, array<string, mixed>>
+     */
+    private function _collectRuleElements(mixed $node): array
+    {
+        if (!is_array($node)) {
+            return [];
+        }
+        if (isset($node['rule_type'])) {
+            return [$node];
+        }
+        $elements = [];
+        foreach ($node as $value) {
+            if (is_array($value)) {
+                $elements = array_merge($elements, $this->_collectRuleElements($value));
+            }
+        }
+        return $elements;
+    }
+
+    /**
+     * qs-03: resolves a bucketed_into_experience_key rule element read-only
+     * (target lookup via getEntity(), presence check via getData() — never
+     * triggers bucketing of the target, never writes, never tracks — AC5),
+     * then builds a synthetic single-key $data/RuleObject pair that reproduces
+     * the contract's `matching.negated ? !bucketedRaw : bucketedRaw` via the
+     * SAME real, unmodified isRuleMatched() -> Comparisons::equals() negation
+     * logic every generic 'equals' rule already uses.
+     *
+     * Unknown target key -> bucketedRaw = false + AC8 warning naming the key.
+     *
+     * @param array{rule_type: string, matching: array{match_type: string, negated: bool}, value: mixed} $rule
+     * @return array{0: array<string, string>, 1: RuleObject}
+     */
+    private function _buildBucketedIntoExperienceKeyRuleMatch(array $rule, string $visitorId): array
+    {
+        $targetKey = (string)($rule['value'] ?? '');
+        $target = $this->getEntity($targetKey, 'experiences');
+
+        if ($target === null) {
+            $this->_loggerManager?->warn(
+                'DataManager.filterMatchedRecordsWithRule()',
+                str_replace('#', $targetKey, Messages::BUCKETING_EXCLUSION_TARGET_NOT_FOUND)
+            );
+            $bucketedRaw = false;
+        } else {
+            $visitorData = $this->getData($visitorId) ?? [];
+            $bucketingData = $visitorData['bucketing'] ?? [];
+            $bucketedRaw = array_key_exists((string)($target['id'] ?? ''), $bucketingData);
+        }
+
+        $syntheticKey = '__convertSdk_bucketedIntoExperienceKey';
+        $negated = (bool)($rule['matching']['negated'] ?? false);
+        $syntheticData = [$syntheticKey => $bucketedRaw ? 'true' : 'false'];
+        $syntheticRuleObject = new RuleObject([
+            'OR' => [
+                ['AND' => [
+                    ['OR_WHEN' => [[
+                        'rule_type' => RuleType::BucketedIntoExperienceKey->value,
+                        'key' => $syntheticKey,
+                        'matching' => ['match_type' => 'equals', 'negated' => $negated],
+                        'value' => 'true',
+                    ]]],
+                ]],
+            ],
+        ]);
+
+        return [$syntheticData, $syntheticRuleObject];
     }
 
     /**

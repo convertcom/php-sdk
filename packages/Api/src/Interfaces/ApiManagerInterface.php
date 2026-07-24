@@ -79,4 +79,14 @@ interface ApiManagerInterface
      * @return ConfigResponseData
      */
     public function getConfig(): ConfigResponseData;
+
+    /**
+     * Get configuration data scoped to a single experience via `exp=` (qs-02
+     * capability B preview input — AC4). Forces `_conv_low_cache=1` regardless
+     * of `network.cacheLevel`, plus `debug_token=` when configured.
+     *
+     * @param string $experienceId The experience id to inject via `exp=`
+     * @return ConfigResponseData
+     */
+    public function getConfigForExperience(string $experienceId): ConfigResponseData;
 }

@@ -111,6 +111,14 @@ class ApiManager implements ApiManagerInterface
     /** @var string Cache level setting */
     private string $cacheLevel;
 
+    /**
+     * Optional QA/preview debug token (qs-02 capability A). When set, forces
+     * `debug_token=<value>` and `_conv_low_cache=1` onto every config-fetch
+     * URL, regardless of `network.cacheLevel`. Never sent to the track
+     * endpoint; redacted from log output via {@see redactDebugTokenForLog()}.
+     */
+    private ?string $debugToken = null;
+
     /** @var callable Mapper function for data transformation */
     private mixed $mapper;
 
@@ -188,6 +196,7 @@ class ApiManager implements ApiManagerInterface
         $this->cacheLevel = $config && $config->getNetwork() && isset($config->getNetwork()['cacheLevel'])
             ? (string) $config->getNetwork()['cacheLevel']
             : '';
+        $this->debugToken = $config ? $config->getDebugToken() : null;
 
         $this->httpClient = $httpClient ?? Psr18ClientDiscovery::find();
         $this->requestFactory = $requestFactory ?? Psr17FactoryDiscovery::findRequestFactory();
@@ -446,30 +455,75 @@ class ApiManager implements ApiManagerInterface
     }
 
     /**
-     * Get configuration data
+     * Redact the `debug_token` query-param value (qs-02 AC3 — token hygiene)
+     * from a log-only string, e.g. a config-fetch endpoint URL or an
+     * exception message that carries `debug_token=<value>` in its query
+     * string. Encoding-agnostic: matches the value regardless of whether it
+     * was produced by `urlencode()`, `rawurlencode()`, left decoded, or
+     * mangled by an arbitrary PSR-18 client — the exception message passed
+     * in here originates from whatever HTTP client is plugged in, which is
+     * not guaranteed to encode (or even include) the URL the same way this
+     * SDK built it. Only used for values passed to the logger/rethrown
+     * exception — never affects the actual request URL.
      *
+     * @param string $value The string to redact before logging
+     * @return string The value with the token value masked, if present
+     */
+    private function redactDebugTokenForLog(string $value): string
+    {
+        if ($this->debugToken === null || $this->debugToken === '') {
+            return $value;
+        }
+
+        return (string) preg_replace(
+            '/(debug_token=)[^&\s]*/i',
+            '${1}***REDACTED***',
+            $value
+        );
+    }
+
+    /**
+     * Build the query string for a config-fetch request, applying the shared
+     * environment/debug_token/_conv_low_cache rules (qs-02 AC1) plus any
+     * caller-supplied extra params (e.g. `exp=` for the preview fetch).
+     *
+     * @param array<string, string> $additionalParams Extra key=>value params to append
+     * @param bool $forceLowCache Force `_conv_low_cache=1` regardless of cacheLevel/debugToken
+     * @return string The query string including the leading `?`, or '' if empty
+     */
+    private function buildConfigQueryString(array $additionalParams = [], bool $forceLowCache = false): string
+    {
+        $hasDebugToken = $this->debugToken !== null && $this->debugToken !== '';
+
+        $params = [];
+        if ($this->environment) {
+            $params[] = 'environment=' . urlencode($this->environment);
+        }
+        foreach ($additionalParams as $key => $value) {
+            $params[] = $key . '=' . urlencode((string) $value);
+        }
+        if ($hasDebugToken) {
+            // Forced regardless of network.cacheLevel — qs-02 AC1.
+            $params[] = 'debug_token=' . urlencode((string) $this->debugToken);
+        }
+        if ($forceLowCache || $this->cacheLevel === 'low' || $hasDebugToken) {
+            $params[] = '_conv_low_cache=1';
+        }
+
+        return $params !== [] ? '?' . implode('&', $params) : '';
+    }
+
+    /**
+     * Shared GET/parse/log/error-handling body for the two config-fetch entry
+     * points ({@see getConfig()} and {@see getConfigForExperience()}) — only
+     * the query string and the log context label differ between them.
+     *
+     * @param string $query The query string (including leading `?`, or '')
+     * @param string $logContext Log context label (e.g. 'ApiManager.getConfig()')
      * @return ConfigResponseData
      */
-    public function getConfig(): ConfigResponseData
+    private function fetchConfigFromEndpoint(string $query, string $logContext): ConfigResponseData
     {
-        if ($this->loggerManager && method_exists($this->loggerManager, 'trace')) {
-            $this->loggerManager->trace('ApiManager.getConfig()');
-        }
-
-        $query = '';
-        if ($this->cacheLevel === 'low' || $this->environment) {
-            $query = '?';
-        }
-        if ($this->environment) {
-            $query .= 'environment=' . urlencode($this->environment);
-        }
-        if ($this->cacheLevel === 'low') {
-            if ($query !== '?') {
-                $query .= '&';
-            }
-            $query .= '_conv_low_cache=1';
-        }
-
         try {
             $response = $this->request(
                 'GET',
@@ -483,8 +537,8 @@ class ApiManager implements ApiManagerInterface
             if ($statusCode < 200 || $statusCode >= 300) {
                 $url = $this->configEndpoint . "/config/{$this->sdkKey}";
                 if ($this->loggerManager) {
-                    $this->loggerManager->error('ApiManager.getConfig()', [
-                        'endpoint' => $url . $query,
+                    $this->loggerManager->error($logContext, [
+                        'endpoint' => $this->redactDebugTokenForLog($url . $query),
                         'status' => 'error',
                         'httpStatus' => $statusCode,
                         'error' => "HTTP {$statusCode}",
@@ -505,8 +559,8 @@ class ApiManager implements ApiManagerInterface
 
             if ($this->loggerManager) {
                 $project = $configData->getProject();
-                $this->loggerManager->debug('ApiManager.getConfig()', [
-                    'endpoint' => $this->configEndpoint . "/config/{$this->sdkKey}" . $query,
+                $this->loggerManager->debug($logContext, [
+                    'endpoint' => $this->redactDebugTokenForLog($this->configEndpoint . "/config/{$this->sdkKey}" . $query),
                     'status' => 'success',
                     'httpStatus' => $statusCode,
                     'accountId' => $configData->getAccountId() ?? 'unknown',
@@ -517,20 +571,65 @@ class ApiManager implements ApiManagerInterface
 
             return $configData;
         } catch (ClientExceptionInterface $e) {
+            // qs-02 AC3 — PSR-18 client exceptions (e.g. Guzzle's ConnectException
+            // on DNS/TLS/timeout failures) commonly append " for <full URI>" to
+            // getMessage(), which carries the same debug_token=<value> query
+            // param as the sibling `endpoint` log field below. Redact once here
+            // so neither the log entry nor the rethrown RuntimeException leaks it.
+            $safeMessage = $this->redactDebugTokenForLog($e->getMessage());
+
             if ($this->loggerManager) {
-                $this->loggerManager->error('ApiManager.getConfig()', [
-                    'endpoint' => $this->configEndpoint . "/config/{$this->sdkKey}" . $query,
+                $this->loggerManager->error($logContext, [
+                    'endpoint' => $this->redactDebugTokenForLog($this->configEndpoint . "/config/{$this->sdkKey}" . $query),
                     'status' => 'error',
-                    'error' => $e->getMessage(),
+                    'error' => $safeMessage,
                     'code' => method_exists($e, 'getCode') ? $e->getCode() : null,
                 ]);
             }
 
             throw new \RuntimeException(
-                "Failed to fetch config from {$this->configEndpoint}/config/{$this->sdkKey}: HTTP error - {$e->getMessage()}",
+                "Failed to fetch config from {$this->configEndpoint}/config/{$this->sdkKey}: HTTP error - {$safeMessage}",
                 (int)$e->getCode(),
                 $e
             );
         }
+    }
+
+    /**
+     * Get configuration data
+     *
+     * @return ConfigResponseData
+     */
+    public function getConfig(): ConfigResponseData
+    {
+        if ($this->loggerManager && method_exists($this->loggerManager, 'trace')) {
+            $this->loggerManager->trace('ApiManager.getConfig()');
+        }
+
+        $query = $this->buildConfigQueryString();
+
+        return $this->fetchConfigFromEndpoint($query, 'ApiManager.getConfig()');
+    }
+
+    /**
+     * Get configuration data scoped to a single experience (qs-02 capability B
+     * preview input — AC4). Forces `exp={experienceId}` and `_conv_low_cache=1`
+     * onto the config-fetch URL regardless of `network.cacheLevel`, plus
+     * `debug_token=` when configured — this is how the SDK resolves a preview
+     * target that is absent from the current config (draft/paused/other
+     * environment).
+     *
+     * @param string $experienceId The experience id to inject via `exp=`
+     * @return ConfigResponseData
+     */
+    public function getConfigForExperience(string $experienceId): ConfigResponseData
+    {
+        if ($this->loggerManager && method_exists($this->loggerManager, 'trace')) {
+            $this->loggerManager->trace('ApiManager.getConfigForExperience()', ['experienceId' => $experienceId]);
+        }
+
+        $query = $this->buildConfigQueryString(['exp' => $experienceId], true);
+
+        return $this->fetchConfigFromEndpoint($query, 'ApiManager.getConfigForExperience()');
     }
 }

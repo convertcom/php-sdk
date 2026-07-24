@@ -125,9 +125,22 @@ interface DataManagerInterface
      * @param GoalData[]|null $goalData Array of GoalData objects (optional)
      * @param VisitorSegments|null $segments (optional)
      * @param array|null $conversionSetting Associative array with ConversionSettingKey keys (optional)
+     * @param bool $suppressPersistence qs-02 capability (B) preview input — when true,
+     *     suppresses the goal-triggered write and the conversion/transaction enqueue
      * @return RuleError|bool
      */
-    public function convert(string $visitorId, string $goalId, ?array $goalRule = null, ?array $goalData = null, ?VisitorSegments $segments = null, ?array $conversionSetting = null): bool|RuleError;
+    public function convert(string $visitorId, string $goalId, ?array $goalRule = null, ?array $goalData = null, ?VisitorSegments $segments = null, ?array $conversionSetting = null, bool $suppressPersistence = false): bool|RuleError;
+
+    /**
+     * Build a bucketed-variation array for a preview forced decision (qs-02
+     * capability B preview input), bypassing every normal gate. Pure: never
+     * writes visitor state or enqueues a tracking event.
+     *
+     * @param array<string, mixed> $experienceData
+     * @param string $variationId
+     * @return array<string, mixed>|null
+     */
+    public function buildPreviewDecision(array $experienceData, string $variationId): ?array;
 
     /**
      * Get a list of entities by type.

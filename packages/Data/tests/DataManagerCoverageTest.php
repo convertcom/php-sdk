@@ -269,6 +269,158 @@ class DataManagerCoverageTest extends TestCase
         $this->assertTrue($activatedFired);
     }
 
+    /**
+     * Parity lock (qs-16 correction, post-review of the prior remediation pass):
+     * confirmed directly against ../javascript-sdk/packages/js-sdk/src/context.ts
+     * (every preview call site sets `enableStorage: false, suppressEvents: true`
+     * together, e.g. lines ~250-252) and ../javascript-sdk/packages/data/src/
+     * data-manager.ts selectLocations() (`if (!suppressEvents) { fire(LOCATION_ACTIVATED...) }`
+     * / `if (!suppressEvents) { fire(LOCATION_DEACTIVATED...) }`), which gates the
+     * event fires on a distinct `suppressEvents` flag, independent of `enableStorage`.
+     * JS DOES suppress LOCATION_ACTIVATED/LOCATION_DEACTIVATED while previewing.
+     * PHP's `suppressPersistence` is contractually preview-exclusive (see
+     * LocationAttributes::$suppressPersistence docblock — "never exposed as a
+     * public per-call override"), so PHP reuses that single flag to gate both
+     * event fires and the persistence write, rather than adding a second field.
+     * Location matching/bookkeeping must still run unconditionally.
+     */
+    public function testSelectLocationsSuppressesActivatedEventWhenSuppressPersistenceTrue(): void
+    {
+        $activatedFired = false;
+        $this->eventManager->on(SystemEvents::LocationActivated, function () use (&$activatedFired) {
+            $activatedFired = true;
+        });
+
+        $items = [
+            [
+                'id' => 'loc-1',
+                'key' => 'homepage',
+                'name' => 'Homepage',
+                'rules' => [
+                    'OR' => [
+                        ['AND' => [
+                            ['OR_WHEN' => [
+                                [
+                                    'rule_type' => 'generic_key_value',
+                                    'matching' => ['match_type' => 'matches', 'negated' => false],
+                                    'key' => 'url',
+                                    'value' => 'https://convert.com/',
+                                ],
+                            ]],
+                        ]],
+                    ],
+                ],
+            ],
+        ];
+
+        $attributes = new LocationAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'suppressPersistence' => true,
+        ]);
+
+        $result = $this->dataManager->selectLocations($this->visitorId, $items, $attributes);
+
+        $this->assertCount(1, $result, 'matching must still run unconditionally under suppressPersistence');
+        $this->assertFalse($activatedFired, 'LocationActivated must NOT fire under suppressPersistence — JS SDK parity via suppressEvents');
+        $storedData = $this->dataManager->getData($this->visitorId) ?? [];
+        $this->assertEmpty($storedData['locations'] ?? [], 'the visitor-state write must be suppressed');
+    }
+
+    /**
+     * Companion regression: when suppressPersistence is false/absent (the default,
+     * non-preview path), LocationActivated must still fire exactly as before.
+     */
+    public function testSelectLocationsFiresActivatedWhenSuppressPersistenceFalse(): void
+    {
+        $activatedFired = false;
+        $this->eventManager->on(SystemEvents::LocationActivated, function () use (&$activatedFired) {
+            $activatedFired = true;
+        });
+
+        $items = [
+            [
+                'id' => 'loc-1',
+                'key' => 'homepage',
+                'name' => 'Homepage',
+                'rules' => [
+                    'OR' => [
+                        ['AND' => [
+                            ['OR_WHEN' => [
+                                [
+                                    'rule_type' => 'generic_key_value',
+                                    'matching' => ['match_type' => 'matches', 'negated' => false],
+                                    'key' => 'url',
+                                    'value' => 'https://convert.com/',
+                                ],
+                            ]],
+                        ]],
+                    ],
+                ],
+            ],
+        ];
+
+        $attributes = new LocationAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+        ]);
+
+        $result = $this->dataManager->selectLocations($this->visitorId, $items, $attributes);
+
+        $this->assertCount(1, $result);
+        $this->assertTrue($activatedFired, 'LocationActivated must fire when suppressPersistence is not set');
+        $storedData = $this->dataManager->getData($this->visitorId) ?? [];
+        $this->assertContains('homepage', $storedData['locations'] ?? []);
+    }
+
+    /**
+     * Deactivation counterpart: suppressPersistence=true must also gate
+     * LocationDeactivated, mirroring the Activated case above.
+     */
+    public function testSelectLocationsSuppressesDeactivatedEventWhenSuppressPersistenceTrue(): void
+    {
+        $items = [
+            [
+                'id' => 'loc-1',
+                'key' => 'homepage',
+                'name' => 'Homepage',
+                'rules' => [
+                    'OR' => [
+                        ['AND' => [
+                            ['OR_WHEN' => [
+                                [
+                                    'rule_type' => 'generic_key_value',
+                                    'matching' => ['match_type' => 'matches', 'negated' => false],
+                                    'key' => 'url',
+                                    'value' => 'https://convert.com/',
+                                ],
+                            ]],
+                        ]],
+                    ],
+                ],
+            ],
+        ];
+
+        // Activate the location first (non-suppressed, so it persists — matching
+        // ../javascript-sdk's non-preview baseline behavior for this setup step).
+        $attributes = new LocationAttributes([
+            'locationProperties' => ['url' => 'https://convert.com/'],
+        ]);
+        $this->dataManager->selectLocations($this->visitorId, $items, $attributes);
+
+        $deactivatedFired = false;
+        $this->eventManager->on(SystemEvents::LocationDeactivated, function () use (&$deactivatedFired) {
+            $deactivatedFired = true;
+        });
+
+        $attributes2 = new LocationAttributes([
+            'locationProperties' => ['url' => 'https://other.com/'],
+            'suppressPersistence' => true,
+        ]);
+
+        $result = $this->dataManager->selectLocations($this->visitorId, $items, $attributes2);
+        $this->assertCount(0, $result, 'matching must still run unconditionally under suppressPersistence');
+        $this->assertFalse($deactivatedFired, 'LocationDeactivated must NOT fire under suppressPersistence — JS SDK parity via suppressEvents');
+    }
+
     // ---- filterMatchedCustomSegments tests ----
 
     public function testFilterMatchedCustomSegmentsShouldReturnMatchingSegments(): void
