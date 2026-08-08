@@ -25,6 +25,17 @@ jobs:
         with:
           node-version: 'lts/*'
 
+      - name: Enable Corepack
+        # Without this, the runner's preinstalled Yarn 1.22.x services
+        # `yarn install` below. Classic Yarn cannot read this project's Yarn 4
+        # lockfile and silently ignores `--immutable` (its own spelling is
+        # `--frozen-lockfile`), so it re-resolved every dependency from the
+        # package.json ranges and overwrote yarn.lock on each release run —
+        # "success Saved lockfile" in the job log. Corepack honours the
+        # `packageManager` field in package.json, so CI installs exactly the
+        # tree recorded in yarn.lock and a drifted lockfile fails the job.
+        run: corepack enable
+
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.4'
