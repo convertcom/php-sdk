@@ -1,6 +1,6 @@
 <?php
 /**
- * SubmitsFormGoal
+ * ExperienceKeyBucketedMatchRuleAllOfMatching
  *
  * PHP version 8.1
  *
@@ -32,7 +32,7 @@ use \ArrayAccess;
 use \OpenAPI\Client\ObjectSerializer;
 
 /**
- * SubmitsFormGoal Class Doc Comment
+ * ExperienceKeyBucketedMatchRuleAllOfMatching Class Doc Comment
  *
  * @category Class
  * @package  OpenAPI\Client
@@ -40,7 +40,7 @@ use \OpenAPI\Client\ObjectSerializer;
  * @link     https://openapi-generator.tech
  * @implements \ArrayAccess<string, mixed>
  */
-class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
+class ExperienceKeyBucketedMatchRuleAllOfMatching implements ModelInterface, ArrayAccess, \JsonSerializable
 {
     public const DISCRIMINATOR = null;
 
@@ -49,7 +49,7 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       *
       * @var string
       */
-    protected static $openAPIModelName = 'SubmitsFormGoal';
+    protected static $openAPIModelName = 'ExperienceKeyBucketedMatchRule_allOf_matching';
 
     /**
       * Array of property to type mappings. Used for (de)serialization
@@ -57,12 +57,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       * @var string[]
       */
     protected static $openAPITypes = [
-        'id' => 'string',
-        'name' => 'string',
-        'key' => 'string',
-        'type' => 'string',
-        'rules' => '\OpenAPI\Client\Model\RuleObject',
-        'settings' => '\OpenAPI\Client\Model\SubmitsFormGoalSettings'
+        'negated' => 'bool',
+        'match_type' => '\OpenAPI\Client\Model\ChoiceMatchingOptions'
     ];
 
     /**
@@ -73,12 +69,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       * @psalm-var array<string, string|null>
       */
     protected static $openAPIFormats = [
-        'id' => null,
-        'name' => null,
-        'key' => null,
-        'type' => null,
-        'rules' => null,
-        'settings' => null
+        'negated' => null,
+        'match_type' => null
     ];
 
     /**
@@ -87,12 +79,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       * @var boolean[]
       */
     protected static array $openAPINullables = [
-        'id' => false,
-        'name' => false,
-        'key' => true,
-        'type' => false,
-        'rules' => true,
-        'settings' => false
+        'negated' => false,
+        'match_type' => false
     ];
 
     /**
@@ -181,12 +169,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $attributeMap = [
-        'id' => 'id',
-        'name' => 'name',
-        'key' => 'key',
-        'type' => 'type',
-        'rules' => 'rules',
-        'settings' => 'settings'
+        'negated' => 'negated',
+        'match_type' => 'match_type'
     ];
 
     /**
@@ -195,12 +179,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $setters = [
-        'id' => 'setId',
-        'name' => 'setName',
-        'key' => 'setKey',
-        'type' => 'setType',
-        'rules' => 'setRules',
-        'settings' => 'setSettings'
+        'negated' => 'setNegated',
+        'match_type' => 'setMatchType'
     ];
 
     /**
@@ -209,12 +189,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $getters = [
-        'id' => 'getId',
-        'name' => 'getName',
-        'key' => 'getKey',
-        'type' => 'getType',
-        'rules' => 'getRules',
-        'settings' => 'getSettings'
+        'negated' => 'getNegated',
+        'match_type' => 'getMatchType'
     ];
 
     /**
@@ -258,19 +234,6 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
         return self::$openAPIModelName;
     }
 
-    public const TYPE_SUBMITS_FORM = 'submits_form';
-
-    /**
-     * Gets allowable values of the enum
-     *
-     * @return string[]
-     */
-    public function getTypeAllowableValues()
-    {
-        return [
-            self::TYPE_SUBMITS_FORM,
-        ];
-    }
 
     /**
      * Associative array for storing property values
@@ -287,12 +250,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      */
     public function __construct(?array $data = null)
     {
-        $this->setIfExists('id', $data ?? [], null);
-        $this->setIfExists('name', $data ?? [], null);
-        $this->setIfExists('key', $data ?? [], null);
-        $this->setIfExists('type', $data ?? [], null);
-        $this->setIfExists('rules', $data ?? [], null);
-        $this->setIfExists('settings', $data ?? [], null);
+        $this->setIfExists('negated', $data ?? [], null);
+        $this->setIfExists('match_type', $data ?? [], null);
     }
 
     /**
@@ -322,15 +281,6 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
     {
         $invalidProperties = [];
 
-        $allowedValues = $this->getTypeAllowableValues();
-        if (!is_null($this->container['type']) && !in_array($this->container['type'], $allowedValues, true)) {
-            $invalidProperties[] = sprintf(
-                "invalid value '%s' for 'type', must be one of '%s'",
-                $this->container['type'],
-                implode("', '", $allowedValues)
-            );
-        }
-
         return $invalidProperties;
     }
 
@@ -347,187 +297,55 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
 
 
     /**
-     * Gets id
+     * Gets negated
      *
-     * @return string|null
+     * @return bool|null
      */
-    public function getId()
+    public function getNegated()
     {
-        return $this->container['id'];
+        return $this->container['negated'];
     }
 
     /**
-     * Sets id
+     * Sets negated
      *
-     * @param string|null $id Goal ID
+     * @param bool|null $negated If `true`, the logical result of the match is inverted. For example, if `match_type` is 'contains' and `value` is 'apple', `negated: true` means the rule matches if the attribute *does not* contain 'apple'.
      *
      * @return self
      */
-    public function setId($id)
+    public function setNegated($negated)
     {
-        if (is_null($id)) {
-            throw new \InvalidArgumentException('non-nullable id cannot be null');
+        if (is_null($negated)) {
+            throw new \InvalidArgumentException('non-nullable negated cannot be null');
         }
-        $this->container['id'] = $id;
+        $this->container['negated'] = $negated;
 
         return $this;
     }
 
     /**
-     * Gets name
+     * Gets match_type
      *
-     * @return string|null
+     * @return \OpenAPI\Client\Model\ChoiceMatchingOptions|null
      */
-    public function getName()
+    public function getMatchType()
     {
-        return $this->container['name'];
+        return $this->container['match_type'];
     }
 
     /**
-     * Sets name
+     * Sets match_type
      *
-     * @param string|null $name Goal Name.
+     * @param \OpenAPI\Client\Model\ChoiceMatchingOptions|null $match_type match_type
      *
      * @return self
      */
-    public function setName($name)
+    public function setMatchType($match_type)
     {
-        if (is_null($name)) {
-            throw new \InvalidArgumentException('non-nullable name cannot be null');
+        if (is_null($match_type)) {
+            throw new \InvalidArgumentException('non-nullable match_type cannot be null');
         }
-        $this->container['name'] = $name;
-
-        return $this;
-    }
-
-    /**
-     * Gets key
-     *
-     * @return string|null
-     */
-    public function getKey()
-    {
-        return $this->container['key'];
-    }
-
-    /**
-     * Sets key
-     *
-     * @param string|null $key Goal Key
-     *
-     * @return self
-     */
-    public function setKey($key)
-    {
-        if (is_null($key)) {
-            array_push($this->openAPINullablesSetToNull, 'key');
-        } else {
-            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
-            $index = array_search('key', $nullablesSetToNull);
-            if ($index !== FALSE) {
-                unset($nullablesSetToNull[$index]);
-                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
-            }
-        }
-        $this->container['key'] = $key;
-
-        return $this;
-    }
-
-    /**
-     * Gets type
-     *
-     * @return string|null
-     */
-    public function getType()
-    {
-        return $this->container['type'];
-    }
-
-    /**
-     * Sets type
-     *
-     * @param string|null $type type
-     *
-     * @return self
-     */
-    public function setType($type)
-    {
-        if (is_null($type)) {
-            throw new \InvalidArgumentException('non-nullable type cannot be null');
-        }
-        $allowedValues = $this->getTypeAllowableValues();
-        if (!in_array($type, $allowedValues, true)) {
-            throw new \InvalidArgumentException(
-                sprintf(
-                    "Invalid value '%s' for 'type', must be one of '%s'",
-                    $type,
-                    implode("', '", $allowedValues)
-                )
-            );
-        }
-        $this->container['type'] = $type;
-
-        return $this;
-    }
-
-    /**
-     * Gets rules
-     *
-     * @return \OpenAPI\Client\Model\RuleObject|null
-     */
-    public function getRules()
-    {
-        return $this->container['rules'];
-    }
-
-    /**
-     * Sets rules
-     *
-     * @param \OpenAPI\Client\Model\RuleObject|null $rules rules
-     *
-     * @return self
-     */
-    public function setRules($rules)
-    {
-        if (is_null($rules)) {
-            array_push($this->openAPINullablesSetToNull, 'rules');
-        } else {
-            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
-            $index = array_search('rules', $nullablesSetToNull);
-            if ($index !== FALSE) {
-                unset($nullablesSetToNull[$index]);
-                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
-            }
-        }
-        $this->container['rules'] = $rules;
-
-        return $this;
-    }
-
-    /**
-     * Gets settings
-     *
-     * @return \OpenAPI\Client\Model\SubmitsFormGoalSettings|null
-     */
-    public function getSettings()
-    {
-        return $this->container['settings'];
-    }
-
-    /**
-     * Sets settings
-     *
-     * @param \OpenAPI\Client\Model\SubmitsFormGoalSettings|null $settings settings
-     *
-     * @return self
-     */
-    public function setSettings($settings)
-    {
-        if (is_null($settings)) {
-            throw new \InvalidArgumentException('non-nullable settings cannot be null');
-        }
-        $this->container['settings'] = $settings;
+        $this->container['match_type'] = $match_type;
 
         return $this;
     }
