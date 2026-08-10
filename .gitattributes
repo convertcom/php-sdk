@@ -1,0 +1,11 @@
+# Keep the committed Yarn release out of the Composer dist archive. Composer
+# downloads dist packages through GitHub's archive API, which honours
+# export-ignore, so consumers of convertcom/php-sdk never receive this path.
+#
+# .yarn/releases holds the pinned Yarn 4 binary (~3.6 MB) that .yarnrc.yml
+# points yarnPath at. It exists so this repo's own CI installs a reproducible
+# dependency tree, and is of no use to anyone installing the SDK.
+#
+# Scoped deliberately to .yarn/ only — excluding anything else from the dist
+# archive would change what consumers receive, which is out of scope here.
+.yarn/ export-ignore

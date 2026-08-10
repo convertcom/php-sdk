@@ -8,4 +8,11 @@ coverage.xml
 .php-cs-fixer.cache
 node_modules/
 .pnp.*
-.yarn/
+# Ignore .yarn contents but NOT the directory itself — git cannot re-include a
+# path whose parent directory is excluded, so this must be `.yarn/*` rather than
+# `.yarn/` for the negation below to take effect.
+.yarn/*
+# The pinned Yarn release is committed on purpose: .yarnrc.yml points yarnPath
+# at it, which is what makes `yarn install --immutable` in CI run Yarn 4 instead
+# of whatever yarn the runner happens to ship.
+!.yarn/releases

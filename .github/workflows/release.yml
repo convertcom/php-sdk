@@ -25,16 +25,19 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      - name: Enable Corepack
-        # Without this, the runner's preinstalled Yarn 1.22.x services
-        # `yarn install` below. Classic Yarn cannot read this project's Yarn 4
-        # lockfile and silently ignores `--immutable` (its own spelling is
-        # `--frozen-lockfile`), so it re-resolved every dependency from the
-        # package.json ranges and overwrote yarn.lock on each release run —
-        # "success Saved lockfile" in the job log. Corepack honours the
-        # `packageManager` field in package.json, so CI installs exactly the
-        # tree recorded in yarn.lock and a drifted lockfile fails the job.
-        run: corepack enable
+      # No Corepack step, and none is needed. `yarnPath` in .yarnrc.yml points
+      # at the Yarn 4.18.0 binary committed under .yarn/releases, and every
+      # yarn honours it — including the Yarn 1.22.x that GitHub runners
+      # preinstall. So the `yarn` invocations below run Yarn 4 whatever the
+      # runner ships, with no dependency on Corepack (which Node stopped
+      # distributing as of 25.0.0) or on which Node `lts/*` resolves to.
+      #
+      # This is what makes `yarn install --immutable` actually immutable.
+      # Previously classic Yarn serviced it, could not read a Yarn 4 lockfile,
+      # and silently ignored `--immutable` (it spells it `--frozen-lockfile`) —
+      # so it re-resolved every dependency from the package.json ranges and
+      # rewrote yarn.lock on each release run ("success Saved lockfile" in the
+      # job log). Now a drifted lockfile fails the job with YN0028 instead.
 
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
