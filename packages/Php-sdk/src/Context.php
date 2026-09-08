@@ -350,6 +350,7 @@ final class Context implements ContextInterface
                 ? $attributes->getTypeCasting()
                 : true,
             'environment' => $attributes?->getEnvironment() ?? $this->environment,
+            'ignoreLocationProperties' => $attributes?->getIgnoreLocationProperties() ?? false,
         ];
         // qs-02: zero-trace across the WHOLE context once a preview is active —
         // runFeature() buckets every experience in config, not just a named one.
