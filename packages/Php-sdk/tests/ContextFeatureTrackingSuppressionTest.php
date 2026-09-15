@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
+require_once __DIR__ . '/Support/FeaturePathTestDoubles.php';
+
 use ConvertSdk\ApiManager;
 use ConvertSdk\BucketingManager;
 use ConvertSdk\Config\DefaultConfig;
@@ -12,95 +14,16 @@ use ConvertSdk\DataManager;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
-use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\LogManager;
 use ConvertSdk\RuleManager;
 use ConvertSdk\SegmentsManager;
+use ConvertSdk\Tests\Support\FeaturePathCountingApiManager;
+use ConvertSdk\Tests\Support\FeaturePathRecordingDataStore;
 use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use OpenAPI\Client\Model\VisitorSegments;
-use OpenAPI\Client\Model\VisitorTrackingEvents;
 use PHPUnit\Framework\TestCase;
-
-/**
- * Counts real enqueue() calls without mocking network I/O — enqueue() only
- * queues internally until batch size or an explicit releaseQueue(), and this
- * suite never crosses either, so delegating to a real ApiManager is safe.
- */
-final class CountingApiManagerDecorator implements ApiManagerInterface
-{
-    public int $enqueueCalls = 0;
-
-    public function __construct(private readonly ApiManagerInterface $inner)
-    {
-    }
-
-    public function request(string $method, array $path, array $data = [], array $headers = []): array
-    {
-        return $this->inner->request($method, $path, $data, $headers);
-    }
-
-    public function enqueue(string $visitorId, VisitorTrackingEvents $eventRequest, ?VisitorSegments $segments = null): void
-    {
-        $this->enqueueCalls++;
-        $this->inner->enqueue($visitorId, $eventRequest, $segments);
-    }
-
-    public function releaseQueue(?string $reason = null): void
-    {
-        $this->inner->releaseQueue($reason);
-    }
-
-    public function enableTracking(): void
-    {
-        $this->inner->enableTracking();
-    }
-
-    public function disableTracking(): void
-    {
-        $this->inner->disableTracking();
-    }
-
-    public function setData(ConfigResponseData $data): void
-    {
-        $this->inner->setData($data);
-    }
-
-    public function getConfig(): ConfigResponseData
-    {
-        return $this->inner->getConfig();
-    }
-
-    public function getConfigForExperience(string $experienceId): ConfigResponseData
-    {
-        return $this->inner->getConfigForExperience($experienceId);
-    }
-}
-
-/**
- * Minimal duck-typed visitor dataStore — DataManager only ever calls get()/set()
- * on whatever is installed via setDataStore().
- */
-final class RecordingFeatureDataStore
-{
-    public int $setCalls = 0;
-
-    /** @var array<string, mixed> */
-    private array $data = [];
-
-    public function get(string $key): mixed
-    {
-        return $this->data[$key] ?? null;
-    }
-
-    public function set(string $key, mixed $data): void
-    {
-        $this->setCalls++;
-        $this->data[$key] = $data;
-    }
-}
 
 /**
  * CAP-1 (SPEC-per-call-bucketing-attributes) concern 3 — enableTracking must
@@ -109,7 +32,7 @@ final class RecordingFeatureDataStore
  */
 class ContextFeatureTrackingSuppressionTest extends TestCase
 {
-    /** @return array{context: Context, apiManager: CountingApiManagerDecorator, dataStore: RecordingFeatureDataStore} */
+    /** @return array{context: Context, apiManager: FeaturePathCountingApiManager, dataStore: FeaturePathRecordingDataStore} */
     private function buildContext(string $visitorId): array
     {
         $testConfig = json_decode(file_get_contents(__DIR__ . '/test-config.json'), true);
@@ -140,9 +63,9 @@ class ContextFeatureTrackingSuppressionTest extends TestCase
         );
         $ruleManager = new RuleManager();
         $eventManager = new EventManager();
-        $apiManager = new CountingApiManagerDecorator(new ApiManager($config, $eventManager, $loggerManager));
+        $apiManager = new FeaturePathCountingApiManager(new ApiManager($config, $eventManager, $loggerManager));
         $dataManager = new DataManager($config, $bucketingManager, $ruleManager, $eventManager, $apiManager, $loggerManager);
-        $dataStore = new RecordingFeatureDataStore();
+        $dataStore = new FeaturePathRecordingDataStore();
         $dataManager->setDataStore($dataStore);
 
         $experienceManager = new ExperienceManager(dataManager: $dataManager);

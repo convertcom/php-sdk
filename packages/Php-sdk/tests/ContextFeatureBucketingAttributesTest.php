@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ConvertSdk\Tests;
 
+require_once __DIR__ . '/Support/FeaturePathTestDoubles.php';
+
 use ConvertSdk\ApiManager;
 use ConvertSdk\BucketingManager;
 use ConvertSdk\Config\DefaultConfig;
@@ -14,100 +16,22 @@ use ConvertSdk\Enums\FeatureStatus;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
-use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
 use ConvertSdk\LogManager;
 use ConvertSdk\RuleManager;
 use ConvertSdk\SegmentsManager;
+use ConvertSdk\Tests\Support\FeaturePathCountingApiManager;
+use ConvertSdk\Tests\Support\FeaturePathRecordingDataStore;
 use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
-use OpenAPI\Client\Model\VisitorSegments;
-use OpenAPI\Client\Model\VisitorTrackingEvents;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Counts real enqueue() calls for the suppressPersistence behavioural case below —
- * scoped to this file (rather than reusing ContextFeatureTrackingSuppressionTest's
- * identically-shaped double) so this file loads standalone under PHPUnit's
- * single-file runner, which does not autoload sibling test files.
- */
-final class SuppressPersistenceCountingApiManager implements ApiManagerInterface
-{
-    public int $enqueueCalls = 0;
-
-    public function __construct(private readonly ApiManagerInterface $inner)
-    {
-    }
-
-    public function request(string $method, array $path, array $data = [], array $headers = []): array
-    {
-        return $this->inner->request($method, $path, $data, $headers);
-    }
-
-    public function enqueue(string $visitorId, VisitorTrackingEvents $eventRequest, ?VisitorSegments $segments = null): void
-    {
-        $this->enqueueCalls++;
-        $this->inner->enqueue($visitorId, $eventRequest, $segments);
-    }
-
-    public function releaseQueue(?string $reason = null): void
-    {
-        $this->inner->releaseQueue($reason);
-    }
-
-    public function enableTracking(): void
-    {
-        $this->inner->enableTracking();
-    }
-
-    public function disableTracking(): void
-    {
-        $this->inner->disableTracking();
-    }
-
-    public function setData(ConfigResponseData $data): void
-    {
-        $this->inner->setData($data);
-    }
-
-    public function getConfig(): ConfigResponseData
-    {
-        return $this->inner->getConfig();
-    }
-
-    public function getConfigForExperience(string $experienceId): ConfigResponseData
-    {
-        return $this->inner->getConfigForExperience($experienceId);
-    }
-}
-
-/** Minimal duck-typed visitor dataStore — DataManager only calls get()/set(). */
-final class SuppressPersistenceRecordingDataStore
-{
-    public int $setCalls = 0;
-
-    /** @var array<string, mixed> */
-    private array $data = [];
-
-    public function get(string $key): mixed
-    {
-        return $this->data[$key] ?? null;
-    }
-
-    public function set(string $key, mixed $data): void
-    {
-        $this->setCalls++;
-        $this->data[$key] = $data;
-    }
-}
-
-/**
  * CAP-1 (SPEC-per-call-bucketing-attributes) — Context::runFeature()/runFeatures()
- * must forward the full BucketingAttributes object (like runExperience()/
- * runExperiences() already do), not the five-key literal they build today.
+ * forward the full BucketingAttributes object, mirroring runExperience()/runExperiences().
  */
 class ContextFeatureBucketingAttributesTest extends TestCase
 {
@@ -373,12 +297,7 @@ class ContextFeatureBucketingAttributesTest extends TestCase
         $this->assertSame(FeatureStatus::Disabled, $disabledByKey['feature-2']->status);
     }
 
-    /**
-     * CAP-2 (SPEC-per-call-bucketing-attributes) — Context::runFeatures() must forward the
-     * caller's experienceKeys as the ['experiences' => ...] filter FeatureManager::runFeatures()
-     * reads. Assert the spy's third argument, not the captured DTO: the DTO already carries
-     * experienceKeys once CAP-1 spreads it, which would pass with the filter still null.
-     */
+    // Spy the third argument, not the DTO — D-5 (SPEC-per-call-bucketing-attributes).
     public function testRunFeaturesForwardsExperienceKeysAsExperiencesFilter(): void
     {
         $realManager = $this->featureManager;
@@ -551,7 +470,38 @@ class ContextFeatureBucketingAttributesTest extends TestCase
         $this->assertSame(0, $featuresRig['dataStore']->setCalls);
     }
 
-    /** @return array{context: Context, apiManager: SuppressPersistenceCountingApiManager, dataStore: SuppressPersistenceRecordingDataStore} */
+    /**
+     * bucketing-attributes.md forceVariationId property 4 — a force disagreeing with a
+     * stored decision recomputes and writes through as the visitor's new sticky decision.
+     */
+    public function testForceVariationIdDisagreeingWithStoredDecisionWritesThrough(): void
+    {
+        $visitorId = 'bucketing-attrs-force-write-through';
+        $experienceId = '100218246'; // test-experience-ab-fullstack-3, carries feature-1
+        $rig = $this->buildSuppressionRig($visitorId);
+
+        $natural = $rig['context']->runFeature('feature-1', new BucketingAttributes($this->locationAndVisitorPropertiesFixture()));
+        $this->assertInstanceOf(BucketedFeature::class, $natural);
+        $storedNatural = $rig['dataManager']->getData($visitorId)['bucketing'][$experienceId] ?? null;
+        $this->assertNotNull($storedNatural, 'the natural call must have bucketed and persisted a decision to disagree with');
+
+        $forcedVariationId = $storedNatural === '100299460' ? '100299461' : '100299460';
+
+        $forced = $rig['context']->runFeature('feature-1', new BucketingAttributes(
+            $this->locationAndVisitorPropertiesFixture() + ['forceVariationId' => $forcedVariationId]
+        ));
+        $this->assertInstanceOf(BucketedFeature::class, $forced);
+        $this->assertGreaterThan(0, $rig['dataStore']->setCalls, 'a disagreeing force must still write through to the dataStore');
+        $storedAfterForce = $rig['dataManager']->getData($visitorId)['bucketing'][$experienceId] ?? null;
+        $this->assertSame($forcedVariationId, $storedAfterForce, 'a disagreeing force must overwrite the stored decision');
+
+        $reread = $rig['context']->runFeature('feature-1', new BucketingAttributes($this->locationAndVisitorPropertiesFixture()));
+        $this->assertInstanceOf(BucketedFeature::class, $reread);
+        $storedAfterReread = $rig['dataManager']->getData($visitorId)['bucketing'][$experienceId] ?? null;
+        $this->assertSame($forcedVariationId, $storedAfterReread, 'a subsequent no-force call must return the now-sticky forced decision');
+    }
+
+    /** @return array{context: Context, apiManager: FeaturePathCountingApiManager, dataStore: FeaturePathRecordingDataStore, dataManager: DataManager} */
     private function buildSuppressionRig(string $visitorId): array
     {
         $bucketingConfig = $this->config->getBucketing();
@@ -561,9 +511,9 @@ class ContextFeatureBucketingAttributesTest extends TestCase
         );
         $ruleManager = new RuleManager();
         $eventManager = new EventManager();
-        $apiManager = new SuppressPersistenceCountingApiManager(new ApiManager($this->config, $eventManager, $this->loggerManager));
+        $apiManager = new FeaturePathCountingApiManager(new ApiManager($this->config, $eventManager, $this->loggerManager));
         $dataManager = new DataManager($this->config, $bucketingManager, $ruleManager, $eventManager, $apiManager, $this->loggerManager);
-        $dataStore = new SuppressPersistenceRecordingDataStore();
+        $dataStore = new FeaturePathRecordingDataStore();
         $dataManager->setDataStore($dataStore);
 
         $experienceManager = new ExperienceManager(dataManager: $dataManager);
@@ -581,6 +531,6 @@ class ContextFeatureBucketingAttributesTest extends TestCase
             $apiManager,
         );
 
-        return ['context' => $context, 'apiManager' => $apiManager, 'dataStore' => $dataStore];
+        return ['context' => $context, 'apiManager' => $apiManager, 'dataStore' => $dataStore, 'dataManager' => $dataManager];
     }
 }
