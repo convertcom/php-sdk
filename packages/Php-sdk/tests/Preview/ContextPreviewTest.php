@@ -10,6 +10,7 @@ use ConvertSdk\Core;
 use ConvertSdk\DataManager;
 use ConvertSdk\DTO\BucketedFeature;
 use ConvertSdk\DTO\BucketedVariation;
+use ConvertSdk\Enums\FeatureStatus;
 use ConvertSdk\Enums\SystemEvents;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
@@ -956,10 +957,11 @@ class ContextPreviewTest extends TestCase
         $trackedAttributes = array_merge(self::LOCATION_PROPERTIES, ['enableTracking' => true, 'suppressPersistence' => false]);
 
         $feature = $context->runFeature(self::FEATURE_KEY, new BucketingAttributes($trackedAttributes));
-        $this->assertInstanceOf(BucketedFeature::class, $feature, 'the feature-carrying experience must actually bucket, not be blocked by a gate — otherwise this test would pass trivially');
+        $this->assertSame(FeatureStatus::Enabled, $feature->status, 'the feature-carrying experience must actually bucket Enabled, not be blocked by a gate — otherwise this test would pass trivially');
 
         $features = $context->runFeatures(new BucketingAttributes($trackedAttributes));
-        $this->assertNotEmpty($features, 'runFeatures() must actually bucket experiences, not be blocked by a gate — otherwise this test would pass trivially');
+        $enabledFeatures = array_filter($features, fn (BucketedFeature $f) => $f->status === FeatureStatus::Enabled);
+        $this->assertNotEmpty($enabledFeatures, 'runFeatures() must actually bucket at least one feature Enabled, not be blocked by a gate — otherwise this test would pass trivially');
 
         // Model the PHP-FPM shutdown handler ConvertSDK::create() registers.
         $rig['apiManager']->releaseQueue('shutdown');

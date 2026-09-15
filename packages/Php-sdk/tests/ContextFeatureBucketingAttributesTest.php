@@ -14,6 +14,7 @@ use ConvertSdk\Enums\FeatureStatus;
 use ConvertSdk\Event\EventManager;
 use ConvertSdk\ExperienceManager;
 use ConvertSdk\FeatureManager;
+use ConvertSdk\Interfaces\ApiManagerInterface;
 use ConvertSdk\Interfaces\FeatureManagerInterface;
 use ConvertSdk\LogManager;
 use ConvertSdk\RuleManager;
@@ -22,8 +23,86 @@ use ConvertSdk\Utils\ObjectUtils;
 use OpenAPI\Client\BucketingAttributes;
 use OpenAPI\Client\Config;
 use OpenAPI\Client\Model\ConfigResponseData;
+use OpenAPI\Client\Model\VisitorSegments;
+use OpenAPI\Client\Model\VisitorTrackingEvents;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+
+/**
+ * Counts real enqueue() calls for the suppressPersistence behavioural case below —
+ * scoped to this file (rather than reusing ContextFeatureTrackingSuppressionTest's
+ * identically-shaped double) so this file loads standalone under PHPUnit's
+ * single-file runner, which does not autoload sibling test files.
+ */
+final class SuppressPersistenceCountingApiManager implements ApiManagerInterface
+{
+    public int $enqueueCalls = 0;
+
+    public function __construct(private readonly ApiManagerInterface $inner)
+    {
+    }
+
+    public function request(string $method, array $path, array $data = [], array $headers = []): array
+    {
+        return $this->inner->request($method, $path, $data, $headers);
+    }
+
+    public function enqueue(string $visitorId, VisitorTrackingEvents $eventRequest, ?VisitorSegments $segments = null): void
+    {
+        $this->enqueueCalls++;
+        $this->inner->enqueue($visitorId, $eventRequest, $segments);
+    }
+
+    public function releaseQueue(?string $reason = null): void
+    {
+        $this->inner->releaseQueue($reason);
+    }
+
+    public function enableTracking(): void
+    {
+        $this->inner->enableTracking();
+    }
+
+    public function disableTracking(): void
+    {
+        $this->inner->disableTracking();
+    }
+
+    public function setData(ConfigResponseData $data): void
+    {
+        $this->inner->setData($data);
+    }
+
+    public function getConfig(): ConfigResponseData
+    {
+        return $this->inner->getConfig();
+    }
+
+    public function getConfigForExperience(string $experienceId): ConfigResponseData
+    {
+        return $this->inner->getConfigForExperience($experienceId);
+    }
+}
+
+/** Minimal duck-typed visitor dataStore — DataManager only calls get()/set(). */
+final class SuppressPersistenceRecordingDataStore
+{
+    public int $setCalls = 0;
+
+    /** @var array<string, mixed> */
+    private array $data = [];
+
+    public function get(string $key): mixed
+    {
+        return $this->data[$key] ?? null;
+    }
+
+    public function set(string $key, mixed $data): void
+    {
+        $this->setCalls++;
+        $this->data[$key] = $data;
+    }
+}
 
 /**
  * CAP-1 (SPEC-per-call-bucketing-attributes) — Context::runFeature()/runFeatures()
@@ -129,6 +208,7 @@ class ContextFeatureBucketingAttributesTest extends TestCase
             'forceVariationId' => '100299461',
             'ignoreLocationProperties' => true,
             'updateVisitorProperties' => true,
+            'suppressPersistence' => true,
         ];
     }
 
@@ -139,6 +219,7 @@ class ContextFeatureBucketingAttributesTest extends TestCase
         $this->assertSame('100299461', $captured->forceVariationId);
         $this->assertTrue($captured->ignoreLocationProperties);
         $this->assertTrue($captured->updateVisitorProperties);
+        $this->assertTrue($captured->suppressPersistence);
         $this->assertSame(['url' => 'https://convert.com/'], $captured->locationProperties);
         $this->assertSame(['varName3' => 'something'], $captured->visitorProperties);
         $this->assertSame($this->config->getEnvironment(), $captured->environment);
@@ -426,17 +507,80 @@ class ContextFeatureBucketingAttributesTest extends TestCase
      */
     public function testRunFeaturesIgnoresExperienceKeysOrder(): void
     {
-        $configOrder = $this->context->runFeatures(new BucketingAttributes(
+        $configOrder = $this->featuresByKey($this->context->runFeatures(new BucketingAttributes(
             $this->locationAndVisitorPropertiesFixture() + [
-                'experienceKeys' => ['test-experience-ab-fullstack-2', 'test-experience-ab-fullstack-3'],
+                'experienceKeys' => ['test-experience-ab-fullstack-3', 'test-experience-ab-fullstack-4'],
             ]
-        ));
-        $reversedOrder = $this->context->runFeatures(new BucketingAttributes(
+        )));
+        $reversedOrder = $this->featuresByKey($this->context->runFeatures(new BucketingAttributes(
             $this->locationAndVisitorPropertiesFixture() + [
-                'experienceKeys' => ['test-experience-ab-fullstack-3', 'test-experience-ab-fullstack-2'],
+                'experienceKeys' => ['test-experience-ab-fullstack-4', 'test-experience-ab-fullstack-3'],
             ]
-        ));
+        )));
 
+        // feature-2 is only carried by test-experience-ab-fullstack-2, excluded from this
+        // filter — Disabled here (rather than Enabled, seen unfiltered) proves the filter
+        // was actually applied rather than merely that the call is deterministic.
+        $this->assertSame(FeatureStatus::Enabled, $configOrder['feature-1']->status);
+        $this->assertSame(FeatureStatus::Disabled, $configOrder['feature-2']->status);
+        $this->assertSame(FeatureStatus::Enabled, $reversedOrder['feature-1']->status);
+        $this->assertSame(FeatureStatus::Disabled, $reversedOrder['feature-2']->status);
         $this->assertEquals($configOrder, $reversedOrder);
+    }
+
+    /**
+     * CAP-1 (SPEC-per-call-bucketing-attributes) — suppressPersistence must gate BOTH the
+     * sticky-decision write and the tracking enqueue on a non-preview context, unlike
+     * enableTracking: false (ContextFeatureTrackingSuppressionTest), which only gates the
+     * enqueue and still persists.
+     */
+    public function testSuppressPersistenceProducesNoWritesOnNonPreviewContext(): void
+    {
+        $attributes = fn () => new BucketingAttributes(
+            $this->locationAndVisitorPropertiesFixture() + ['suppressPersistence' => true, 'enableTracking' => true]
+        );
+
+        $featureRig = $this->buildSuppressionRig('bucketing-attrs-suppress-persistence-feature');
+        $featureRig['context']->runFeature('feature-1', $attributes());
+        $this->assertSame(0, $featureRig['apiManager']->enqueueCalls);
+        $this->assertSame(0, $featureRig['dataStore']->setCalls);
+
+        $featuresRig = $this->buildSuppressionRig('bucketing-attrs-suppress-persistence-features');
+        $featuresRig['context']->runFeatures($attributes());
+        $this->assertSame(0, $featuresRig['apiManager']->enqueueCalls);
+        $this->assertSame(0, $featuresRig['dataStore']->setCalls);
+    }
+
+    /** @return array{context: Context, apiManager: SuppressPersistenceCountingApiManager, dataStore: SuppressPersistenceRecordingDataStore} */
+    private function buildSuppressionRig(string $visitorId): array
+    {
+        $bucketingConfig = $this->config->getBucketing();
+        $bucketingManager = new BucketingManager(
+            maxTraffic: $bucketingConfig['max_traffic'] ?? 10000,
+            hashSeed: $bucketingConfig['hash_seed'] ?? 9999,
+        );
+        $ruleManager = new RuleManager();
+        $eventManager = new EventManager();
+        $apiManager = new SuppressPersistenceCountingApiManager(new ApiManager($this->config, $eventManager, $this->loggerManager));
+        $dataManager = new DataManager($this->config, $bucketingManager, $ruleManager, $eventManager, $apiManager, $this->loggerManager);
+        $dataStore = new SuppressPersistenceRecordingDataStore();
+        $dataManager->setDataStore($dataStore);
+
+        $experienceManager = new ExperienceManager(dataManager: $dataManager);
+        $featureManager = new FeatureManager(dataManager: $dataManager);
+        $segmentsManager = new SegmentsManager($this->config, $dataManager, $ruleManager);
+
+        $context = new Context(
+            $this->config,
+            $visitorId,
+            $eventManager,
+            $experienceManager,
+            $featureManager,
+            $dataManager,
+            $segmentsManager,
+            $apiManager,
+        );
+
+        return ['context' => $context, 'apiManager' => $apiManager, 'dataStore' => $dataStore];
     }
 }
