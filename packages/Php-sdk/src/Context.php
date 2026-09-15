@@ -449,7 +449,11 @@ final class Context implements ContextInterface
             $forwardedData['suppressPersistence'] = true;
         }
 
-        $bucketedFeatures = $this->featureManager->runFeatures($this->visitorId, new BucketingAttributes($forwardedData));
+        $bucketedFeatures = $this->featureManager->runFeatures(
+            $this->visitorId,
+            new BucketingAttributes($forwardedData),
+            ['experiences' => $attributes?->getExperienceKeys()]
+        );
 
         // Filter out RuleError results
         $matchedErrors = array_filter($bucketedFeatures, function ($match) {
