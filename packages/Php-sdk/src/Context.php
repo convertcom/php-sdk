@@ -341,16 +341,9 @@ final class Context implements ContextInterface
         }
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
-
-        $forwardedData = [
-            'visitorProperties' => $visitorProperties,
-            'locationProperties' => $attributes?->getLocationProperties(),
-            'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-            'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
-                ? $attributes->getTypeCasting()
-                : true,
-            'environment' => $attributes?->getEnvironment() ?? $this->environment,
-        ];
+        $forwardedData = $attributes ? get_object_vars($attributes) : [];
+        $forwardedData['visitorProperties'] = $visitorProperties;
+        $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
         // qs-02: zero-trace across the WHOLE context once a preview is active —
         // runFeature() buckets every experience in config, not just a named one.
         if ($this->previewExperience !== null) {
@@ -447,16 +440,9 @@ final class Context implements ContextInterface
         }
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
-
-        $forwardedData = [
-            'visitorProperties' => $visitorProperties,
-            'locationProperties' => $attributes?->getLocationProperties(),
-            'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-            'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
-                ? $attributes->getTypeCasting()
-                : true,
-            'environment' => $attributes?->getEnvironment() ?? $this->environment,
-        ];
+        $forwardedData = $attributes ? get_object_vars($attributes) : [];
+        $forwardedData['visitorProperties'] = $visitorProperties;
+        $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
         // qs-02: zero-trace across the WHOLE context once a preview is active —
         // runFeatures() buckets every experience in config.
         if ($this->previewExperience !== null) {
