@@ -927,6 +927,47 @@ class ContextPreviewTest extends TestCase
         $this->assertSame(0, $rig['dataStore']->setCalls, 'zero visitor-state dataStore writes after runFeature()/runFeatures() on a preview context');
     }
 
+    /**
+     * CAP-3 (SPEC-per-call-bucketing-attributes) guard, not a RED test: a
+     * caller asking to be tracked must still leave zero trace under preview.
+     * Expected to PASS today too — Context::runFeature()/runFeatures() drop
+     * enableTracking/suppressPersistence from the caller entirely right now,
+     * so this can't fail on that account until CAP-1's forwarding fix lands.
+     */
+    #[Test]
+    public function previewContextLeavesZeroTraceAcrossFeatureMethodsEvenWhenCallerAsksToBeTracked(): void
+    {
+        $targetId = '9110';
+        $targetKey = 'feature-preview-target-tracked-exp';
+        $target = $this->experienceFixture($targetId, $targetKey, ['status' => 'draft'], [
+            $this->variation('9110-A', 'a'),
+            $this->variation('9110-B', 'b'),
+        ]);
+
+        $rig = $this->buildRig([$this->featureCarryingExperience()], [$this->featureFixture()]);
+        $this->queueExpFetchResponse($target);
+
+        $context = $rig['core']->createContext('preview-visitor-feature-tracked');
+        $context->setPreview($targetId, '9110-B');
+
+        $forced = $context->runExperience($targetKey);
+        $this->assertInstanceOf(BucketedVariation::class, $forced, 'preview target must still force its decision');
+
+        $trackedAttributes = array_merge(self::LOCATION_PROPERTIES, ['enableTracking' => true, 'suppressPersistence' => false]);
+
+        $feature = $context->runFeature(self::FEATURE_KEY, new BucketingAttributes($trackedAttributes));
+        $this->assertInstanceOf(BucketedFeature::class, $feature, 'the feature-carrying experience must actually bucket, not be blocked by a gate — otherwise this test would pass trivially');
+
+        $features = $context->runFeatures(new BucketingAttributes($trackedAttributes));
+        $this->assertNotEmpty($features, 'runFeatures() must actually bucket experiences, not be blocked by a gate — otherwise this test would pass trivially');
+
+        // Model the PHP-FPM shutdown handler ConvertSDK::create() registers.
+        $rig['apiManager']->releaseQueue('shutdown');
+
+        $this->assertSame([], $this->trackRequests(), 'zero requests to the track endpoint even when the caller asked to be tracked, under preview');
+        $this->assertSame(0, $rig['dataStore']->setCalls, 'zero visitor-state dataStore writes even when the caller asked to be tracked, under preview');
+    }
+
     // -- AC7: isolation from a concurrent non-preview context ----------------------------
 
     #[Test]
