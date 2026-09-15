@@ -141,7 +141,7 @@ interface FeatureManagerInterface
      *
      * @param string $visitorId Visitor ID
      * @param BucketingAttributes $attributes Bucketing attributes
-     * @param array<string, string[]>|null $filter Optional filter (e.g., ['experienceKeys' => ['exp1']])
+     * @param array{experiences?: string[]|null, features?: string[]|null}|null $filter Optional filter, e.g. ['experiences' => ['exp-key']]
      * @return array<int, array<string, mixed>> Array of bucketed feature arrays
      */
     public function runFeatures(
