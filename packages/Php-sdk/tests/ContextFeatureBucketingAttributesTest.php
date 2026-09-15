@@ -291,4 +291,152 @@ class ContextFeatureBucketingAttributesTest extends TestCase
         $this->assertArrayHasKey('feature-2', $disabledByKey);
         $this->assertSame(FeatureStatus::Disabled, $disabledByKey['feature-2']->status);
     }
+
+    /**
+     * CAP-2 (SPEC-per-call-bucketing-attributes) — Context::runFeatures() must forward the
+     * caller's experienceKeys as the ['experiences' => ...] filter FeatureManager::runFeatures()
+     * reads. Assert the spy's third argument, not the captured DTO: the DTO already carries
+     * experienceKeys once CAP-1 spreads it, which would pass with the filter still null.
+     */
+    public function testRunFeaturesForwardsExperienceKeysAsExperiencesFilter(): void
+    {
+        $realManager = $this->featureManager;
+        $capturedFilter = null;
+
+        $spy = $this->createMock(FeatureManagerInterface::class);
+        $spy->method('runFeatures')->willReturnCallback(
+            function (string $visitorId, BucketingAttributes $attributes, ?array $filter = null) use ($realManager, &$capturedFilter) {
+                $capturedFilter = $filter;
+                return $realManager->runFeatures($visitorId, $attributes, $filter);
+            }
+        );
+
+        $context = new Context(
+            $this->config,
+            $this->visitorId,
+            $this->eventManager,
+            $this->experienceManager,
+            $spy,
+            $this->dataManager,
+            $this->segmentsManager,
+            $this->apiManager,
+        );
+
+        $context->runFeatures(new BucketingAttributes([
+            'experienceKeys' => ['test-experience-ab-fullstack-3'],
+        ]));
+
+        $this->assertIsArray($capturedFilter);
+        // The filter key is 'experiences' — FeatureManagerInterface's own docblock says
+        // 'experienceKeys', but every implementation reads 'experiences'.
+        $this->assertSame(['test-experience-ab-fullstack-3'], $capturedFilter['experiences'] ?? null);
+        $this->assertArrayNotHasKey('features', $capturedFilter);
+    }
+
+    /** @return array<string, mixed> */
+    private function locationAndVisitorPropertiesFixture(): array
+    {
+        return [
+            'locationProperties' => ['url' => 'https://convert.com/'],
+            'visitorProperties' => ['varName3' => 'something'],
+        ];
+    }
+
+    /**
+     * @param array<int, BucketedFeature> $features
+     * @return array<string, BucketedFeature>
+     */
+    private function featuresByKey(array $features): array
+    {
+        $byKey = [];
+        foreach ($features as $feature) {
+            $byKey[$feature->featureKey] = $feature;
+        }
+        return $byKey;
+    }
+
+    /**
+     * CAP-2 (SPEC-per-call-bucketing-attributes) — narrowing to an experience that does not
+     * carry a feature must disable that feature without omitting it from the result array.
+     */
+    public function testRunFeaturesNarrowsToFilteredExperienceButKeepsEveryDeclaredFeature(): void
+    {
+        $unfiltered = $this->featuresByKey(
+            $this->context->runFeatures(new BucketingAttributes($this->locationAndVisitorPropertiesFixture()))
+        );
+        $this->assertSame(FeatureStatus::Enabled, $unfiltered['feature-1']->status);
+        $this->assertSame(FeatureStatus::Enabled, $unfiltered['feature-2']->status);
+
+        $narrowed = $this->featuresByKey($this->context->runFeatures(new BucketingAttributes(
+            $this->locationAndVisitorPropertiesFixture() + ['experienceKeys' => ['test-experience-ab-fullstack-3']]
+        )));
+
+        $this->assertArrayHasKey('feature-1', $narrowed);
+        $this->assertArrayHasKey('feature-2', $narrowed);
+        $this->assertSame(FeatureStatus::Disabled, $narrowed['feature-2']->status);
+    }
+
+    /** @return array<string, array{0: ?array<int, string>, 1: FeatureStatus, 2: FeatureStatus}> */
+    public static function experienceKeysFilterCasesProvider(): array
+    {
+        return [
+            'experienceKeys absent — every experience evaluated' => [
+                null,
+                FeatureStatus::Enabled,
+                FeatureStatus::Enabled,
+            ],
+            'experienceKeys empty array — every experience, not "match nothing"' => [
+                [],
+                FeatureStatus::Enabled,
+                FeatureStatus::Enabled,
+            ],
+            'one unknown key among known — the known key still resolves' => [
+                ['does-not-exist', 'test-experience-ab-fullstack-3'],
+                FeatureStatus::Enabled,
+                FeatureStatus::Disabled,
+            ],
+            'every key unknown — zero experiences, every feature disabled' => [
+                ['does-not-exist-1', 'does-not-exist-2'],
+                FeatureStatus::Disabled,
+                FeatureStatus::Disabled,
+            ],
+        ];
+    }
+
+    #[DataProvider('experienceKeysFilterCasesProvider')]
+    public function testRunFeaturesHonoursExperienceKeysFilter(
+        ?array $experienceKeys,
+        FeatureStatus $expectedFeature1Status,
+        FeatureStatus $expectedFeature2Status
+    ): void {
+        $attributesData = $this->locationAndVisitorPropertiesFixture();
+        if ($experienceKeys !== null) {
+            $attributesData['experienceKeys'] = $experienceKeys;
+        }
+
+        $byKey = $this->featuresByKey($this->context->runFeatures(new BucketingAttributes($attributesData)));
+
+        $this->assertSame($expectedFeature1Status, $byKey['feature-1']->status);
+        $this->assertSame($expectedFeature2Status, $byKey['feature-2']->status);
+    }
+
+    /**
+     * CAP-2 (SPEC-per-call-bucketing-attributes) — the order of experienceKeys must not affect
+     * the result: DataManager::getItemsByKeys() iterates the declared list, not the filter.
+     */
+    public function testRunFeaturesIgnoresExperienceKeysOrder(): void
+    {
+        $configOrder = $this->context->runFeatures(new BucketingAttributes(
+            $this->locationAndVisitorPropertiesFixture() + [
+                'experienceKeys' => ['test-experience-ab-fullstack-2', 'test-experience-ab-fullstack-3'],
+            ]
+        ));
+        $reversedOrder = $this->context->runFeatures(new BucketingAttributes(
+            $this->locationAndVisitorPropertiesFixture() + [
+                'experienceKeys' => ['test-experience-ab-fullstack-3', 'test-experience-ab-fullstack-2'],
+            ]
+        ));
+
+        $this->assertEquals($configOrder, $reversedOrder);
+    }
 }
