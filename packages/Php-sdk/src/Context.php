@@ -166,7 +166,15 @@ final class Context implements ContextInterface
      * Get variation from specific experience.
      *
      * @param string $experienceKey An experience's key that should be activated
-     * @param BucketingAttributes|null $attributes Attributes for the visitor
+     * @param BucketingAttributes|null $attributes visitorProperties (merged with
+     * stored ones, not replacing them); locationProperties; updateVisitorProperties
+     * (persist); environment (override); enableTracking (default true; false only
+     * suppresses the tracking event); ignoreLocationProperties (strict `true` only
+     * -- not `'true'`/`1` -- bypasses the location gate entirely: no location
+     * properties needed, none consulted; audience/environment unaffected);
+     * forceVariationId (selects WITHIN normal gating, NOT preview -- environment/
+     * location/audience still apply; binds only its own experience).
+     * typeCasting/experienceKeys are inert on this path.
      * @return BucketedVariation|null The bucketed variation DTO, or null for all non-success paths
      */
     public function runExperience(string $experienceKey, ?BucketingAttributes $attributes = null): ?BucketedVariation
@@ -234,7 +242,15 @@ final class Context implements ContextInterface
     /**
      * Get variations across all experiences.
      *
-     * @param BucketingAttributes|null $attributes Attributes for the visitor
+     * @param BucketingAttributes|null $attributes visitorProperties (merged with
+     * stored ones, not replacing them); locationProperties; updateVisitorProperties
+     * (persist); environment (override); enableTracking (default true; false only
+     * suppresses the tracking event); ignoreLocationProperties (strict `true` only
+     * -- not `'true'`/`1` -- bypasses the location gate entirely: no location
+     * properties needed, none consulted; audience/environment unaffected);
+     * forceVariationId (selects WITHIN normal gating, NOT preview -- environment/
+     * location/audience still apply; binds only its own experience).
+     * typeCasting/experienceKeys are inert on this path.
      * @return BucketedVariation[] Array of bucketed variation DTOs
      */
     public function runExperiences(?BucketingAttributes $attributes = null): array
@@ -327,7 +343,15 @@ final class Context implements ContextInterface
      * Get feature and its status.
      *
      * @param string $key A feature key
-     * @param BucketingAttributes|null $attributes Attributes for the visitor
+     * @param BucketingAttributes|null $attributes visitorProperties (merged, not
+     * replacing, stored ones); locationProperties; updateVisitorProperties
+     * (persist); environment (override); typeCasting (default true: cast
+     * variable values to their declared type); experienceKeys (limit to
+     * these experiences); enableTracking (default true; false only
+     * suppresses the tracking event); ignoreLocationProperties (strict `true`
+     * only -- not `'true'`/`1` -- bypasses the location gate entirely: none
+     * needed, none consulted; audience/environment unaffected); forceVariationId
+     * (selects WITHIN normal gating, NOT preview; binds only its own experience).
      * @return BucketedFeature|null The bucketed feature DTO, or null for not-found/error paths
      */
     public function runFeature(string $key, ?BucketingAttributes $attributes = null): ?BucketedFeature
@@ -341,16 +365,9 @@ final class Context implements ContextInterface
         }
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
-
-        $forwardedData = [
-            'visitorProperties' => $visitorProperties,
-            'locationProperties' => $attributes?->getLocationProperties(),
-            'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-            'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
-                ? $attributes->getTypeCasting()
-                : true,
-            'environment' => $attributes?->getEnvironment() ?? $this->environment,
-        ];
+        $forwardedData = $attributes ? get_object_vars($attributes) : [];
+        $forwardedData['visitorProperties'] = $visitorProperties;
+        $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
         // qs-02: zero-trace across the WHOLE context once a preview is active —
         // runFeature() buckets every experience in config, not just a named one.
         if ($this->previewExperience !== null) {
@@ -433,7 +450,15 @@ final class Context implements ContextInterface
     /**
      * Get features and their statuses.
      *
-     * @param BucketingAttributes|null $attributes Attributes for the visitor
+     * @param BucketingAttributes|null $attributes visitorProperties (merged, not
+     * replacing, stored ones); locationProperties; updateVisitorProperties
+     * (persist); environment (override); typeCasting (default true: cast
+     * variable values to their declared type); experienceKeys (limit to
+     * these experiences); enableTracking (default true; false only
+     * suppresses the tracking event); ignoreLocationProperties (strict `true`
+     * only -- not `'true'`/`1` -- bypasses the location gate entirely: none
+     * needed, none consulted; audience/environment unaffected); forceVariationId
+     * (selects WITHIN normal gating, NOT preview; binds only its own experience).
      * @return BucketedFeature[] Array of bucketed feature DTOs
      */
     public function runFeatures(?BucketingAttributes $attributes = null): array
@@ -447,23 +472,20 @@ final class Context implements ContextInterface
         }
 
         $visitorProperties = $this->getVisitorProperties($attributes?->getVisitorProperties());
-
-        $forwardedData = [
-            'visitorProperties' => $visitorProperties,
-            'locationProperties' => $attributes?->getLocationProperties(),
-            'updateVisitorProperties' => $attributes?->getUpdateVisitorProperties(),
-            'typeCasting' => $attributes !== null && method_exists($attributes, 'getTypeCasting')
-                ? $attributes->getTypeCasting()
-                : true,
-            'environment' => $attributes?->getEnvironment() ?? $this->environment,
-        ];
+        $forwardedData = $attributes ? get_object_vars($attributes) : [];
+        $forwardedData['visitorProperties'] = $visitorProperties;
+        $forwardedData['environment'] = $forwardedData['environment'] ?? $this->environment;
         // qs-02: zero-trace across the WHOLE context once a preview is active —
         // runFeatures() buckets every experience in config.
         if ($this->previewExperience !== null) {
             $forwardedData['suppressPersistence'] = true;
         }
 
-        $bucketedFeatures = $this->featureManager->runFeatures($this->visitorId, new BucketingAttributes($forwardedData));
+        $bucketedFeatures = $this->featureManager->runFeatures(
+            $this->visitorId,
+            new BucketingAttributes($forwardedData),
+            ['experiences' => $attributes?->getExperienceKeys()]
+        );
 
         // Filter out RuleError results
         $matchedErrors = array_filter($bucketedFeatures, function ($match) {
