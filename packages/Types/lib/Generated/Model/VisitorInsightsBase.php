@@ -305,9 +305,9 @@ class VisitorInsightsBase implements ModelInterface, ArrayAccess, \JsonSerializa
     public function __construct(?array $data = null)
     {
         $this->setIfExists('enabled', $data ?? [], null);
-        $this->setIfExists('obfuscate_text', $data ?? [], true);
+        $this->setIfExists('obfuscate_text', $data ?? [], false);
         $this->setIfExists('sampling_rate', $data ?? [], self::SAMPLING_RATE_NUMBER_5);
-        $this->setIfExists('heatmap_visits_limit', $data ?? [], self::HEATMAP_VISITS_LIMIT_NUMBER_5000);
+        $this->setIfExists('heatmap_visits_limit', $data ?? [], self::HEATMAP_VISITS_LIMIT_NUMBER_2500);
     }
 
     /**
