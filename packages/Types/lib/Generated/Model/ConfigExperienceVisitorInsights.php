@@ -1,6 +1,6 @@
 <?php
 /**
- * SubmitsFormGoal
+ * ConfigExperienceVisitorInsights
  *
  * PHP version 8.1
  *
@@ -32,15 +32,16 @@ use \ArrayAccess;
 use \OpenAPI\Client\ObjectSerializer;
 
 /**
- * SubmitsFormGoal Class Doc Comment
+ * ConfigExperienceVisitorInsights Class Doc Comment
  *
  * @category Class
+ * @description Per-experience Visitor Insights flags for the tracking script. Present as an object when project visitor_insights.enabled is on (&#x60;heatmap_enabled&#x60; and &#x60;signals_enabled&#x60; default true). Omitted when the project setting is off.
  * @package  OpenAPI\Client
  * @author   OpenAPI Generator team
  * @link     https://openapi-generator.tech
  * @implements \ArrayAccess<string, mixed>
  */
-class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
+class ConfigExperienceVisitorInsights implements ModelInterface, ArrayAccess, \JsonSerializable
 {
     public const DISCRIMINATOR = null;
 
@@ -49,7 +50,7 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       *
       * @var string
       */
-    protected static $openAPIModelName = 'SubmitsFormGoal';
+    protected static $openAPIModelName = 'ConfigExperience_visitor_insights';
 
     /**
       * Array of property to type mappings. Used for (de)serialization
@@ -57,12 +58,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       * @var string[]
       */
     protected static $openAPITypes = [
-        'id' => 'string',
-        'name' => 'string',
-        'key' => 'string',
-        'type' => 'string',
-        'rules' => '\OpenAPI\Client\Model\RuleObject',
-        'settings' => '\OpenAPI\Client\Model\SubmitsFormGoalSettings'
+        'heatmap_enabled' => 'bool',
+        'signals_enabled' => 'bool'
     ];
 
     /**
@@ -73,12 +70,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       * @psalm-var array<string, string|null>
       */
     protected static $openAPIFormats = [
-        'id' => null,
-        'name' => null,
-        'key' => null,
-        'type' => null,
-        'rules' => null,
-        'settings' => null
+        'heatmap_enabled' => null,
+        'signals_enabled' => null
     ];
 
     /**
@@ -87,12 +80,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       * @var boolean[]
       */
     protected static array $openAPINullables = [
-        'id' => false,
-        'name' => false,
-        'key' => true,
-        'type' => false,
-        'rules' => true,
-        'settings' => false
+        'heatmap_enabled' => false,
+        'signals_enabled' => false
     ];
 
     /**
@@ -181,12 +170,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $attributeMap = [
-        'id' => 'id',
-        'name' => 'name',
-        'key' => 'key',
-        'type' => 'type',
-        'rules' => 'rules',
-        'settings' => 'settings'
+        'heatmap_enabled' => 'heatmap_enabled',
+        'signals_enabled' => 'signals_enabled'
     ];
 
     /**
@@ -195,12 +180,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $setters = [
-        'id' => 'setId',
-        'name' => 'setName',
-        'key' => 'setKey',
-        'type' => 'setType',
-        'rules' => 'setRules',
-        'settings' => 'setSettings'
+        'heatmap_enabled' => 'setHeatmapEnabled',
+        'signals_enabled' => 'setSignalsEnabled'
     ];
 
     /**
@@ -209,12 +190,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $getters = [
-        'id' => 'getId',
-        'name' => 'getName',
-        'key' => 'getKey',
-        'type' => 'getType',
-        'rules' => 'getRules',
-        'settings' => 'getSettings'
+        'heatmap_enabled' => 'getHeatmapEnabled',
+        'signals_enabled' => 'getSignalsEnabled'
     ];
 
     /**
@@ -258,19 +235,6 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
         return self::$openAPIModelName;
     }
 
-    public const TYPE_SUBMITS_FORM = 'submits_form';
-
-    /**
-     * Gets allowable values of the enum
-     *
-     * @return string[]
-     */
-    public function getTypeAllowableValues()
-    {
-        return [
-            self::TYPE_SUBMITS_FORM,
-        ];
-    }
 
     /**
      * Associative array for storing property values
@@ -287,12 +251,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      */
     public function __construct(?array $data = null)
     {
-        $this->setIfExists('id', $data ?? [], null);
-        $this->setIfExists('name', $data ?? [], null);
-        $this->setIfExists('key', $data ?? [], null);
-        $this->setIfExists('type', $data ?? [], null);
-        $this->setIfExists('rules', $data ?? [], null);
-        $this->setIfExists('settings', $data ?? [], null);
+        $this->setIfExists('heatmap_enabled', $data ?? [], null);
+        $this->setIfExists('signals_enabled', $data ?? [], null);
     }
 
     /**
@@ -322,15 +282,6 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
     {
         $invalidProperties = [];
 
-        $allowedValues = $this->getTypeAllowableValues();
-        if (!is_null($this->container['type']) && !in_array($this->container['type'], $allowedValues, true)) {
-            $invalidProperties[] = sprintf(
-                "invalid value '%s' for 'type', must be one of '%s'",
-                $this->container['type'],
-                implode("', '", $allowedValues)
-            );
-        }
-
         return $invalidProperties;
     }
 
@@ -347,187 +298,55 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
 
 
     /**
-     * Gets id
+     * Gets heatmap_enabled
      *
-     * @return string|null
+     * @return bool|null
      */
-    public function getId()
+    public function getHeatmapEnabled()
     {
-        return $this->container['id'];
+        return $this->container['heatmap_enabled'];
     }
 
     /**
-     * Sets id
+     * Sets heatmap_enabled
      *
-     * @param string|null $id Goal ID
+     * @param bool|null $heatmap_enabled Whether heatmaps are enabled for this experience.
      *
      * @return self
      */
-    public function setId($id)
+    public function setHeatmapEnabled($heatmap_enabled)
     {
-        if (is_null($id)) {
-            throw new \InvalidArgumentException('non-nullable id cannot be null');
+        if (is_null($heatmap_enabled)) {
+            throw new \InvalidArgumentException('non-nullable heatmap_enabled cannot be null');
         }
-        $this->container['id'] = $id;
+        $this->container['heatmap_enabled'] = $heatmap_enabled;
 
         return $this;
     }
 
     /**
-     * Gets name
+     * Gets signals_enabled
      *
-     * @return string|null
+     * @return bool|null
      */
-    public function getName()
+    public function getSignalsEnabled()
     {
-        return $this->container['name'];
+        return $this->container['signals_enabled'];
     }
 
     /**
-     * Sets name
+     * Sets signals_enabled
      *
-     * @param string|null $name Goal Name.
+     * @param bool|null $signals_enabled Whether session recordings (Convert Signals™) are enabled for this experience.
      *
      * @return self
      */
-    public function setName($name)
+    public function setSignalsEnabled($signals_enabled)
     {
-        if (is_null($name)) {
-            throw new \InvalidArgumentException('non-nullable name cannot be null');
+        if (is_null($signals_enabled)) {
+            throw new \InvalidArgumentException('non-nullable signals_enabled cannot be null');
         }
-        $this->container['name'] = $name;
-
-        return $this;
-    }
-
-    /**
-     * Gets key
-     *
-     * @return string|null
-     */
-    public function getKey()
-    {
-        return $this->container['key'];
-    }
-
-    /**
-     * Sets key
-     *
-     * @param string|null $key Goal Key
-     *
-     * @return self
-     */
-    public function setKey($key)
-    {
-        if (is_null($key)) {
-            array_push($this->openAPINullablesSetToNull, 'key');
-        } else {
-            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
-            $index = array_search('key', $nullablesSetToNull);
-            if ($index !== FALSE) {
-                unset($nullablesSetToNull[$index]);
-                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
-            }
-        }
-        $this->container['key'] = $key;
-
-        return $this;
-    }
-
-    /**
-     * Gets type
-     *
-     * @return string|null
-     */
-    public function getType()
-    {
-        return $this->container['type'];
-    }
-
-    /**
-     * Sets type
-     *
-     * @param string|null $type type
-     *
-     * @return self
-     */
-    public function setType($type)
-    {
-        if (is_null($type)) {
-            throw new \InvalidArgumentException('non-nullable type cannot be null');
-        }
-        $allowedValues = $this->getTypeAllowableValues();
-        if (!in_array($type, $allowedValues, true)) {
-            throw new \InvalidArgumentException(
-                sprintf(
-                    "Invalid value '%s' for 'type', must be one of '%s'",
-                    $type,
-                    implode("', '", $allowedValues)
-                )
-            );
-        }
-        $this->container['type'] = $type;
-
-        return $this;
-    }
-
-    /**
-     * Gets rules
-     *
-     * @return \OpenAPI\Client\Model\RuleObject|null
-     */
-    public function getRules()
-    {
-        return $this->container['rules'];
-    }
-
-    /**
-     * Sets rules
-     *
-     * @param \OpenAPI\Client\Model\RuleObject|null $rules rules
-     *
-     * @return self
-     */
-    public function setRules($rules)
-    {
-        if (is_null($rules)) {
-            array_push($this->openAPINullablesSetToNull, 'rules');
-        } else {
-            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
-            $index = array_search('rules', $nullablesSetToNull);
-            if ($index !== FALSE) {
-                unset($nullablesSetToNull[$index]);
-                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
-            }
-        }
-        $this->container['rules'] = $rules;
-
-        return $this;
-    }
-
-    /**
-     * Gets settings
-     *
-     * @return \OpenAPI\Client\Model\SubmitsFormGoalSettings|null
-     */
-    public function getSettings()
-    {
-        return $this->container['settings'];
-    }
-
-    /**
-     * Sets settings
-     *
-     * @param \OpenAPI\Client\Model\SubmitsFormGoalSettings|null $settings settings
-     *
-     * @return self
-     */
-    public function setSettings($settings)
-    {
-        if (is_null($settings)) {
-            throw new \InvalidArgumentException('non-nullable settings cannot be null');
-        }
-        $this->container['settings'] = $settings;
+        $this->container['signals_enabled'] = $signals_enabled;
 
         return $this;
     }
