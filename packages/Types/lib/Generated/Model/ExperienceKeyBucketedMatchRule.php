@@ -1,6 +1,6 @@
 <?php
 /**
- * SubmitsFormGoal
+ * ExperienceKeyBucketedMatchRule
  *
  * PHP version 8.1
  *
@@ -32,7 +32,7 @@ use \ArrayAccess;
 use \OpenAPI\Client\ObjectSerializer;
 
 /**
- * SubmitsFormGoal Class Doc Comment
+ * ExperienceKeyBucketedMatchRule Class Doc Comment
  *
  * @category Class
  * @package  OpenAPI\Client
@@ -40,7 +40,7 @@ use \OpenAPI\Client\ObjectSerializer;
  * @link     https://openapi-generator.tech
  * @implements \ArrayAccess<string, mixed>
  */
-class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
+class ExperienceKeyBucketedMatchRule implements ModelInterface, ArrayAccess, \JsonSerializable
 {
     public const DISCRIMINATOR = null;
 
@@ -49,7 +49,7 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       *
       * @var string
       */
-    protected static $openAPIModelName = 'SubmitsFormGoal';
+    protected static $openAPIModelName = 'ExperienceKeyBucketedMatchRule';
 
     /**
       * Array of property to type mappings. Used for (de)serialization
@@ -57,12 +57,9 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       * @var string[]
       */
     protected static $openAPITypes = [
-        'id' => 'string',
-        'name' => 'string',
-        'key' => 'string',
-        'type' => 'string',
-        'rules' => '\OpenAPI\Client\Model\RuleObject',
-        'settings' => '\OpenAPI\Client\Model\SubmitsFormGoalSettings'
+        'rule_type' => '\OpenAPI\Client\Model\ExperienceKeyBucketedMatchRulesTypes',
+        'value' => 'string',
+        'matching' => '\OpenAPI\Client\Model\ExperienceKeyBucketedMatchRuleAllOfMatching'
     ];
 
     /**
@@ -73,12 +70,9 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       * @psalm-var array<string, string|null>
       */
     protected static $openAPIFormats = [
-        'id' => null,
-        'name' => null,
-        'key' => null,
-        'type' => null,
-        'rules' => null,
-        'settings' => null
+        'rule_type' => null,
+        'value' => null,
+        'matching' => null
     ];
 
     /**
@@ -87,12 +81,9 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
       * @var boolean[]
       */
     protected static array $openAPINullables = [
-        'id' => false,
-        'name' => false,
-        'key' => true,
-        'type' => false,
-        'rules' => true,
-        'settings' => false
+        'rule_type' => false,
+        'value' => false,
+        'matching' => false
     ];
 
     /**
@@ -181,12 +172,9 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $attributeMap = [
-        'id' => 'id',
-        'name' => 'name',
-        'key' => 'key',
-        'type' => 'type',
-        'rules' => 'rules',
-        'settings' => 'settings'
+        'rule_type' => 'rule_type',
+        'value' => 'value',
+        'matching' => 'matching'
     ];
 
     /**
@@ -195,12 +183,9 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $setters = [
-        'id' => 'setId',
-        'name' => 'setName',
-        'key' => 'setKey',
-        'type' => 'setType',
-        'rules' => 'setRules',
-        'settings' => 'setSettings'
+        'rule_type' => 'setRuleType',
+        'value' => 'setValue',
+        'matching' => 'setMatching'
     ];
 
     /**
@@ -209,12 +194,9 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      * @var string[]
      */
     protected static $getters = [
-        'id' => 'getId',
-        'name' => 'getName',
-        'key' => 'getKey',
-        'type' => 'getType',
-        'rules' => 'getRules',
-        'settings' => 'getSettings'
+        'rule_type' => 'getRuleType',
+        'value' => 'getValue',
+        'matching' => 'getMatching'
     ];
 
     /**
@@ -258,19 +240,6 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
         return self::$openAPIModelName;
     }
 
-    public const TYPE_SUBMITS_FORM = 'submits_form';
-
-    /**
-     * Gets allowable values of the enum
-     *
-     * @return string[]
-     */
-    public function getTypeAllowableValues()
-    {
-        return [
-            self::TYPE_SUBMITS_FORM,
-        ];
-    }
 
     /**
      * Associative array for storing property values
@@ -287,12 +256,9 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
      */
     public function __construct(?array $data = null)
     {
-        $this->setIfExists('id', $data ?? [], null);
-        $this->setIfExists('name', $data ?? [], null);
-        $this->setIfExists('key', $data ?? [], null);
-        $this->setIfExists('type', $data ?? [], null);
-        $this->setIfExists('rules', $data ?? [], null);
-        $this->setIfExists('settings', $data ?? [], null);
+        $this->setIfExists('rule_type', $data ?? [], null);
+        $this->setIfExists('value', $data ?? [], null);
+        $this->setIfExists('matching', $data ?? [], null);
     }
 
     /**
@@ -322,15 +288,9 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
     {
         $invalidProperties = [];
 
-        $allowedValues = $this->getTypeAllowableValues();
-        if (!is_null($this->container['type']) && !in_array($this->container['type'], $allowedValues, true)) {
-            $invalidProperties[] = sprintf(
-                "invalid value '%s' for 'type', must be one of '%s'",
-                $this->container['type'],
-                implode("', '", $allowedValues)
-            );
+        if ($this->container['rule_type'] === null) {
+            $invalidProperties[] = "'rule_type' can't be null";
         }
-
         return $invalidProperties;
     }
 
@@ -347,187 +307,82 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
 
 
     /**
-     * Gets id
+     * Gets rule_type
+     *
+     * @return \OpenAPI\Client\Model\ExperienceKeyBucketedMatchRulesTypes
+     */
+    public function getRuleType()
+    {
+        return $this->container['rule_type'];
+    }
+
+    /**
+     * Sets rule_type
+     *
+     * @param \OpenAPI\Client\Model\ExperienceKeyBucketedMatchRulesTypes $rule_type rule_type
+     *
+     * @return self
+     */
+    public function setRuleType($rule_type)
+    {
+        if (is_null($rule_type)) {
+            throw new \InvalidArgumentException('non-nullable rule_type cannot be null');
+        }
+        $this->container['rule_type'] = $rule_type;
+
+        return $this;
+    }
+
+    /**
+     * Gets value
      *
      * @return string|null
      */
-    public function getId()
+    public function getValue()
     {
-        return $this->container['id'];
+        return $this->container['value'];
     }
 
     /**
-     * Sets id
+     * Sets value
      *
-     * @param string|null $id Goal ID
+     * @param string|null $value The value used to match against 'rule_type' using 'matching'
      *
      * @return self
      */
-    public function setId($id)
+    public function setValue($value)
     {
-        if (is_null($id)) {
-            throw new \InvalidArgumentException('non-nullable id cannot be null');
+        if (is_null($value)) {
+            throw new \InvalidArgumentException('non-nullable value cannot be null');
         }
-        $this->container['id'] = $id;
+        $this->container['value'] = $value;
 
         return $this;
     }
 
     /**
-     * Gets name
+     * Gets matching
      *
-     * @return string|null
+     * @return \OpenAPI\Client\Model\ExperienceKeyBucketedMatchRuleAllOfMatching|null
      */
-    public function getName()
+    public function getMatching()
     {
-        return $this->container['name'];
+        return $this->container['matching'];
     }
 
     /**
-     * Sets name
+     * Sets matching
      *
-     * @param string|null $name Goal Name.
+     * @param \OpenAPI\Client\Model\ExperienceKeyBucketedMatchRuleAllOfMatching|null $matching matching
      *
      * @return self
      */
-    public function setName($name)
+    public function setMatching($matching)
     {
-        if (is_null($name)) {
-            throw new \InvalidArgumentException('non-nullable name cannot be null');
+        if (is_null($matching)) {
+            throw new \InvalidArgumentException('non-nullable matching cannot be null');
         }
-        $this->container['name'] = $name;
-
-        return $this;
-    }
-
-    /**
-     * Gets key
-     *
-     * @return string|null
-     */
-    public function getKey()
-    {
-        return $this->container['key'];
-    }
-
-    /**
-     * Sets key
-     *
-     * @param string|null $key Goal Key
-     *
-     * @return self
-     */
-    public function setKey($key)
-    {
-        if (is_null($key)) {
-            array_push($this->openAPINullablesSetToNull, 'key');
-        } else {
-            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
-            $index = array_search('key', $nullablesSetToNull);
-            if ($index !== FALSE) {
-                unset($nullablesSetToNull[$index]);
-                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
-            }
-        }
-        $this->container['key'] = $key;
-
-        return $this;
-    }
-
-    /**
-     * Gets type
-     *
-     * @return string|null
-     */
-    public function getType()
-    {
-        return $this->container['type'];
-    }
-
-    /**
-     * Sets type
-     *
-     * @param string|null $type type
-     *
-     * @return self
-     */
-    public function setType($type)
-    {
-        if (is_null($type)) {
-            throw new \InvalidArgumentException('non-nullable type cannot be null');
-        }
-        $allowedValues = $this->getTypeAllowableValues();
-        if (!in_array($type, $allowedValues, true)) {
-            throw new \InvalidArgumentException(
-                sprintf(
-                    "Invalid value '%s' for 'type', must be one of '%s'",
-                    $type,
-                    implode("', '", $allowedValues)
-                )
-            );
-        }
-        $this->container['type'] = $type;
-
-        return $this;
-    }
-
-    /**
-     * Gets rules
-     *
-     * @return \OpenAPI\Client\Model\RuleObject|null
-     */
-    public function getRules()
-    {
-        return $this->container['rules'];
-    }
-
-    /**
-     * Sets rules
-     *
-     * @param \OpenAPI\Client\Model\RuleObject|null $rules rules
-     *
-     * @return self
-     */
-    public function setRules($rules)
-    {
-        if (is_null($rules)) {
-            array_push($this->openAPINullablesSetToNull, 'rules');
-        } else {
-            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
-            $index = array_search('rules', $nullablesSetToNull);
-            if ($index !== FALSE) {
-                unset($nullablesSetToNull[$index]);
-                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
-            }
-        }
-        $this->container['rules'] = $rules;
-
-        return $this;
-    }
-
-    /**
-     * Gets settings
-     *
-     * @return \OpenAPI\Client\Model\SubmitsFormGoalSettings|null
-     */
-    public function getSettings()
-    {
-        return $this->container['settings'];
-    }
-
-    /**
-     * Sets settings
-     *
-     * @param \OpenAPI\Client\Model\SubmitsFormGoalSettings|null $settings settings
-     *
-     * @return self
-     */
-    public function setSettings($settings)
-    {
-        if (is_null($settings)) {
-            throw new \InvalidArgumentException('non-nullable settings cannot be null');
-        }
-        $this->container['settings'] = $settings;
+        $this->container['matching'] = $matching;
 
         return $this;
     }
