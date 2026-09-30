@@ -62,6 +62,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         'devices' => 'string[]',
         'source' => 'string',
         'campaign' => 'string',
+        'content' => 'string',
         'visitorType' => 'string',
         'country' => 'string',
         'customSegments' => 'string[]'
@@ -79,6 +80,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         'devices' => null,
         'source' => null,
         'campaign' => null,
+        'content' => null,
         'visitorType' => null,
         'country' => null,
         'customSegments' => null
@@ -94,6 +96,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         'devices' => false,
         'source' => false,
         'campaign' => false,
+        'content' => false,
         'visitorType' => false,
         'country' => false,
         'customSegments' => false
@@ -189,6 +192,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         'devices' => 'devices',
         'source' => 'source',
         'campaign' => 'campaign',
+        'content' => 'content',
         'visitorType' => 'visitorType',
         'country' => 'country',
         'customSegments' => 'customSegments'
@@ -204,6 +208,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         'devices' => 'setDevices',
         'source' => 'setSource',
         'campaign' => 'setCampaign',
+        'content' => 'setContent',
         'visitorType' => 'setVisitorType',
         'country' => 'setCountry',
         'customSegments' => 'setCustomSegments'
@@ -219,6 +224,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         'devices' => 'getDevices',
         'source' => 'getSource',
         'campaign' => 'getCampaign',
+        'content' => 'getContent',
         'visitorType' => 'getVisitorType',
         'country' => 'getCountry',
         'customSegments' => 'getCustomSegments'
@@ -371,6 +377,7 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('devices', $data ?? [], null);
         $this->setIfExists('source', $data ?? [], null);
         $this->setIfExists('campaign', $data ?? [], null);
+        $this->setIfExists('content', $data ?? [], null);
         $this->setIfExists('visitorType', $data ?? [], null);
         $this->setIfExists('country', $data ?? [], null);
         $this->setIfExists('customSegments', $data ?? [], null);
@@ -586,6 +593,33 @@ class VisitorSegments implements ModelInterface, ArrayAccess, \JsonSerializable
             throw new \InvalidArgumentException('non-nullable campaign cannot be null');
         }
         $this->container['campaign'] = $campaign;
+
+        return $this;
+    }
+
+    /**
+     * Gets content
+     *
+     * @return string|null
+     */
+    public function getContent()
+    {
+        return $this->container['content'];
+    }
+
+    /**
+     * Sets content
+     *
+     * @param string|null $content Content string (ad-creative identifier from utm_content)
+     *
+     * @return self
+     */
+    public function setContent($content)
+    {
+        if (is_null($content)) {
+            throw new \InvalidArgumentException('non-nullable content cannot be null');
+        }
+        $this->container['content'] = $content;
 
         return $this;
     }

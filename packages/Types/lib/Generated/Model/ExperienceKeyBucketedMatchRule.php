@@ -1,6 +1,6 @@
 <?php
 /**
- * SendTrackingEventsRequestDataVisitorsInner
+ * ExperienceKeyBucketedMatchRule
  *
  * PHP version 8.1
  *
@@ -32,7 +32,7 @@ use \ArrayAccess;
 use \OpenAPI\Client\ObjectSerializer;
 
 /**
- * SendTrackingEventsRequestDataVisitorsInner Class Doc Comment
+ * ExperienceKeyBucketedMatchRule Class Doc Comment
  *
  * @category Class
  * @package  OpenAPI\Client
@@ -40,7 +40,7 @@ use \OpenAPI\Client\ObjectSerializer;
  * @link     https://openapi-generator.tech
  * @implements \ArrayAccess<string, mixed>
  */
-class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, ArrayAccess, \JsonSerializable
+class ExperienceKeyBucketedMatchRule implements ModelInterface, ArrayAccess, \JsonSerializable
 {
     public const DISCRIMINATOR = null;
 
@@ -49,7 +49,7 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
       *
       * @var string
       */
-    protected static $openAPIModelName = 'SendTrackingEventsRequestData_visitors_inner';
+    protected static $openAPIModelName = 'ExperienceKeyBucketedMatchRule';
 
     /**
       * Array of property to type mappings. Used for (de)serialization
@@ -57,9 +57,9 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
       * @var string[]
       */
     protected static $openAPITypes = [
-        'segments' => '\OpenAPI\Client\Model\VisitorSegments',
-        'visitorId' => 'string',
-        'events' => '\OpenAPI\Client\Model\VisitorTrackingEvents[]'
+        'rule_type' => '\OpenAPI\Client\Model\ExperienceKeyBucketedMatchRulesTypes',
+        'value' => 'string',
+        'matching' => '\OpenAPI\Client\Model\ExperienceKeyBucketedMatchRuleAllOfMatching'
     ];
 
     /**
@@ -70,9 +70,9 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
       * @psalm-var array<string, string|null>
       */
     protected static $openAPIFormats = [
-        'segments' => null,
-        'visitorId' => null,
-        'events' => null
+        'rule_type' => null,
+        'value' => null,
+        'matching' => null
     ];
 
     /**
@@ -81,9 +81,9 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
       * @var boolean[]
       */
     protected static array $openAPINullables = [
-        'segments' => false,
-        'visitorId' => false,
-        'events' => false
+        'rule_type' => false,
+        'value' => false,
+        'matching' => false
     ];
 
     /**
@@ -172,9 +172,9 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
      * @var string[]
      */
     protected static $attributeMap = [
-        'segments' => 'segments',
-        'visitorId' => 'visitorId',
-        'events' => 'events'
+        'rule_type' => 'rule_type',
+        'value' => 'value',
+        'matching' => 'matching'
     ];
 
     /**
@@ -183,9 +183,9 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
      * @var string[]
      */
     protected static $setters = [
-        'segments' => 'setSegments',
-        'visitorId' => 'setVisitorId',
-        'events' => 'setEvents'
+        'rule_type' => 'setRuleType',
+        'value' => 'setValue',
+        'matching' => 'setMatching'
     ];
 
     /**
@@ -194,9 +194,9 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
      * @var string[]
      */
     protected static $getters = [
-        'segments' => 'getSegments',
-        'visitorId' => 'getVisitorId',
-        'events' => 'getEvents'
+        'rule_type' => 'getRuleType',
+        'value' => 'getValue',
+        'matching' => 'getMatching'
     ];
 
     /**
@@ -256,9 +256,9 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
      */
     public function __construct(?array $data = null)
     {
-        $this->setIfExists('segments', $data ?? [], null);
-        $this->setIfExists('visitorId', $data ?? [], null);
-        $this->setIfExists('events', $data ?? [], null);
+        $this->setIfExists('rule_type', $data ?? [], null);
+        $this->setIfExists('value', $data ?? [], null);
+        $this->setIfExists('matching', $data ?? [], null);
     }
 
     /**
@@ -288,10 +288,9 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
     {
         $invalidProperties = [];
 
-        if (!is_null($this->container['visitorId']) && !preg_match("/^[0-9a-zA-Z._-]+$/", $this->container['visitorId'])) {
-            $invalidProperties[] = "invalid value for 'visitor_id', must be conform to the pattern /^[0-9a-zA-Z._-]+$/.";
+        if ($this->container['rule_type'] === null) {
+            $invalidProperties[] = "'rule_type' can't be null";
         }
-
         return $invalidProperties;
     }
 
@@ -308,87 +307,82 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
 
 
     /**
-     * Gets segments
+     * Gets rule_type
      *
-     * @return \OpenAPI\Client\Model\VisitorSegments|null
+     * @return \OpenAPI\Client\Model\ExperienceKeyBucketedMatchRulesTypes
      */
-    public function getSegments()
+    public function getRuleType()
     {
-        return $this->container['segments'];
+        return $this->container['rule_type'];
     }
 
     /**
-     * Sets segments
+     * Sets rule_type
      *
-     * @param \OpenAPI\Client\Model\VisitorSegments|null $segments segments
+     * @param \OpenAPI\Client\Model\ExperienceKeyBucketedMatchRulesTypes $rule_type rule_type
      *
      * @return self
      */
-    public function setSegments($segments)
+    public function setRuleType($rule_type)
     {
-        if (is_null($segments)) {
-            throw new \InvalidArgumentException('non-nullable segments cannot be null');
+        if (is_null($rule_type)) {
+            throw new \InvalidArgumentException('non-nullable rule_type cannot be null');
         }
-        $this->container['segments'] = $segments;
+        $this->container['rule_type'] = $rule_type;
 
         return $this;
     }
 
     /**
-     * Gets visitor_id
+     * Gets value
      *
      * @return string|null
      */
-    public function getVisitorId()
+    public function getValue()
     {
-        return $this->container['visitorId'];
+        return $this->container['value'];
     }
 
     /**
-     * Sets visitor_id
+     * Sets value
      *
-     * @param string|null $visitor_id The ID of the visitor tracked. Only 0-9, a-z, A-Z, ., - and _ are allowed. The tracking server drops a visitor whose ID breaks this rule and still answers 200, so the events never reach reports or Live Logs. Keep the ID to 64 characters or fewer. One longer ID can stop reports from using visitor-level revenue statistics for its whole variation. An ID over 256 characters may not be tracked at all.
+     * @param string|null $value The value used to match against 'rule_type' using 'matching'
      *
      * @return self
      */
-    public function setVisitorId($visitor_id)
+    public function setValue($value)
     {
-        if (is_null($visitor_id)) {
-            throw new \InvalidArgumentException('non-nullable visitor_id cannot be null');
+        if (is_null($value)) {
+            throw new \InvalidArgumentException('non-nullable value cannot be null');
         }
-
-        if ((!preg_match("/^[0-9a-zA-Z._-]+$/", ObjectSerializer::toString($visitor_id)))) {
-            throw new \InvalidArgumentException("invalid value for \$visitor_id when calling SendTrackingEventsRequestDataVisitorsInner., must conform to the pattern /^[0-9a-zA-Z._-]+$/.");
-        }
-
-        $this->container['visitorId'] = $visitor_id;
+        $this->container['value'] = $value;
 
         return $this;
     }
 
     /**
-     * Gets events
+     * Gets matching
      *
-     * @return \OpenAPI\Client\Model\VisitorTrackingEvents[]|null
+     * @return \OpenAPI\Client\Model\ExperienceKeyBucketedMatchRuleAllOfMatching|null
      */
-    public function getEvents()
+    public function getMatching()
     {
-        return $this->container['events'];
+        return $this->container['matching'];
     }
 
     /**
-     * Sets events
+     * Sets matching
      *
-     * @param \OpenAPI\Client\Model\VisitorTrackingEvents[]|null $events List of events fired for the given visitor
+     * @param \OpenAPI\Client\Model\ExperienceKeyBucketedMatchRuleAllOfMatching|null $matching matching
      *
      * @return self
      */
-    public function setEvents($events)
+    public function setMatching($matching)
     {
-        if (is_null($events)) {
-            throw new \InvalidArgumentException('non-nullable events cannot be null');
+        if (is_null($matching)) {
+            throw new \InvalidArgumentException('non-nullable matching cannot be null');
         }
-        $this->container['events'] = $events;
+        $this->container['matching'] = $matching;
 
         return $this;
     }

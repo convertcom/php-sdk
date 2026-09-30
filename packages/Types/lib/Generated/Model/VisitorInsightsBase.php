@@ -246,33 +246,10 @@ class VisitorInsightsBase implements ModelInterface, ArrayAccess, \JsonSerializa
         return self::$openAPIModelName;
     }
 
-    public const SAMPLING_RATE_NUMBER_5 = 5;
-    public const SAMPLING_RATE_NUMBER_10 = 10;
-    public const SAMPLING_RATE_NUMBER_20 = 20;
-    public const SAMPLING_RATE_NUMBER_30 = 30;
-    public const SAMPLING_RATE_NUMBER_40 = 40;
-    public const SAMPLING_RATE_NUMBER_50 = 50;
     public const HEATMAP_VISITS_LIMIT_NUMBER_2500 = 2500;
     public const HEATMAP_VISITS_LIMIT_NUMBER_5000 = 5000;
     public const HEATMAP_VISITS_LIMIT_NUMBER_10000 = 10000;
     public const HEATMAP_VISITS_LIMIT_NUMBER_15000 = 15000;
-
-    /**
-     * Gets allowable values of the enum
-     *
-     * @return string[]
-     */
-    public function getSamplingRateAllowableValues()
-    {
-        return [
-            self::SAMPLING_RATE_NUMBER_5,
-            self::SAMPLING_RATE_NUMBER_10,
-            self::SAMPLING_RATE_NUMBER_20,
-            self::SAMPLING_RATE_NUMBER_30,
-            self::SAMPLING_RATE_NUMBER_40,
-            self::SAMPLING_RATE_NUMBER_50,
-        ];
-    }
 
     /**
      * Gets allowable values of the enum
@@ -305,9 +282,9 @@ class VisitorInsightsBase implements ModelInterface, ArrayAccess, \JsonSerializa
     public function __construct(?array $data = null)
     {
         $this->setIfExists('enabled', $data ?? [], null);
-        $this->setIfExists('obfuscate_text', $data ?? [], true);
-        $this->setIfExists('sampling_rate', $data ?? [], self::SAMPLING_RATE_NUMBER_5);
-        $this->setIfExists('heatmap_visits_limit', $data ?? [], self::HEATMAP_VISITS_LIMIT_NUMBER_5000);
+        $this->setIfExists('obfuscate_text', $data ?? [], false);
+        $this->setIfExists('sampling_rate', $data ?? [], 5);
+        $this->setIfExists('heatmap_visits_limit', $data ?? [], self::HEATMAP_VISITS_LIMIT_NUMBER_2500);
     }
 
     /**
@@ -337,13 +314,12 @@ class VisitorInsightsBase implements ModelInterface, ArrayAccess, \JsonSerializa
     {
         $invalidProperties = [];
 
-        $allowedValues = $this->getSamplingRateAllowableValues();
-        if (!is_null($this->container['sampling_rate']) && !in_array($this->container['sampling_rate'], $allowedValues, true)) {
-            $invalidProperties[] = sprintf(
-                "invalid value '%s' for 'sampling_rate', must be one of '%s'",
-                $this->container['sampling_rate'],
-                implode("', '", $allowedValues)
-            );
+        if (!is_null($this->container['sampling_rate']) && ($this->container['sampling_rate'] > 100)) {
+            $invalidProperties[] = "invalid value for 'sampling_rate', must be smaller than or equal to 100.";
+        }
+
+        if (!is_null($this->container['sampling_rate']) && ($this->container['sampling_rate'] < 0)) {
+            $invalidProperties[] = "invalid value for 'sampling_rate', must be bigger than or equal to 0.";
         }
 
         $allowedValues = $this->getHeatmapVisitsLimitAllowableValues();
@@ -446,16 +422,14 @@ class VisitorInsightsBase implements ModelInterface, ArrayAccess, \JsonSerializa
         if (is_null($sampling_rate)) {
             throw new \InvalidArgumentException('non-nullable sampling_rate cannot be null');
         }
-        $allowedValues = $this->getSamplingRateAllowableValues();
-        if (!in_array($sampling_rate, $allowedValues, true)) {
-            throw new \InvalidArgumentException(
-                sprintf(
-                    "Invalid value '%s' for 'sampling_rate', must be one of '%s'",
-                    $sampling_rate,
-                    implode("', '", $allowedValues)
-                )
-            );
+
+        if (($sampling_rate > 100)) {
+            throw new \InvalidArgumentException('invalid value for $sampling_rate when calling VisitorInsightsBase., must be smaller than or equal to 100.');
         }
+        if (($sampling_rate < 0)) {
+            throw new \InvalidArgumentException('invalid value for $sampling_rate when calling VisitorInsightsBase., must be bigger than or equal to 0.');
+        }
+
         $this->container['sampling_rate'] = $sampling_rate;
 
         return $this;
