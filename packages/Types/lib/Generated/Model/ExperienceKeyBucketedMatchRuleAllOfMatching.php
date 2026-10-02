@@ -1,6 +1,6 @@
 <?php
 /**
- * SendTrackingEventsRequestDataVisitorsInner
+ * ExperienceKeyBucketedMatchRuleAllOfMatching
  *
  * PHP version 8.1
  *
@@ -32,7 +32,7 @@ use \ArrayAccess;
 use \OpenAPI\Client\ObjectSerializer;
 
 /**
- * SendTrackingEventsRequestDataVisitorsInner Class Doc Comment
+ * ExperienceKeyBucketedMatchRuleAllOfMatching Class Doc Comment
  *
  * @category Class
  * @package  OpenAPI\Client
@@ -40,7 +40,7 @@ use \OpenAPI\Client\ObjectSerializer;
  * @link     https://openapi-generator.tech
  * @implements \ArrayAccess<string, mixed>
  */
-class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, ArrayAccess, \JsonSerializable
+class ExperienceKeyBucketedMatchRuleAllOfMatching implements ModelInterface, ArrayAccess, \JsonSerializable
 {
     public const DISCRIMINATOR = null;
 
@@ -49,7 +49,7 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
       *
       * @var string
       */
-    protected static $openAPIModelName = 'SendTrackingEventsRequestData_visitors_inner';
+    protected static $openAPIModelName = 'ExperienceKeyBucketedMatchRule_allOf_matching';
 
     /**
       * Array of property to type mappings. Used for (de)serialization
@@ -57,9 +57,8 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
       * @var string[]
       */
     protected static $openAPITypes = [
-        'segments' => '\OpenAPI\Client\Model\VisitorSegments',
-        'visitorId' => 'string',
-        'events' => '\OpenAPI\Client\Model\VisitorTrackingEvents[]'
+        'negated' => 'bool',
+        'match_type' => '\OpenAPI\Client\Model\ChoiceMatchingOptions'
     ];
 
     /**
@@ -70,9 +69,8 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
       * @psalm-var array<string, string|null>
       */
     protected static $openAPIFormats = [
-        'segments' => null,
-        'visitorId' => null,
-        'events' => null
+        'negated' => null,
+        'match_type' => null
     ];
 
     /**
@@ -81,9 +79,8 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
       * @var boolean[]
       */
     protected static array $openAPINullables = [
-        'segments' => false,
-        'visitorId' => false,
-        'events' => false
+        'negated' => false,
+        'match_type' => false
     ];
 
     /**
@@ -172,9 +169,8 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
      * @var string[]
      */
     protected static $attributeMap = [
-        'segments' => 'segments',
-        'visitorId' => 'visitorId',
-        'events' => 'events'
+        'negated' => 'negated',
+        'match_type' => 'match_type'
     ];
 
     /**
@@ -183,9 +179,8 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
      * @var string[]
      */
     protected static $setters = [
-        'segments' => 'setSegments',
-        'visitorId' => 'setVisitorId',
-        'events' => 'setEvents'
+        'negated' => 'setNegated',
+        'match_type' => 'setMatchType'
     ];
 
     /**
@@ -194,9 +189,8 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
      * @var string[]
      */
     protected static $getters = [
-        'segments' => 'getSegments',
-        'visitorId' => 'getVisitorId',
-        'events' => 'getEvents'
+        'negated' => 'getNegated',
+        'match_type' => 'getMatchType'
     ];
 
     /**
@@ -256,9 +250,8 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
      */
     public function __construct(?array $data = null)
     {
-        $this->setIfExists('segments', $data ?? [], null);
-        $this->setIfExists('visitorId', $data ?? [], null);
-        $this->setIfExists('events', $data ?? [], null);
+        $this->setIfExists('negated', $data ?? [], null);
+        $this->setIfExists('match_type', $data ?? [], null);
     }
 
     /**
@@ -288,10 +281,6 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
     {
         $invalidProperties = [];
 
-        if (!is_null($this->container['visitorId']) && !preg_match("/^[0-9a-zA-Z._-]+$/", $this->container['visitorId'])) {
-            $invalidProperties[] = "invalid value for 'visitor_id', must be conform to the pattern /^[0-9a-zA-Z._-]+$/.";
-        }
-
         return $invalidProperties;
     }
 
@@ -308,87 +297,55 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
 
 
     /**
-     * Gets segments
+     * Gets negated
      *
-     * @return \OpenAPI\Client\Model\VisitorSegments|null
+     * @return bool|null
      */
-    public function getSegments()
+    public function getNegated()
     {
-        return $this->container['segments'];
+        return $this->container['negated'];
     }
 
     /**
-     * Sets segments
+     * Sets negated
      *
-     * @param \OpenAPI\Client\Model\VisitorSegments|null $segments segments
+     * @param bool|null $negated If `true`, the logical result of the match is inverted. For example, if `match_type` is 'contains' and `value` is 'apple', `negated: true` means the rule matches if the attribute *does not* contain 'apple'.
      *
      * @return self
      */
-    public function setSegments($segments)
+    public function setNegated($negated)
     {
-        if (is_null($segments)) {
-            throw new \InvalidArgumentException('non-nullable segments cannot be null');
+        if (is_null($negated)) {
+            throw new \InvalidArgumentException('non-nullable negated cannot be null');
         }
-        $this->container['segments'] = $segments;
+        $this->container['negated'] = $negated;
 
         return $this;
     }
 
     /**
-     * Gets visitor_id
+     * Gets match_type
      *
-     * @return string|null
+     * @return \OpenAPI\Client\Model\ChoiceMatchingOptions|null
      */
-    public function getVisitorId()
+    public function getMatchType()
     {
-        return $this->container['visitorId'];
+        return $this->container['match_type'];
     }
 
     /**
-     * Sets visitor_id
+     * Sets match_type
      *
-     * @param string|null $visitor_id The ID of the visitor tracked. Only 0-9, a-z, A-Z, ., - and _ are allowed. The tracking server drops a visitor whose ID breaks this rule and still answers 200, so the events never reach reports or Live Logs. Keep the ID to 64 characters or fewer. One longer ID can stop reports from using visitor-level revenue statistics for its whole variation. An ID over 256 characters may not be tracked at all.
+     * @param \OpenAPI\Client\Model\ChoiceMatchingOptions|null $match_type match_type
      *
      * @return self
      */
-    public function setVisitorId($visitor_id)
+    public function setMatchType($match_type)
     {
-        if (is_null($visitor_id)) {
-            throw new \InvalidArgumentException('non-nullable visitor_id cannot be null');
+        if (is_null($match_type)) {
+            throw new \InvalidArgumentException('non-nullable match_type cannot be null');
         }
-
-        if ((!preg_match("/^[0-9a-zA-Z._-]+$/", ObjectSerializer::toString($visitor_id)))) {
-            throw new \InvalidArgumentException("invalid value for \$visitor_id when calling SendTrackingEventsRequestDataVisitorsInner., must conform to the pattern /^[0-9a-zA-Z._-]+$/.");
-        }
-
-        $this->container['visitorId'] = $visitor_id;
-
-        return $this;
-    }
-
-    /**
-     * Gets events
-     *
-     * @return \OpenAPI\Client\Model\VisitorTrackingEvents[]|null
-     */
-    public function getEvents()
-    {
-        return $this->container['events'];
-    }
-
-    /**
-     * Sets events
-     *
-     * @param \OpenAPI\Client\Model\VisitorTrackingEvents[]|null $events List of events fired for the given visitor
-     *
-     * @return self
-     */
-    public function setEvents($events)
-    {
-        if (is_null($events)) {
-            throw new \InvalidArgumentException('non-nullable events cannot be null');
-        }
-        $this->container['events'] = $events;
+        $this->container['match_type'] = $match_type;
 
         return $this;
     }
