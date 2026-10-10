@@ -288,6 +288,10 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
     {
         $invalidProperties = [];
 
+        if (!is_null($this->container['visitorId']) && !preg_match("/^[0-9a-zA-Z._-]+$/", $this->container['visitorId'])) {
+            $invalidProperties[] = "invalid value for 'visitor_id', must be conform to the pattern /^[0-9a-zA-Z._-]+$/.";
+        }
+
         return $invalidProperties;
     }
 
@@ -343,7 +347,7 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
     /**
      * Sets visitor_id
      *
-     * @param string|null $visitor_id Id of the visitor tracked
+     * @param string|null $visitor_id The ID of the visitor tracked. Only 0-9, a-z, A-Z, ., - and _ are allowed. The tracking server drops a visitor whose ID breaks this rule and still answers 200, so the events never reach reports or Live Logs. Keep the ID to 64 characters or fewer. One longer ID can stop reports from using visitor-level revenue statistics for its whole variation. An ID over 256 characters may not be tracked at all.
      *
      * @return self
      */
@@ -352,6 +356,11 @@ class SendTrackingEventsRequestDataVisitorsInner implements ModelInterface, Arra
         if (is_null($visitor_id)) {
             throw new \InvalidArgumentException('non-nullable visitor_id cannot be null');
         }
+
+        if ((!preg_match("/^[0-9a-zA-Z._-]+$/", ObjectSerializer::toString($visitor_id)))) {
+            throw new \InvalidArgumentException("invalid value for \$visitor_id when calling SendTrackingEventsRequestDataVisitorsInner., must conform to the pattern /^[0-9a-zA-Z._-]+$/.");
+        }
+
         $this->container['visitorId'] = $visitor_id;
 
         return $this;
