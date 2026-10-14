@@ -59,7 +59,7 @@ class VisitorInsightsData implements ModelInterface, ArrayAccess, \JsonSerializa
     protected static $openAPITypes = [
         'enabled' => 'bool',
         'obfuscate_text' => 'bool',
-        'sampling_rate' => 'float',
+        'sampling_rate' => 'int',
         'heatmap_visits_limit' => 'int',
         'tracking_id' => 'string'
     ];
@@ -288,9 +288,9 @@ class VisitorInsightsData implements ModelInterface, ArrayAccess, \JsonSerializa
     public function __construct(?array $data = null)
     {
         $this->setIfExists('enabled', $data ?? [], null);
-        $this->setIfExists('obfuscate_text', $data ?? [], true);
+        $this->setIfExists('obfuscate_text', $data ?? [], false);
         $this->setIfExists('sampling_rate', $data ?? [], 5);
-        $this->setIfExists('heatmap_visits_limit', $data ?? [], self::HEATMAP_VISITS_LIMIT_NUMBER_5000);
+        $this->setIfExists('heatmap_visits_limit', $data ?? [], self::HEATMAP_VISITS_LIMIT_NUMBER_2500);
         $this->setIfExists('tracking_id', $data ?? [], null);
     }
 
@@ -410,7 +410,7 @@ class VisitorInsightsData implements ModelInterface, ArrayAccess, \JsonSerializa
     /**
      * Gets sampling_rate
      *
-     * @return float|null
+     * @return int|null
      */
     public function getSamplingRate()
     {
@@ -420,7 +420,7 @@ class VisitorInsightsData implements ModelInterface, ArrayAccess, \JsonSerializa
     /**
      * Sets sampling_rate
      *
-     * @param float|null $sampling_rate The sampling rate for tracking events.
+     * @param int|null $sampling_rate The sampling rate for tracking events.
      *
      * @return self
      */
