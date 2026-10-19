@@ -61,6 +61,7 @@ class ConfigGoalBase implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => 'string',
         'name' => 'string',
         'key' => 'string',
+        'is_guardrail' => 'bool',
         'type' => '\OpenAPI\Client\Model\GoalTypes[]',
         'rules' => '\OpenAPI\Client\Model\RuleObject'
     ];
@@ -76,6 +77,7 @@ class ConfigGoalBase implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => null,
         'name' => null,
         'key' => null,
+        'is_guardrail' => null,
         'type' => null,
         'rules' => null
     ];
@@ -88,7 +90,8 @@ class ConfigGoalBase implements ModelInterface, ArrayAccess, \JsonSerializable
     protected static array $openAPINullables = [
         'id' => false,
         'name' => false,
-        'key' => false,
+        'key' => true,
+        'is_guardrail' => false,
         'type' => false,
         'rules' => true
     ];
@@ -182,6 +185,7 @@ class ConfigGoalBase implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => 'id',
         'name' => 'name',
         'key' => 'key',
+        'is_guardrail' => 'is_guardrail',
         'type' => 'type',
         'rules' => 'rules'
     ];
@@ -195,6 +199,7 @@ class ConfigGoalBase implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => 'setId',
         'name' => 'setName',
         'key' => 'setKey',
+        'is_guardrail' => 'setIsGuardrail',
         'type' => 'setType',
         'rules' => 'setRules'
     ];
@@ -208,6 +213,7 @@ class ConfigGoalBase implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => 'getId',
         'name' => 'getName',
         'key' => 'getKey',
+        'is_guardrail' => 'getIsGuardrail',
         'type' => 'getType',
         'rules' => 'getRules'
     ];
@@ -272,6 +278,7 @@ class ConfigGoalBase implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('id', $data ?? [], null);
         $this->setIfExists('name', $data ?? [], null);
         $this->setIfExists('key', $data ?? [], null);
+        $this->setIfExists('is_guardrail', $data ?? [], null);
         $this->setIfExists('type', $data ?? [], null);
         $this->setIfExists('rules', $data ?? [], null);
     }
@@ -392,9 +399,43 @@ class ConfigGoalBase implements ModelInterface, ArrayAccess, \JsonSerializable
     public function setKey($key)
     {
         if (is_null($key)) {
-            throw new \InvalidArgumentException('non-nullable key cannot be null');
+            array_push($this->openAPINullablesSetToNull, 'key');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('key', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
         }
         $this->container['key'] = $key;
+
+        return $this;
+    }
+
+    /**
+     * Gets is_guardrail
+     *
+     * @return bool|null
+     */
+    public function getIsGuardrail()
+    {
+        return $this->container['is_guardrail'];
+    }
+
+    /**
+     * Sets is_guardrail
+     *
+     * @param bool|null $is_guardrail Present, and `true`, only when this goal is a guardrail goal. Omitted for every other goal, so a config without guardrail goals is unchanged. Treat a missing value as `false`. The tracking script reports every fire of a guardrail goal, including a fire made by a visitor who is in no experience.
+     *
+     * @return self
+     */
+    public function setIsGuardrail($is_guardrail)
+    {
+        if (is_null($is_guardrail)) {
+            throw new \InvalidArgumentException('non-nullable is_guardrail cannot be null');
+        }
+        $this->container['is_guardrail'] = $is_guardrail;
 
         return $this;
     }
