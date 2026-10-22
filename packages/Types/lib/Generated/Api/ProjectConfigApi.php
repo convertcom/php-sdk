@@ -80,6 +80,12 @@ class ProjectConfigApi
         'getProjectConfigBySdkKey' => [
             'application/json',
         ],
+        'getProjectConfigJs' => [
+            'application/json',
+        ],
+        'getProjectConfigJsBySdkKey' => [
+            'application/json',
+        ],
         'getProjectOptionalSettings' => [
             'application/json',
         ],
@@ -873,6 +879,788 @@ class ProjectConfigApi
      * @return array an array of host settings
      */
     protected function getHostSettingsForgetProjectConfigBySdkKey(): array
+    {
+        return [
+            [
+                "url" => "https://cdn-4.convertexperiments.com/api/v1",
+                "description" => "Live API server for **Configs** endpoints",
+            ],
+            [
+                "url" => "https://cdn-provider-dev.convertexperiments.com/api/v1",
+                "description" => "Live API server for **Configs** endpoints",
+            ]
+        ];
+    }
+
+    /**
+     * Operation getProjectConfigJs
+     *
+     * Default Get Project Config as JavaScript
+     *
+     * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+     * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
+     * @param  int $project_id ID of the project to be retrieved (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJs'] to see the possible values for this operation
+     *
+     * @throws \OpenAPI\Client\ApiException on non-2xx response or if the response body is not in the expected format
+     * @throws \InvalidArgumentException
+     * @return string|\OpenAPI\Client\Model\ErrorData
+     */
+    public function getProjectConfigJs($account_id, $project_id, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJs'][0])
+    {
+        list($response) = $this->getProjectConfigJsWithHttpInfo($account_id, $project_id, $environment, $_conv_assign, $hostIndex, $variables, $contentType);
+        return $response;
+    }
+
+    /**
+     * Operation getProjectConfigJsWithHttpInfo
+     *
+     * Default Get Project Config as JavaScript
+     *
+     * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+     * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
+     * @param  int $project_id ID of the project to be retrieved (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJs'] to see the possible values for this operation
+     *
+     * @throws \OpenAPI\Client\ApiException on non-2xx response or if the response body is not in the expected format
+     * @throws \InvalidArgumentException
+     * @return array of string|\OpenAPI\Client\Model\ErrorData, HTTP status code, HTTP response headers (array of strings)
+     */
+    public function getProjectConfigJsWithHttpInfo($account_id, $project_id, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJs'][0])
+    {
+        $request = $this->getProjectConfigJsRequest($account_id, $project_id, $environment, $_conv_assign, $hostIndex, $variables, $contentType);
+
+        try {
+            $options = $this->createHttpClientOption();
+            try {
+                $response = $this->client->send($request, $options);
+            } catch (RequestException $e) {
+                throw new ApiException(
+                    "[{$e->getCode()}] {$e->getMessage()}",
+                    (int) $e->getCode(),
+                    $e->getResponse() ? $e->getResponse()->getHeaders() : null,
+                    $e->getResponse() ? (string) $e->getResponse()->getBody() : null
+                );
+            } catch (ConnectException $e) {
+                throw new ApiException(
+                    "[{$e->getCode()}] {$e->getMessage()}",
+                    (int) $e->getCode(),
+                    null,
+                    null
+                );
+            }
+
+            $statusCode = $response->getStatusCode();
+
+
+            switch($statusCode) {
+                case 200:
+                    return $this->handleResponseWithDataType(
+                        'string',
+                        $request,
+                        $response,
+                    );
+                default:
+                    return $this->handleResponseWithDataType(
+                        '\OpenAPI\Client\Model\ErrorData',
+                        $request,
+                        $response,
+                    );
+            }
+
+            
+
+            if ($statusCode < 200 || $statusCode > 299) {
+                throw new ApiException(
+                    sprintf(
+                        '[%d] Error connecting to the API (%s)',
+                        $statusCode,
+                        (string) $request->getUri()
+                    ),
+                    $statusCode,
+                    $response->getHeaders(),
+                    (string) $response->getBody()
+                );
+            }
+
+            return $this->handleResponseWithDataType(
+                'string',
+                $request,
+                $response,
+            );
+        } catch (ApiException $e) {
+            switch ($e->getCode()) {
+                case 200:
+                    $data = ObjectSerializer::deserialize(
+                        $e->getResponseBody(),
+                        'string',
+                        $e->getResponseHeaders()
+                    );
+                    $e->setResponseObject($data);
+                    throw $e;
+                default:
+                    $data = ObjectSerializer::deserialize(
+                        $e->getResponseBody(),
+                        '\OpenAPI\Client\Model\ErrorData',
+                        $e->getResponseHeaders()
+                    );
+                    $e->setResponseObject($data);
+                    throw $e;
+            }
+        
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Operation getProjectConfigJsAsync
+     *
+     * Default Get Project Config as JavaScript
+     *
+     * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+     * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
+     * @param  int $project_id ID of the project to be retrieved (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJs'] to see the possible values for this operation
+     *
+     * @throws \InvalidArgumentException
+     * @return \GuzzleHttp\Promise\PromiseInterface
+     */
+    public function getProjectConfigJsAsync($account_id, $project_id, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJs'][0])
+    {
+        return $this->getProjectConfigJsAsyncWithHttpInfo($account_id, $project_id, $environment, $_conv_assign, $hostIndex, $variables, $contentType)
+            ->then(
+                function ($response) {
+                    return $response[0];
+                }
+            );
+    }
+
+    /**
+     * Operation getProjectConfigJsAsyncWithHttpInfo
+     *
+     * Default Get Project Config as JavaScript
+     *
+     * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+     * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
+     * @param  int $project_id ID of the project to be retrieved (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJs'] to see the possible values for this operation
+     *
+     * @throws \InvalidArgumentException
+     * @return \GuzzleHttp\Promise\PromiseInterface
+     */
+    public function getProjectConfigJsAsyncWithHttpInfo($account_id, $project_id, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJs'][0])
+    {
+        $returnType = 'string';
+        $request = $this->getProjectConfigJsRequest($account_id, $project_id, $environment, $_conv_assign, $hostIndex, $variables, $contentType);
+
+        return $this->client
+            ->sendAsync($request, $this->createHttpClientOption())
+            ->then(
+                function ($response) use ($returnType) {
+                    if ($returnType === '\SplFileObject') {
+                        $content = $response->getBody(); //stream goes to serializer
+                    } else {
+                        $content = (string) $response->getBody();
+                        if ($returnType !== 'string') {
+                            $content = json_decode($content);
+                        }
+                    }
+
+                    return [
+                        ObjectSerializer::deserialize($content, $returnType, []),
+                        $response->getStatusCode(),
+                        $response->getHeaders()
+                    ];
+                },
+                function ($exception) {
+                    $response = $exception->getResponse();
+                    $statusCode = $response->getStatusCode();
+                    throw new ApiException(
+                        sprintf(
+                            '[%d] Error connecting to the API (%s)',
+                            $statusCode,
+                            $exception->getRequest()->getUri()
+                        ),
+                        $statusCode,
+                        $response->getHeaders(),
+                        (string) $response->getBody()
+                    );
+                }
+            );
+    }
+
+    /**
+     * Create request for operation 'getProjectConfigJs'
+     *
+    * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+    * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
+     * @param  int $project_id ID of the project to be retrieved (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJs'] to see the possible values for this operation
+     *
+     * @throws \InvalidArgumentException
+     * @return \GuzzleHttp\Psr7\Request
+     */
+    public function getProjectConfigJsRequest($account_id, $project_id, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJs'][0])
+    {
+
+        // verify the required parameter 'account_id' is set
+        if ($account_id === null || (is_array($account_id) && count($account_id) === 0)) {
+            throw new \InvalidArgumentException(
+                'Missing the required parameter $account_id when calling getProjectConfigJs'
+            );
+        }
+
+        // verify the required parameter 'project_id' is set
+        if ($project_id === null || (is_array($project_id) && count($project_id) === 0)) {
+            throw new \InvalidArgumentException(
+                'Missing the required parameter $project_id when calling getProjectConfigJs'
+            );
+        }
+
+
+
+
+        $resourcePath = '/config-js/{account_id}/{project_id}';
+        $formParams = [];
+        $queryParams = [];
+        $headerParams = [];
+        $httpBody = '';
+        $multipart = false;
+
+        // query params
+        $queryParams = array_merge($queryParams, ObjectSerializer::toQueryValue(
+            $environment,
+            'environment', // param base name
+            'string', // openApiType
+            'form', // style
+            true, // explode
+            false // required
+        ) ?? []);
+        // query params
+        $queryParams = array_merge($queryParams, ObjectSerializer::toQueryValue(
+            $_conv_assign,
+            '_conv_assign', // param base name
+            'string', // openApiType
+            'form', // style
+            true, // explode
+            false // required
+        ) ?? []);
+
+
+        // path params
+        if ($account_id !== null) {
+            $resourcePath = str_replace(
+                '{' . 'account_id' . '}',
+                ObjectSerializer::toPathValue($account_id),
+                $resourcePath
+            );
+        }
+        // path params
+        if ($project_id !== null) {
+            $resourcePath = str_replace(
+                '{' . 'project_id' . '}',
+                ObjectSerializer::toPathValue($project_id),
+                $resourcePath
+            );
+        }
+
+
+        $headers = $this->headerSelector->selectHeaders(
+            ['application/javascript', 'application/json', ],
+            $contentType,
+            $multipart
+        );
+
+        // for model (json/xml)
+        if (count($formParams) > 0) {
+            if ($multipart) {
+                $multipartContents = [];
+                foreach ($formParams as $formParamName => $formParamValue) {
+                    $formParamValueItems = is_array($formParamValue) ? $formParamValue : [$formParamValue];
+                    foreach ($formParamValueItems as $formParamValueItem) {
+                        $multipartContents[] = [
+                            'name' => $formParamName,
+                            'contents' => $formParamValueItem
+                        ];
+                    }
+                }
+                // for HTTP post (form)
+                $httpBody = new MultipartStream($multipartContents);
+
+            } elseif (stripos($headers['Content-Type'], 'application/json') !== false) {
+                # if Content-Type contains "application/json", json_encode the form parameters
+                $httpBody = \GuzzleHttp\Utils::jsonEncode($formParams);
+            } else {
+                // for HTTP post (form)
+                $httpBody = ObjectSerializer::buildQuery($formParams);
+            }
+        }
+
+
+        $defaultHeaders = [];
+        if ($this->config->getUserAgent()) {
+            $defaultHeaders['User-Agent'] = $this->config->getUserAgent();
+        }
+
+        $headers = array_merge(
+            $defaultHeaders,
+            $headerParams,
+            $headers
+        );
+
+        # Preserve the original behavior of server indexing.
+        if ($hostIndex === null) {
+            $hostIndex = $this->hostIndex;
+        }
+
+        $hostSettings = $this->getHostSettingsForgetProjectConfigJs();
+
+        if ($hostIndex < 0 || $hostIndex >= count($hostSettings)) {
+            throw new \InvalidArgumentException("Invalid index {$hostIndex} when selecting the host. Must be less than ".count($hostSettings));
+        }
+        $operationHost = Configuration::getHostString($hostSettings, $hostIndex, $variables);
+        $query = ObjectSerializer::buildQuery($queryParams);
+        return new Request(
+            'GET',
+            $operationHost . $resourcePath . ($query ? "?{$query}" : ''),
+            $headers,
+            $httpBody
+        );
+    }
+
+    /**
+     * Returns an array of host settings for Operation getProjectConfigJs
+     *
+     * @return array an array of host settings
+     */
+    protected function getHostSettingsForgetProjectConfigJs(): array
+    {
+        return [
+            [
+                "url" => "https://cdn-4.convertexperiments.com/api/v1",
+                "description" => "Live API server for **Configs** endpoints",
+            ],
+            [
+                "url" => "https://cdn-provider-dev.convertexperiments.com/api/v1",
+                "description" => "Live API server for **Configs** endpoints",
+            ]
+        ];
+    }
+
+    /**
+     * Operation getProjectConfigJsBySdkKey
+     *
+     * Sdk-Key Get Project Config as JavaScript
+     *
+     * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+     * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  string $sdk_key The SDK key used to retrieve the project&#39;s config (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJsBySdkKey'] to see the possible values for this operation
+     *
+     * @throws \OpenAPI\Client\ApiException on non-2xx response or if the response body is not in the expected format
+     * @throws \InvalidArgumentException
+     * @return string|\OpenAPI\Client\Model\ErrorData
+     */
+    public function getProjectConfigJsBySdkKey($sdk_key, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJsBySdkKey'][0])
+    {
+        list($response) = $this->getProjectConfigJsBySdkKeyWithHttpInfo($sdk_key, $environment, $_conv_assign, $hostIndex, $variables, $contentType);
+        return $response;
+    }
+
+    /**
+     * Operation getProjectConfigJsBySdkKeyWithHttpInfo
+     *
+     * Sdk-Key Get Project Config as JavaScript
+     *
+     * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+     * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  string $sdk_key The SDK key used to retrieve the project&#39;s config (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJsBySdkKey'] to see the possible values for this operation
+     *
+     * @throws \OpenAPI\Client\ApiException on non-2xx response or if the response body is not in the expected format
+     * @throws \InvalidArgumentException
+     * @return array of string|\OpenAPI\Client\Model\ErrorData, HTTP status code, HTTP response headers (array of strings)
+     */
+    public function getProjectConfigJsBySdkKeyWithHttpInfo($sdk_key, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJsBySdkKey'][0])
+    {
+        $request = $this->getProjectConfigJsBySdkKeyRequest($sdk_key, $environment, $_conv_assign, $hostIndex, $variables, $contentType);
+
+        try {
+            $options = $this->createHttpClientOption();
+            try {
+                $response = $this->client->send($request, $options);
+            } catch (RequestException $e) {
+                throw new ApiException(
+                    "[{$e->getCode()}] {$e->getMessage()}",
+                    (int) $e->getCode(),
+                    $e->getResponse() ? $e->getResponse()->getHeaders() : null,
+                    $e->getResponse() ? (string) $e->getResponse()->getBody() : null
+                );
+            } catch (ConnectException $e) {
+                throw new ApiException(
+                    "[{$e->getCode()}] {$e->getMessage()}",
+                    (int) $e->getCode(),
+                    null,
+                    null
+                );
+            }
+
+            $statusCode = $response->getStatusCode();
+
+
+            switch($statusCode) {
+                case 200:
+                    return $this->handleResponseWithDataType(
+                        'string',
+                        $request,
+                        $response,
+                    );
+                default:
+                    return $this->handleResponseWithDataType(
+                        '\OpenAPI\Client\Model\ErrorData',
+                        $request,
+                        $response,
+                    );
+            }
+
+            
+
+            if ($statusCode < 200 || $statusCode > 299) {
+                throw new ApiException(
+                    sprintf(
+                        '[%d] Error connecting to the API (%s)',
+                        $statusCode,
+                        (string) $request->getUri()
+                    ),
+                    $statusCode,
+                    $response->getHeaders(),
+                    (string) $response->getBody()
+                );
+            }
+
+            return $this->handleResponseWithDataType(
+                'string',
+                $request,
+                $response,
+            );
+        } catch (ApiException $e) {
+            switch ($e->getCode()) {
+                case 200:
+                    $data = ObjectSerializer::deserialize(
+                        $e->getResponseBody(),
+                        'string',
+                        $e->getResponseHeaders()
+                    );
+                    $e->setResponseObject($data);
+                    throw $e;
+                default:
+                    $data = ObjectSerializer::deserialize(
+                        $e->getResponseBody(),
+                        '\OpenAPI\Client\Model\ErrorData',
+                        $e->getResponseHeaders()
+                    );
+                    $e->setResponseObject($data);
+                    throw $e;
+            }
+        
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Operation getProjectConfigJsBySdkKeyAsync
+     *
+     * Sdk-Key Get Project Config as JavaScript
+     *
+     * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+     * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  string $sdk_key The SDK key used to retrieve the project&#39;s config (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJsBySdkKey'] to see the possible values for this operation
+     *
+     * @throws \InvalidArgumentException
+     * @return \GuzzleHttp\Promise\PromiseInterface
+     */
+    public function getProjectConfigJsBySdkKeyAsync($sdk_key, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJsBySdkKey'][0])
+    {
+        return $this->getProjectConfigJsBySdkKeyAsyncWithHttpInfo($sdk_key, $environment, $_conv_assign, $hostIndex, $variables, $contentType)
+            ->then(
+                function ($response) {
+                    return $response[0];
+                }
+            );
+    }
+
+    /**
+     * Operation getProjectConfigJsBySdkKeyAsyncWithHttpInfo
+     *
+     * Sdk-Key Get Project Config as JavaScript
+     *
+     * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+     * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  string $sdk_key The SDK key used to retrieve the project&#39;s config (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJsBySdkKey'] to see the possible values for this operation
+     *
+     * @throws \InvalidArgumentException
+     * @return \GuzzleHttp\Promise\PromiseInterface
+     */
+    public function getProjectConfigJsBySdkKeyAsyncWithHttpInfo($sdk_key, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJsBySdkKey'][0])
+    {
+        $returnType = 'string';
+        $request = $this->getProjectConfigJsBySdkKeyRequest($sdk_key, $environment, $_conv_assign, $hostIndex, $variables, $contentType);
+
+        return $this->client
+            ->sendAsync($request, $this->createHttpClientOption())
+            ->then(
+                function ($response) use ($returnType) {
+                    if ($returnType === '\SplFileObject') {
+                        $content = $response->getBody(); //stream goes to serializer
+                    } else {
+                        $content = (string) $response->getBody();
+                        if ($returnType !== 'string') {
+                            $content = json_decode($content);
+                        }
+                    }
+
+                    return [
+                        ObjectSerializer::deserialize($content, $returnType, []),
+                        $response->getStatusCode(),
+                        $response->getHeaders()
+                    ];
+                },
+                function ($exception) {
+                    $response = $exception->getResponse();
+                    $statusCode = $response->getStatusCode();
+                    throw new ApiException(
+                        sprintf(
+                            '[%d] Error connecting to the API (%s)',
+                            $statusCode,
+                            $exception->getRequest()->getUri()
+                        ),
+                        $statusCode,
+                        $response->getHeaders(),
+                        (string) $response->getBody()
+                    );
+                }
+            );
+    }
+
+    /**
+     * Create request for operation 'getProjectConfigJsBySdkKey'
+     *
+    * This operation contains host(s) defined in the OpenAPI spec. Use 'hostIndex' to select the host.
+    * if needed, use the 'variables' parameter to pass variables to the host.
+     * URL: https://cdn-4.convertexperiments.com/api/v1
+     * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
+     *
+     * @param  string $sdk_key The SDK key used to retrieve the project&#39;s config (required)
+     * @param  string|null $environment Filter experiences based on environment. (optional)
+     * @param  string|null $_conv_assign Selects the form of the JavaScript body. Only the exact value &#x60;window&#x60; selects the window form. Any other value, an empty value, or no parameter gives the default form. An unrecognized value never causes an error. (optional)
+     * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
+     * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
+     * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getProjectConfigJsBySdkKey'] to see the possible values for this operation
+     *
+     * @throws \InvalidArgumentException
+     * @return \GuzzleHttp\Psr7\Request
+     */
+    public function getProjectConfigJsBySdkKeyRequest($sdk_key, $environment = null, $_conv_assign = null, ?int $hostIndex = null, array $variables = [], string $contentType = self::contentTypes['getProjectConfigJsBySdkKey'][0])
+    {
+
+        // verify the required parameter 'sdk_key' is set
+        if ($sdk_key === null || (is_array($sdk_key) && count($sdk_key) === 0)) {
+            throw new \InvalidArgumentException(
+                'Missing the required parameter $sdk_key when calling getProjectConfigJsBySdkKey'
+            );
+        }
+
+
+
+
+        $resourcePath = '/config-js/{sdk_key}';
+        $formParams = [];
+        $queryParams = [];
+        $headerParams = [];
+        $httpBody = '';
+        $multipart = false;
+
+        // query params
+        $queryParams = array_merge($queryParams, ObjectSerializer::toQueryValue(
+            $environment,
+            'environment', // param base name
+            'string', // openApiType
+            'form', // style
+            true, // explode
+            false // required
+        ) ?? []);
+        // query params
+        $queryParams = array_merge($queryParams, ObjectSerializer::toQueryValue(
+            $_conv_assign,
+            '_conv_assign', // param base name
+            'string', // openApiType
+            'form', // style
+            true, // explode
+            false // required
+        ) ?? []);
+
+
+        // path params
+        if ($sdk_key !== null) {
+            $resourcePath = str_replace(
+                '{' . 'sdk_key' . '}',
+                ObjectSerializer::toPathValue($sdk_key),
+                $resourcePath
+            );
+        }
+
+
+        $headers = $this->headerSelector->selectHeaders(
+            ['application/javascript', 'application/json', ],
+            $contentType,
+            $multipart
+        );
+
+        // for model (json/xml)
+        if (count($formParams) > 0) {
+            if ($multipart) {
+                $multipartContents = [];
+                foreach ($formParams as $formParamName => $formParamValue) {
+                    $formParamValueItems = is_array($formParamValue) ? $formParamValue : [$formParamValue];
+                    foreach ($formParamValueItems as $formParamValueItem) {
+                        $multipartContents[] = [
+                            'name' => $formParamName,
+                            'contents' => $formParamValueItem
+                        ];
+                    }
+                }
+                // for HTTP post (form)
+                $httpBody = new MultipartStream($multipartContents);
+
+            } elseif (stripos($headers['Content-Type'], 'application/json') !== false) {
+                # if Content-Type contains "application/json", json_encode the form parameters
+                $httpBody = \GuzzleHttp\Utils::jsonEncode($formParams);
+            } else {
+                // for HTTP post (form)
+                $httpBody = ObjectSerializer::buildQuery($formParams);
+            }
+        }
+
+        // this endpoint requires API key authentication
+        $apiKey = $this->config->getApiKeyWithPrefix('Authorization');
+        if ($apiKey !== null) {
+            $headers['Authorization'] = $apiKey;
+        }
+        // this endpoint requires API key authentication
+        $apiKey = $this->config->getApiKeyWithPrefix('convert-debug-token');
+        if ($apiKey !== null) {
+            $headers['convert-debug-token'] = $apiKey;
+        }
+
+        $defaultHeaders = [];
+        if ($this->config->getUserAgent()) {
+            $defaultHeaders['User-Agent'] = $this->config->getUserAgent();
+        }
+
+        $headers = array_merge(
+            $defaultHeaders,
+            $headerParams,
+            $headers
+        );
+
+        # Preserve the original behavior of server indexing.
+        if ($hostIndex === null) {
+            $hostIndex = $this->hostIndex;
+        }
+
+        $hostSettings = $this->getHostSettingsForgetProjectConfigJsBySdkKey();
+
+        if ($hostIndex < 0 || $hostIndex >= count($hostSettings)) {
+            throw new \InvalidArgumentException("Invalid index {$hostIndex} when selecting the host. Must be less than ".count($hostSettings));
+        }
+        $operationHost = Configuration::getHostString($hostSettings, $hostIndex, $variables);
+        $query = ObjectSerializer::buildQuery($queryParams);
+        return new Request(
+            'GET',
+            $operationHost . $resourcePath . ($query ? "?{$query}" : ''),
+            $headers,
+            $httpBody
+        );
+    }
+
+    /**
+     * Returns an array of host settings for Operation getProjectConfigJsBySdkKey
+     *
+     * @return array an array of host settings
+     */
+    protected function getHostSettingsForgetProjectConfigJsBySdkKey(): array
     {
         return [
             [
