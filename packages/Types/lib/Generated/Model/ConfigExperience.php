@@ -74,7 +74,8 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
         'integrations' => '\OpenAPI\Client\Model\ConfigExperienceIntegrationsInner[]',
         'environments' => 'string[]',
         'environment' => 'string',
-        'settings' => '\OpenAPI\Client\Model\ConfigExperienceSettings'
+        'settings' => '\OpenAPI\Client\Model\ConfigExperienceSettings',
+        'visitor_insights' => '\OpenAPI\Client\Model\ConfigExperienceVisitorInsights'
     ];
 
     /**
@@ -102,7 +103,8 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
         'integrations' => null,
         'environments' => null,
         'environment' => null,
-        'settings' => null
+        'settings' => null,
+        'visitor_insights' => null
     ];
 
     /**
@@ -113,7 +115,7 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
     protected static array $openAPINullables = [
         'id' => false,
         'name' => false,
-        'key' => false,
+        'key' => true,
         'locations' => true,
         'site_area' => true,
         'audiences' => true,
@@ -128,7 +130,8 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
         'integrations' => false,
         'environments' => false,
         'environment' => false,
-        'settings' => false
+        'settings' => false,
+        'visitor_insights' => true
     ];
 
     /**
@@ -234,7 +237,8 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
         'integrations' => 'integrations',
         'environments' => 'environments',
         'environment' => 'environment',
-        'settings' => 'settings'
+        'settings' => 'settings',
+        'visitor_insights' => 'visitor_insights'
     ];
 
     /**
@@ -260,7 +264,8 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
         'integrations' => 'setIntegrations',
         'environments' => 'setEnvironments',
         'environment' => 'setEnvironment',
-        'settings' => 'setSettings'
+        'settings' => 'setSettings',
+        'visitor_insights' => 'setVisitorInsights'
     ];
 
     /**
@@ -286,7 +291,8 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
         'integrations' => 'getIntegrations',
         'environments' => 'getEnvironments',
         'environment' => 'getEnvironment',
-        'settings' => 'getSettings'
+        'settings' => 'getSettings',
+        'visitor_insights' => 'getVisitorInsights'
     ];
 
     /**
@@ -364,6 +370,7 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('environments', $data ?? [], null);
         $this->setIfExists('environment', $data ?? [], null);
         $this->setIfExists('settings', $data ?? [], null);
+        $this->setIfExists('visitor_insights', $data ?? [], null);
     }
 
     /**
@@ -482,7 +489,14 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
     public function setKey($key)
     {
         if (is_null($key)) {
-            throw new \InvalidArgumentException('non-nullable key cannot be null');
+            array_push($this->openAPINullablesSetToNull, 'key');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('key', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
         }
         $this->container['key'] = $key;
 
@@ -913,6 +927,40 @@ class ConfigExperience implements ModelInterface, ArrayAccess, \JsonSerializable
             throw new \InvalidArgumentException('non-nullable settings cannot be null');
         }
         $this->container['settings'] = $settings;
+
+        return $this;
+    }
+
+    /**
+     * Gets visitor_insights
+     *
+     * @return \OpenAPI\Client\Model\ConfigExperienceVisitorInsights|null
+     */
+    public function getVisitorInsights()
+    {
+        return $this->container['visitor_insights'];
+    }
+
+    /**
+     * Sets visitor_insights
+     *
+     * @param \OpenAPI\Client\Model\ConfigExperienceVisitorInsights|null $visitor_insights visitor_insights
+     *
+     * @return self
+     */
+    public function setVisitorInsights($visitor_insights)
+    {
+        if (is_null($visitor_insights)) {
+            array_push($this->openAPINullablesSetToNull, 'visitor_insights');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('visitor_insights', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
+        }
+        $this->container['visitor_insights'] = $visitor_insights;
 
         return $this;
     }
