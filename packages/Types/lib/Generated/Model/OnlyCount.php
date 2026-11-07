@@ -302,7 +302,7 @@ class OnlyCount implements ModelInterface, ArrayAccess, \JsonSerializable
     /**
      * Sets only_count
      *
-     * @param bool|null $only_count If set to `true` in a list request, the response will only contain the total count of matching items (`extra.pagination.items_count`) and will not include the actual item data. Useful for quickly getting totals without fetching full datasets.
+     * @param bool|null $only_count If set to `true` in a list request, the response is `{\"data\": <count>}`: `data` is the total number of matching items (an integer), with no item data and no `extra` object. Useful for quickly getting totals without fetching full datasets.
      *
      * @return self
      */
