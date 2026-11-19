@@ -60,6 +60,7 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => 'string',
         'name' => 'string',
         'key' => 'string',
+        'always_tracked' => 'bool',
         'type' => 'string',
         'rules' => '\OpenAPI\Client\Model\RuleObject',
         'settings' => '\OpenAPI\Client\Model\SubmitsFormGoalSettings'
@@ -76,6 +77,7 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => null,
         'name' => null,
         'key' => null,
+        'always_tracked' => null,
         'type' => null,
         'rules' => null,
         'settings' => null
@@ -89,7 +91,8 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
     protected static array $openAPINullables = [
         'id' => false,
         'name' => false,
-        'key' => false,
+        'key' => true,
+        'always_tracked' => false,
         'type' => false,
         'rules' => true,
         'settings' => false
@@ -184,6 +187,7 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => 'id',
         'name' => 'name',
         'key' => 'key',
+        'always_tracked' => 'always_tracked',
         'type' => 'type',
         'rules' => 'rules',
         'settings' => 'settings'
@@ -198,6 +202,7 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => 'setId',
         'name' => 'setName',
         'key' => 'setKey',
+        'always_tracked' => 'setAlwaysTracked',
         'type' => 'setType',
         'rules' => 'setRules',
         'settings' => 'setSettings'
@@ -212,6 +217,7 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
         'id' => 'getId',
         'name' => 'getName',
         'key' => 'getKey',
+        'always_tracked' => 'getAlwaysTracked',
         'type' => 'getType',
         'rules' => 'getRules',
         'settings' => 'getSettings'
@@ -290,6 +296,7 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('id', $data ?? [], null);
         $this->setIfExists('name', $data ?? [], null);
         $this->setIfExists('key', $data ?? [], null);
+        $this->setIfExists('always_tracked', $data ?? [], null);
         $this->setIfExists('type', $data ?? [], null);
         $this->setIfExists('rules', $data ?? [], null);
         $this->setIfExists('settings', $data ?? [], null);
@@ -420,9 +427,43 @@ class SubmitsFormGoal implements ModelInterface, ArrayAccess, \JsonSerializable
     public function setKey($key)
     {
         if (is_null($key)) {
-            throw new \InvalidArgumentException('non-nullable key cannot be null');
+            array_push($this->openAPINullablesSetToNull, 'key');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('key', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
         }
         $this->container['key'] = $key;
+
+        return $this;
+    }
+
+    /**
+     * Gets always_tracked
+     *
+     * @return bool|null
+     */
+    public function getAlwaysTracked()
+    {
+        return $this->container['always_tracked'];
+    }
+
+    /**
+     * Sets always_tracked
+     *
+     * @param bool|null $always_tracked Present, and `true`, only when an active metric needs every fire of this goal. Omitted for every other goal, so a config without such goals is unchanged. Treat a missing value as `false`. The tracking script reports every fire of this goal, including a fire made by a visitor who is in no experience.
+     *
+     * @return self
+     */
+    public function setAlwaysTracked($always_tracked)
+    {
+        if (is_null($always_tracked)) {
+            throw new \InvalidArgumentException('non-nullable always_tracked cannot be null');
+        }
+        $this->container['always_tracked'] = $always_tracked;
 
         return $this;
     }

@@ -61,7 +61,10 @@ class VisitorTrackingEventsData implements ModelInterface, ArrayAccess, \JsonSer
         'variationId' => 'string',
         'goalId' => 'string',
         'goalData' => '\OpenAPI\Client\Model\ConversionEventGoalDataInner[]',
-        'bucketingData' => 'array<string,string>'
+        'bucketingData' => 'array<string,string>',
+        'timestamp' => 'int',
+        'sessionId' => 'string',
+        'sessionStart' => 'bool'
     ];
 
     /**
@@ -76,7 +79,10 @@ class VisitorTrackingEventsData implements ModelInterface, ArrayAccess, \JsonSer
         'variationId' => null,
         'goalId' => null,
         'goalData' => null,
-        'bucketingData' => null
+        'bucketingData' => null,
+        'timestamp' => 'int64',
+        'sessionId' => null,
+        'sessionStart' => null
     ];
 
     /**
@@ -89,7 +95,10 @@ class VisitorTrackingEventsData implements ModelInterface, ArrayAccess, \JsonSer
         'variationId' => false,
         'goalId' => false,
         'goalData' => false,
-        'bucketingData' => false
+        'bucketingData' => false,
+        'timestamp' => false,
+        'sessionId' => false,
+        'sessionStart' => false
     ];
 
     /**
@@ -182,7 +191,10 @@ class VisitorTrackingEventsData implements ModelInterface, ArrayAccess, \JsonSer
         'variationId' => 'variationId',
         'goalId' => 'goalId',
         'goalData' => 'goalData',
-        'bucketingData' => 'bucketingData'
+        'bucketingData' => 'bucketingData',
+        'timestamp' => 'timestamp',
+        'sessionId' => 'sessionId',
+        'sessionStart' => 'sessionStart'
     ];
 
     /**
@@ -195,7 +207,10 @@ class VisitorTrackingEventsData implements ModelInterface, ArrayAccess, \JsonSer
         'variationId' => 'setVariationId',
         'goalId' => 'setGoalId',
         'goalData' => 'setGoalData',
-        'bucketingData' => 'setBucketingData'
+        'bucketingData' => 'setBucketingData',
+        'timestamp' => 'setTimestamp',
+        'sessionId' => 'setSessionId',
+        'sessionStart' => 'setSessionStart'
     ];
 
     /**
@@ -208,7 +223,10 @@ class VisitorTrackingEventsData implements ModelInterface, ArrayAccess, \JsonSer
         'variationId' => 'getVariationId',
         'goalId' => 'getGoalId',
         'goalData' => 'getGoalData',
-        'bucketingData' => 'getBucketingData'
+        'bucketingData' => 'getBucketingData',
+        'timestamp' => 'getTimestamp',
+        'sessionId' => 'getSessionId',
+        'sessionStart' => 'getSessionStart'
     ];
 
     /**
@@ -273,6 +291,9 @@ class VisitorTrackingEventsData implements ModelInterface, ArrayAccess, \JsonSer
         $this->setIfExists('goalId', $data ?? [], null);
         $this->setIfExists('goalData', $data ?? [], null);
         $this->setIfExists('bucketingData', $data ?? [], null);
+        $this->setIfExists('timestamp', $data ?? [], null);
+        $this->setIfExists('sessionId', $data ?? [], null);
+        $this->setIfExists('sessionStart', $data ?? [], null);
     }
 
     /**
@@ -311,6 +332,18 @@ class VisitorTrackingEventsData implements ModelInterface, ArrayAccess, \JsonSer
         if ($this->container['goalId'] === null) {
             $invalidProperties[] = "'goal_id' can't be null";
         }
+        if (!is_null($this->container['timestamp']) && ($this->container['timestamp'] < 0)) {
+            $invalidProperties[] = "invalid value for 'timestamp', must be bigger than or equal to 0.";
+        }
+
+        if (!is_null($this->container['sessionId']) && (mb_strlen($this->container['sessionId']) > 64)) {
+            $invalidProperties[] = "invalid value for 'session_id', the character length must be smaller than or equal to 64.";
+        }
+
+        if (!is_null($this->container['sessionId']) && !preg_match("/^[0-9A-Za-z._-]+$/", $this->container['sessionId'])) {
+            $invalidProperties[] = "invalid value for 'session_id', must be conform to the pattern /^[0-9A-Za-z._-]+$/.";
+        }
+
         return $invalidProperties;
     }
 
@@ -457,6 +490,99 @@ class VisitorTrackingEventsData implements ModelInterface, ArrayAccess, \JsonSer
             throw new \InvalidArgumentException('non-nullable bucketing_data cannot be null');
         }
         $this->container['bucketingData'] = $bucketing_data;
+
+        return $this;
+    }
+
+    /**
+     * Gets timestamp
+     *
+     * @return int|null
+     */
+    public function getTimestamp()
+    {
+        return $this->container['timestamp'];
+    }
+
+    /**
+     * Sets timestamp
+     *
+     * @param int|null $timestamp Unix time in seconds at which the client enqueued the event
+     *
+     * @return self
+     */
+    public function setTimestamp($timestamp)
+    {
+        if (is_null($timestamp)) {
+            throw new \InvalidArgumentException('non-nullable timestamp cannot be null');
+        }
+
+        if (($timestamp < 0)) {
+            throw new \InvalidArgumentException('invalid value for $timestamp when calling VisitorTrackingEventsData., must be bigger than or equal to 0.');
+        }
+
+        $this->container['timestamp'] = $timestamp;
+
+        return $this;
+    }
+
+    /**
+     * Gets session_id
+     *
+     * @return string|null
+     */
+    public function getSessionId()
+    {
+        return $this->container['sessionId'];
+    }
+
+    /**
+     * Sets session_id
+     *
+     * @param string|null $session_id ID of the visitor's session. Only 0-9, a-z, A-Z, ., - and _ are allowed, up to 64 characters. The endpoint treats a value that starts with `fb-` as absent.
+     *
+     * @return self
+     */
+    public function setSessionId($session_id)
+    {
+        if (is_null($session_id)) {
+            throw new \InvalidArgumentException('non-nullable session_id cannot be null');
+        }
+        if ((mb_strlen($session_id) > 64)) {
+            throw new \InvalidArgumentException('invalid length for $session_id when calling VisitorTrackingEventsData., must be smaller than or equal to 64.');
+        }
+        if ((!preg_match("/^[0-9A-Za-z._-]+$/", ObjectSerializer::toString($session_id)))) {
+            throw new \InvalidArgumentException("invalid value for \$session_id when calling VisitorTrackingEventsData., must conform to the pattern /^[0-9A-Za-z._-]+$/.");
+        }
+
+        $this->container['sessionId'] = $session_id;
+
+        return $this;
+    }
+
+    /**
+     * Gets session_start
+     *
+     * @return bool|null
+     */
+    public function getSessionStart()
+    {
+        return $this->container['sessionStart'];
+    }
+
+    /**
+     * Sets session_start
+     *
+     * @param bool|null $session_start Whether this event starts the session. The endpoint reads it only when a `sessionId` is sent.
+     *
+     * @return self
+     */
+    public function setSessionStart($session_start)
+    {
+        if (is_null($session_start)) {
+            throw new \InvalidArgumentException('non-nullable session_start cannot be null');
+        }
+        $this->container['sessionStart'] = $session_start;
 
         return $this;
     }

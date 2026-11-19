@@ -237,6 +237,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
 
     public const EVENT_TYPE_BUCKETING = 'bucketing';
     public const EVENT_TYPE_CONVERSION = 'conversion';
+    public const EVENT_TYPE_SEEN = 'seen';
 
     /**
      * Gets allowable values of the enum
@@ -248,6 +249,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
         return [
             self::EVENT_TYPE_BUCKETING,
             self::EVENT_TYPE_CONVERSION,
+            self::EVENT_TYPE_SEEN,
         ];
     }
 
@@ -334,7 +336,7 @@ class VisitorTrackingEvents implements ModelInterface, ArrayAccess, \JsonSeriali
     /**
      * Sets event_type
      *
-     * @param string|null $event_type Type of the event. It can be a bucketing or a conversion event
+     * @param string|null $event_type Type of the event. It can be a bucketing, a conversion or a seen event
      *
      * @return self
      */

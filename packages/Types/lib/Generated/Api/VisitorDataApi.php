@@ -140,7 +140,7 @@ class VisitorDataApi
      *
      * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
      * @param  int $project_id ID of the project to be retrieved (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorData'] to see the possible values for this operation
@@ -167,7 +167,7 @@ class VisitorDataApi
      *
      * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
      * @param  int $project_id ID of the project to be retrieved (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorData'] to see the possible values for this operation
@@ -275,7 +275,7 @@ class VisitorDataApi
      *
      * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
      * @param  int $project_id ID of the project to be retrieved (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorData'] to see the possible values for this operation
@@ -305,7 +305,7 @@ class VisitorDataApi
      *
      * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
      * @param  int $project_id ID of the project to be retrieved (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorData'] to see the possible values for this operation
@@ -364,7 +364,7 @@ class VisitorDataApi
      *
      * @param  int $account_id ID of the account that owns the retrieved/saved data (required)
      * @param  int $project_id ID of the project to be retrieved (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorData'] to see the possible values for this operation
@@ -404,15 +404,6 @@ class VisitorDataApi
         $httpBody = '';
         $multipart = false;
 
-        // query params
-        $queryParams = array_merge($queryParams, ObjectSerializer::toQueryValue(
-            $visitor_id,
-            'visitor_id', // param base name
-            'string', // openApiType
-            'form', // style
-            true, // explode
-            true // required
-        ) ?? []);
 
 
         // path params
@@ -428,6 +419,14 @@ class VisitorDataApi
             $resourcePath = str_replace(
                 '{' . 'project_id' . '}',
                 ObjectSerializer::toPathValue($project_id),
+                $resourcePath
+            );
+        }
+        // path params
+        if ($visitor_id !== null) {
+            $resourcePath = str_replace(
+                '{' . 'visitor_id' . '}',
+                ObjectSerializer::toPathValue($visitor_id),
                 $resourcePath
             );
         }
@@ -526,7 +525,7 @@ class VisitorDataApi
      * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
      *
      * @param  string $sdk_key The SDK key used to retrieve the project&#39;s visitor data (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorDataBySdkKey'] to see the possible values for this operation
@@ -552,7 +551,7 @@ class VisitorDataApi
      * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
      *
      * @param  string $sdk_key The SDK key used to retrieve the project&#39;s visitor data (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorDataBySdkKey'] to see the possible values for this operation
@@ -659,7 +658,7 @@ class VisitorDataApi
      * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
      *
      * @param  string $sdk_key The SDK key used to retrieve the project&#39;s visitor data (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorDataBySdkKey'] to see the possible values for this operation
@@ -688,7 +687,7 @@ class VisitorDataApi
      * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
      *
      * @param  string $sdk_key The SDK key used to retrieve the project&#39;s visitor data (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorDataBySdkKey'] to see the possible values for this operation
@@ -746,7 +745,7 @@ class VisitorDataApi
      * URL: https://cdn-provider-dev.convertexperiments.com/api/v1
      *
      * @param  string $sdk_key The SDK key used to retrieve the project&#39;s visitor data (required)
-     * @param  string $visitor_id ID of the visitor to be retrieved (required)
+     * @param  string $visitor_id ID of the visitor to be retrieved. Use the same visitor ID sent to the tracking endpoints. They accept only 0-9, a-z, A-Z, ., - and _. Keep it to 64 characters or fewer. (required)
      * @param  null|int $hostIndex Host index. Defaults to null. If null, then the library will use $this->hostIndex instead
      * @param  array $variables Associative array of variables to pass to the host. Defaults to empty array.
      * @param  string $contentType The value for the Content-Type header. Check self::contentTypes['getVisitorDataBySdkKey'] to see the possible values for this operation
@@ -779,15 +778,6 @@ class VisitorDataApi
         $httpBody = '';
         $multipart = false;
 
-        // query params
-        $queryParams = array_merge($queryParams, ObjectSerializer::toQueryValue(
-            $visitor_id,
-            'visitor_id', // param base name
-            'string', // openApiType
-            'form', // style
-            true, // explode
-            true // required
-        ) ?? []);
 
 
         // path params
@@ -795,6 +785,14 @@ class VisitorDataApi
             $resourcePath = str_replace(
                 '{' . 'sdk_key' . '}',
                 ObjectSerializer::toPathValue($sdk_key),
+                $resourcePath
+            );
+        }
+        // path params
+        if ($visitor_id !== null) {
+            $resourcePath = str_replace(
+                '{' . 'visitor_id' . '}',
+                ObjectSerializer::toPathValue($visitor_id),
                 $resourcePath
             );
         }
