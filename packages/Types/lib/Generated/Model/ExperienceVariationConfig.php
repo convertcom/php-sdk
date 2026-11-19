@@ -90,7 +90,7 @@ class ExperienceVariationConfig implements ModelInterface, ArrayAccess, \JsonSer
     protected static array $openAPINullables = [
         'id' => false,
         'name' => false,
-        'key' => false,
+        'key' => true,
         'traffic_allocation' => false,
         'status' => false,
         'changes' => false
@@ -407,7 +407,14 @@ class ExperienceVariationConfig implements ModelInterface, ArrayAccess, \JsonSer
     public function setKey($key)
     {
         if (is_null($key)) {
-            throw new \InvalidArgumentException('non-nullable key cannot be null');
+            array_push($this->openAPINullablesSetToNull, 'key');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('key', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
         }
         $this->container['key'] = $key;
 
